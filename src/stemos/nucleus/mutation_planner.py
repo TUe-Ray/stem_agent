@@ -46,10 +46,12 @@ class MutationPlanner:
             response_schema=MutationPlan.model_json_schema(),
         )
         if isinstance(result, dict) and "mutation_plan" in result:
+            self.model_client.record_structured_output_repair()
             result = result["mutation_plan"]
         try:
             return MutationPlan.model_validate(result)
         except Exception:
+            self.model_client.record_structured_output_repair()
             return self._deterministic_plan(
                 scenario=scenario,
                 genome=genome,

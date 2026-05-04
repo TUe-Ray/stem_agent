@@ -9,6 +9,7 @@ import yaml
 
 from stemos.evolution.control import EvolutionControl
 from stemos.evolution.loop import EvolutionLoop
+from stemos.evolution.visuals import VisualizationBuilder
 from stemos.genome.loader import load_genome
 from stemos.harness.builder import HarnessBuilder
 from stemos.harness.runner import HarnessRunner
@@ -146,6 +147,20 @@ def compare(run_path: Path) -> None:
         typer.echo("\n".join(f"  - {item}" for item in promoted) or "  - None")
         typer.echo("Rejected or rolled back mutations:")
         typer.echo("\n".join(f"  - {item}" for item in rejected) or "  - None")
+
+
+@app.command()
+def visualize(run_path: Path) -> None:
+    paths = VisualizationBuilder().visualize(run_path, update_report=True)
+    typer.echo(f"Visuals written to {run_path / 'visuals'}")
+    for path in paths:
+        typer.echo(f"- {path}")
+
+
+@app.command()
+def aggregate(run_paths: list[Path]) -> None:
+    path = VisualizationBuilder().aggregate(run_paths)
+    typer.echo(f"Aggregate report: {path}")
 
 
 @app.command()

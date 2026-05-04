@@ -145,6 +145,8 @@ The run writes:
 ```bash
 stemos inspect runs/demo_001
 stemos compare runs/demo_001
+stemos visualize runs/demo_001
+stemos aggregate runs/openai_001 runs/openai_002 runs/openai_003
 ```
 
 `report.md` includes:
@@ -156,6 +158,11 @@ stemos compare runs/demo_001
 - frozen genome path
 - before/after comparison
 - lineage narrative explaining how the harness differentiated
+- Mermaid evolution timeline and before/after harness graph
+- Guardian selection board
+- OpenAI run metadata without API keys
+
+`stemos visualize` writes reviewer-facing files under `runs/<run_id>/visuals/`, including `evolution_timeline.md`, `organism_shape.md`, `harness_before_after.md`, `guardian_selection_board.md`, `output_comparison.md`, and an optional `visual_report.html`.
 
 ## Safe Stop Controls
 

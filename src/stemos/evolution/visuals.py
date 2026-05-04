@@ -1,0 +1,522 @@
+from __future__ import annotations
+
+import html
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from stemos.genome.loader import load_genome
+from stemos.genome.models import Genome
+from stemos.harness.builder import HarnessBuilder
+from stemos.harness.runner import HarnessRunner
+from stemos.kernel.evaluator import GuardianFitnessEvaluator
+from stemos.scenarios.loader import load_scenario
+from stemos.scenarios.schema import Scenario, TaskCase
+
+
+VISUALS_START = "<!-- STEMOS_VISUALS_START -->"
+VISUALS_END = "<!-- STEMOS_VISUALS_END -->"
+
+
+@dataclass
+class RunArtifacts:
+    run_dir: Path
+    baseline_genome: Genome
+    frozen_genome: Genome
+    baseline_eval: dict[str, Any]
+    final_eval: dict[str, Any]
+    lineage: list[dict[str, Any]]
+    scenario: Scenario
+    config: dict[str, Any]
+    metadata: dict[str, Any]
+
+
+class VisualizationBuilder:
+    """Generate reviewer-facing evolution visuals from run artifacts."""
+
+    def visualize(self, run_dir: str | Path, *, update_report: bool = True) -> list[Path]:
+        artifacts = self._load_artifacts(Path(run_dir))
+        visuals_dir = artifacts.run_dir / "visuals"
+        visuals_dir.mkdir(parents=True, exist_ok=True)
+
+        files = {
+            "evolution_timeline.md": self.evolution_timeline(artifacts),
+            "organism_shape.md": self.organism_shape(artifacts),
+            "harness_before_after.md": self.harness_before_after(artifacts),
+            "guardian_selection_board.md": self.guardian_selection_board(artifacts),
+            "output_comparison.md": self.output_comparison(artifacts),
+            "visual_report.html": self.visual_report_html(artifacts),
+        }
+        paths: list[Path] = []
+        for name, content in files.items():
+            path = visuals_dir / name
+            path.write_text(content, encoding="utf-8")
+            paths.append(path)
+
+        if update_report:
+            self.embed_in_report(artifacts.run_dir, self.report_visual_block(artifacts))
+        return paths
+
+    def report_visual_block(self, artifacts: RunArtifacts) -> str:
+        sections = [
+            VISUALS_START,
+            "## Visual Overview",
+            "",
+            self.openai_run_metadata(artifacts),
+            "",
+            self.evolution_timeline(artifacts),
+            "",
+            self.organism_shape(artifacts),
+            "",
+            self.harness_before_after(artifacts),
+            "",
+            self.guardian_selection_board(artifacts),
+            "",
+            self.not_subagent_explanation(),
+            "",
+            VISUALS_END,
+        ]
+        return "\n".join(sections).rstrip() + "\n"
+
+    def embed_in_report(self, run_dir: Path, block: str) -> None:
+        report_path = run_dir / "report.md"
+        if report_path.exists():
+            report = report_path.read_text(encoding="utf-8")
+        else:
+            report = "# StemOS Evolution Report\n"
+
+        pattern = re.compile(
+            rf"\n?{re.escape(VISUALS_START)}.*?{re.escape(VISUALS_END)}\n?",
+            re.DOTALL,
+        )
+        report = pattern.sub("\n", report).rstrip()
+        report_path.write_text(report + "\n\n" + block, encoding="utf-8")
+
+    def evolution_timeline(self, artifacts: RunArtifacts) -> str:
+        nodes = [
+            '  G0["G0 stem seed<br/>score '
+            + self._score(artifacts.baseline_eval)
+            + '"]'
+        ]
+        edges: list[str] = []
+        current = "G0"
+        promoted_index = 1
+        rejected_index = 0
+
+        for event in artifacts.lineage:
+            kind = event.get("event")
+            if kind == "mutation_promoted":
+                node_id = f"G{promoted_index}"
+                label = self._mutation_label(event)
+                nodes.append(
+                    f'  {node_id}["{label}<br/>score {event.get("score_after", "?")}"]'
+                )
+                edges.append(f"  {current} --> {node_id}")
+                current = node_id
+                promoted_index += 1
+            elif kind in {"mutation_rejected", "mutation_rolled_back"}:
+                node_id = f"R{rejected_index}"
+                label = self._mutation_label(event)
+                reason = self._truncate(str(event.get("reason", kind)), 44)
+                nodes.append(f'  {node_id}["{label}<br/>{reason}"]')
+                edges.append(f"  {current} -.-> {node_id}")
+                rejected_index += 1
+
+        nodes.append(
+            '  F["frozen specialized harness<br/>score '
+            + self._score(artifacts.final_eval)
+            + '"]'
+        )
+        edges.append(f"  {current} --> F")
+
+        class_lines = [
+            "  classDef rejected stroke:#d33,color:#b11,stroke-dasharray: 5 5;",
+        ]
+        if rejected_index:
+            class_lines.append(
+                "  class " + ",".join(f"R{index}" for index in range(rejected_index)) + " rejected;"
+            )
+
+        return "\n".join(
+            [
+                "## Evolution Timeline",
+                "",
+                "```mermaid",
+                "flowchart LR",
+                *nodes,
+                *edges,
+                *class_lines,
+                "```",
+            ]
+        )
+
+    def organism_shape(self, artifacts: RunArtifacts) -> str:
+        accepted_tools = len(artifacts.frozen_genome.tools.get("generated", []) or [])
+        rejected_tools = sum(
+            1
+            for event in artifacts.lineage
+            if event.get("event") == "mutation_rejected"
+            and event.get("mutation_type") == "create_tool"
+        )
+        rows = [
+            ("Roles", len(artifacts.baseline_genome.roles), len(artifacts.frozen_genome.roles)),
+            (
+                "Workflow steps",
+                len(artifacts.baseline_genome.workflow),
+                len(artifacts.frozen_genome.workflow),
+            ),
+            (
+                "Self-evaluation",
+                self._enabled(artifacts.baseline_genome),
+                self._enabled(artifacts.frozen_genome),
+            ),
+            (
+                "Quality gates",
+                len(artifacts.baseline_genome.quality_gates),
+                len(artifacts.frozen_genome.quality_gates),
+            ),
+            (
+                "Generated tools",
+                len(artifacts.baseline_genome.tools.get("generated", []) or []),
+                f"{accepted_tools} accepted, {rejected_tools} rejected",
+            ),
+            (
+                "Environment artifacts",
+                len(artifacts.baseline_genome.environment.required_artifacts),
+                len(artifacts.frozen_genome.environment.required_artifacts),
+            ),
+            ("Score", self._score(artifacts.baseline_eval), self._score(artifacts.final_eval)),
+        ]
+        table = ["| Shape signal | Initial organism | Final organism |", "|---|---:|---:|"]
+        table.extend(f"| {name} | {before} | {after} |" for name, before, after in rows)
+        return "\n".join(["## Initial vs Final Organism", "", *table])
+
+    def harness_before_after(self, artifacts: RunArtifacts) -> str:
+        baseline = self._workflow_chain("B", artifacts.baseline_genome, include_organs=False)
+        frozen = self._workflow_chain("F", artifacts.frozen_genome, include_organs=True)
+        return "\n".join(
+            [
+                "## Harness Before/After Graph",
+                "",
+                "```mermaid",
+                "flowchart LR",
+                '  subgraph Baseline["Baseline harness"]',
+                *baseline,
+                "  end",
+                '  subgraph Frozen["Frozen harness"]',
+                *frozen,
+                "  end",
+                "```",
+            ]
+        )
+
+    def guardian_selection_board(self, artifacts: RunArtifacts) -> str:
+        rows = [
+            "| Generation | Mutation | Type | Decision | Score before | Score after | Guardian reason |",
+            "|---:|---|---|---|---:|---:|---|",
+        ]
+        for event in artifacts.lineage:
+            if event.get("event") not in {
+                "mutation_promoted",
+                "mutation_rejected",
+                "mutation_rolled_back",
+            }:
+                continue
+            decision = {
+                "mutation_promoted": "promoted",
+                "mutation_rejected": "rejected",
+                "mutation_rolled_back": "rolled back",
+            }[str(event["event"])]
+            reason = event.get("reason")
+            if not reason and decision == "promoted":
+                reason = "fitness improved"
+            rows.append(
+                "| {generation} | {target} | {mutation_type} | {decision} | {before} | {after} | {reason} |".format(
+                    generation=event.get("generation", ""),
+                    target=self._escape_table(str(event.get("target", ""))),
+                    mutation_type=self._escape_table(str(event.get("mutation_type", ""))),
+                    decision=decision,
+                    before=event.get("score_before", ""),
+                    after=event.get("score_after", ""),
+                    reason=self._escape_table(str(reason or "")),
+                )
+            )
+        return "\n".join(["## Guardian Selection Board", "", *rows])
+
+    def output_comparison(self, artifacts: RunArtifacts) -> str:
+        sample_input = self._sample_input(artifacts)
+        baseline_output = self._run_output(
+            artifacts.baseline_genome,
+            artifacts.scenario,
+            artifacts.run_dir / "visuals" / "baseline_workspace",
+            sample_input,
+        )
+        evolved_output = self._run_output(
+            artifacts.frozen_genome,
+            artifacts.scenario,
+            artifacts.run_dir / "visuals" / "frozen_workspace",
+            sample_input,
+        )
+        evaluator = GuardianFitnessEvaluator()
+        checklist = ["| Requirement | Baseline | Evolved |", "|---|---:|---:|"]
+        for requirement in artifacts.scenario.expected_output.requirements:
+            baseline_ok = evaluator._requirement_satisfied(requirement, baseline_output)
+            evolved_ok = evaluator._requirement_satisfied(requirement, evolved_output)
+            checklist.append(
+                f"| {self._escape_table(requirement)} | {self._mark(baseline_ok)} | {self._mark(evolved_ok)} |"
+            )
+
+        return "\n".join(
+            [
+                "## Before/After Output Comparison",
+                "",
+                f"Sample input: `{sample_input}`",
+                "",
+                "### Requirement Coverage Checklist",
+                *checklist,
+                "",
+                "### Baseline Output",
+                "",
+                "```markdown",
+                baseline_output.strip(),
+                "```",
+                "",
+                "### Evolved Output",
+                "",
+                "```markdown",
+                evolved_output.strip(),
+                "```",
+            ]
+        )
+
+    def not_subagent_explanation(self) -> str:
+        return "\n".join(
+            [
+                "## Why This Is Not Predefined Subagent Orchestration",
+                "",
+                "Roles are not predefined subagents. They are phenotypic structures that survive only if Guardian fitness improves. In this run, a redundant role was rolled back, while workflow/tool/gate organs survived.",
+            ]
+        )
+
+    def openai_run_metadata(self, artifacts: RunArtifacts) -> str:
+        metadata = artifacts.metadata or self._infer_metadata(artifacts)
+        rows = [
+            ("run mode", metadata.get("run_mode", "not recorded")),
+            ("model", metadata.get("model", "not recorded")),
+            ("endpoint", metadata.get("endpoint", "not recorded")),
+            ("offline_mode", metadata.get("offline_mode", "not recorded")),
+            ("fallback_used", metadata.get("fallback_used", "not recorded")),
+            ("model calls", metadata.get("model_calls", "not recorded")),
+            (
+                "structured output repairs",
+                metadata.get("structured_output_repairs", "not recorded"),
+            ),
+            ("total estimated cost", metadata.get("total_estimated_cost", "not recorded")),
+        ]
+        lines = ["## OpenAI Run Metadata", "", "| Field | Value |", "|---|---|"]
+        lines.extend(f"| {field} | {self._escape_table(str(value))} |" for field, value in rows)
+        return "\n".join(lines)
+
+    def visual_report_html(self, artifacts: RunArtifacts) -> str:
+        markdown = "\n\n".join(
+            [
+                self.evolution_timeline(artifacts),
+                self.organism_shape(artifacts),
+                self.harness_before_after(artifacts),
+                self.guardian_selection_board(artifacts),
+                self.output_comparison(artifacts),
+                self.not_subagent_explanation(),
+                self.openai_run_metadata(artifacts),
+            ]
+        )
+        return (
+            "<!doctype html><html><head><meta charset=\"utf-8\">"
+            "<title>StemOS Visual Report</title>"
+            "<style>body{font-family:system-ui,sans-serif;max-width:980px;margin:40px auto;line-height:1.5}"
+            "pre,code{background:#f6f8fa;padding:2px 4px}pre{padding:12px;overflow:auto}"
+            "table{border-collapse:collapse}td,th{border:1px solid #d0d7de;padding:6px 8px}</style>"
+            "</head><body><pre>"
+            + html.escape(markdown)
+            + "</pre></body></html>"
+        )
+
+    def aggregate(self, run_dirs: list[str | Path], output_path: Path | None = None) -> Path:
+        rows = [
+            "| Run | Baseline | Final | Improvement | Promoted | Rejected/Rolled Back | Final organism shape |",
+            "|---|---:|---:|---:|---:|---:|---|",
+        ]
+        for item in run_dirs:
+            artifacts = self._load_artifacts(Path(item))
+            baseline = float(artifacts.baseline_eval.get("promotion_score", 0.0))
+            final = float(artifacts.final_eval.get("promotion_score", 0.0))
+            promoted = sum(1 for event in artifacts.lineage if event.get("event") == "mutation_promoted")
+            rejected = sum(
+                1
+                for event in artifacts.lineage
+                if event.get("event") in {"mutation_rejected", "mutation_rolled_back"}
+            )
+            shape = (
+                f"{len(artifacts.frozen_genome.roles)} roles, "
+                f"{len(artifacts.frozen_genome.workflow)} steps, "
+                f"{len(artifacts.frozen_genome.quality_gates)} gates, "
+                f"{len(artifacts.frozen_genome.tools.get('generated', []) or [])} generated tools, "
+                f"{len(artifacts.frozen_genome.environment.required_artifacts)} artifacts"
+            )
+            rows.append(
+                f"| {self._escape_table(str(artifacts.run_dir))} | {baseline:.4f} | {final:.4f} | {final - baseline:.4f} | {promoted} | {rejected} | {shape} |"
+            )
+        content = "\n".join(["# StemOS Aggregate Run Report", "", *rows, ""])
+        path = output_path or Path("runs") / "aggregate_report.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        return path
+
+    def _load_artifacts(self, run_dir: Path) -> RunArtifacts:
+        baseline_genome = load_genome(run_dir / "baseline_genome.yaml")
+        frozen_genome = load_genome(run_dir / "frozen_genome.yaml")
+        baseline_eval = self._read_json(run_dir / "generation_000" / "eval_result.json")
+        final_eval = self._read_json(run_dir / "final_evaluation" / "eval_result.json")
+        lineage = self._read_lineage(run_dir / "lineage.jsonl")
+        config = self._read_yaml(run_dir / "config_snapshot.yaml")
+        metadata = self._read_json(run_dir / "run_metadata.json", missing_ok=True)
+        scenario_path = Path(config.get("scenario_path", "scenarios/toy_structured_answer"))
+        scenario = load_scenario(scenario_path).scenario
+        return RunArtifacts(
+            run_dir=run_dir,
+            baseline_genome=baseline_genome,
+            frozen_genome=frozen_genome,
+            baseline_eval=baseline_eval,
+            final_eval=final_eval,
+            lineage=lineage,
+            scenario=scenario,
+            config=config,
+            metadata=metadata,
+        )
+
+    def _workflow_chain(
+        self, prefix: str, genome: Genome, *, include_organs: bool
+    ) -> list[str]:
+        lines = [f'    {prefix}Input["user input"]']
+        previous = f"{prefix}Input"
+        for index, step in enumerate(genome.workflow):
+            node = f"{prefix}S{index}"
+            lines.append(f'    {node}["{step.id}"]')
+            lines.append(f"    {previous} --> {node}")
+            previous = node
+        if include_organs and genome.quality_gates:
+            lines.append(f'    {prefix}Gate["quality gate"]')
+            lines.append(f"    {previous} --> {prefix}Gate")
+            previous = f"{prefix}Gate"
+        if include_organs and genome.tools.get("generated"):
+            lines.append(f'    {prefix}Tool["checker tool"]')
+            lines.append(f"    {previous} --> {prefix}Tool")
+            previous = f"{prefix}Tool"
+        lines.append(f'    {prefix}Out["final output"]')
+        lines.append(f"    {previous} --> {prefix}Out")
+        return lines
+
+    def _run_output(
+        self, genome: Genome, scenario: Scenario, workspace: Path, sample_input: str
+    ) -> str:
+        harness = HarnessBuilder().materialize(genome, scenario, workspace_dir=workspace)
+        result = HarnessRunner().run_case(
+            harness,
+            TaskCase(id="visual_sample", input={"user_request": sample_input}),
+        )
+        return result.final_output
+
+    def _sample_input(self, artifacts: RunArtifacts) -> str:
+        for case in artifacts.config.get("validation_cases", []):
+            value = case.get("input", {}).get("user_request")
+            if value:
+                return str(value)
+        return "Help me plan a focused workday."
+
+    def _infer_metadata(self, artifacts: RunArtifacts) -> dict[str, Any]:
+        settings = artifacts.config.get("settings", {}) or {}
+        offline_mode = settings.get("offline_mode", "not recorded")
+        model_calls = sum(1 for event in artifacts.lineage if event.get("event") == "mutation_plan")
+        if offline_mode is False:
+            model_calls += 1
+        repairs = 0
+        if offline_mode is False:
+            repairs = sum(
+                1
+                for event in artifacts.lineage
+                if event.get("event") == "mutation_plan"
+                and "Offline deterministic" in str(event.get("summary", ""))
+            )
+        endpoint = settings.get("openai_endpoint")
+        if not endpoint and offline_mode is False:
+            endpoint = "not recorded"
+        return {
+            "run_mode": "offline deterministic" if offline_mode else "openai-backed",
+            "model": settings.get("model", "not recorded"),
+            "endpoint": endpoint or "not recorded",
+            "offline_mode": offline_mode,
+            "fallback_used": "not recorded",
+            "model_calls": model_calls if offline_mode is False else 0,
+            "structured_output_repairs": repairs,
+            "total_estimated_cost": artifacts.final_eval.get("cost_estimate", "not recorded"),
+        }
+
+    def _mutation_label(self, event: dict[str, Any]) -> str:
+        mutation_type = str(event.get("mutation_type", "mutation"))
+        rationale = str(event.get("rationale", ""))
+        if mutation_type == "modify_self_evaluation":
+            return "self-eval"
+        if mutation_type == "modify_environment":
+            return "environment"
+        if mutation_type == "add_quality_gate":
+            return "quality gate"
+        if mutation_type == "create_tool":
+            return "safe tool" if event.get("event") == "mutation_promoted" else "tool rejected"
+        if mutation_type == "add_role":
+            return "role organ"
+        if mutation_type == "add_workflow_step" and any(
+            token in rationale.lower() for token in ["revise", "affect", "delivered"]
+        ):
+            return "revise workflow"
+        if mutation_type == "add_workflow_step" and "review" in rationale.lower():
+            return "review workflow"
+        return mutation_type.replace("_", " ")
+
+    def _score(self, data: dict[str, Any]) -> str:
+        value = data.get("promotion_score", data.get("score", 0.0))
+        return f"{float(value):.4f}"
+
+    def _enabled(self, genome: Genome) -> str:
+        return "enabled" if genome.self_evaluation.get("enabled") else "disabled"
+
+    def _mark(self, value: bool) -> str:
+        return "yes" if value else "no"
+
+    def _escape_table(self, value: str) -> str:
+        return value.replace("|", "\\|").replace("\n", "<br/>")
+
+    def _truncate(self, value: str, length: int) -> str:
+        value = value.replace("\n", " ")
+        if len(value) <= length:
+            return value
+        return value[: length - 3] + "..."
+
+    def _read_json(self, path: Path, *, missing_ok: bool = False) -> dict[str, Any]:
+        if missing_ok and not path.exists():
+            return {}
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def _read_yaml(self, path: Path) -> dict[str, Any]:
+        if not path.exists():
+            return {}
+        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+    def _read_lineage(self, path: Path) -> list[dict[str, Any]]:
+        return [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]

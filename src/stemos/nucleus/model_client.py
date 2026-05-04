@@ -29,6 +29,9 @@ class ModelClient:
         self.model = model
         self.offline = offline
         self.endpoint = endpoint or os.getenv("STEMOS_OPENAI_ENDPOINT", "auto")
+        self.model_calls = 0
+        self.fallback_used = False
+        self.structured_output_repairs = 0
 
     def call(
         self,
@@ -40,7 +43,11 @@ class ModelClient:
     ) -> str | dict[str, Any]:
         if self.offline or not os.getenv("OPENAI_API_KEY"):
             return self._offline_response(prompt, response_schema, context or {})
+        self.model_calls += 1
         return self._openai_response(prompt, response_schema, context or {}, tools or [])
+
+    def record_structured_output_repair(self) -> None:
+        self.structured_output_repairs += 1
 
     def _offline_response(
         self,
@@ -77,6 +84,7 @@ class ModelClient:
         except Exception as exc:
             if self.endpoint == "responses" or not self._is_responses_scope_error(exc):
                 raise
+            self.fallback_used = True
             return self._chat_completions_response(client, prompt, response_schema)
 
     def _responses_response(

@@ -48,7 +48,12 @@ class EvolutionLoop:
         runs_root: str | Path = "runs",
     ):
         self.settings = settings or load_settings()
-        model_client = ModelClient(model=self.settings.model, offline=self.settings.offline_mode)
+        model_client = ModelClient(
+            model=self.settings.model,
+            offline=self.settings.offline_mode,
+            endpoint=self.settings.openai_endpoint,
+        )
+        self.model_client = model_client
         self.nucleus = NucleusCommander(
             scenario_interpreter=ScenarioInterpreter(model_client),
             failure_analyzer=FailureAnalyzer(),
@@ -582,6 +587,7 @@ class EvolutionLoop:
         final_dir.mkdir(exist_ok=True)
         final_result = self._run_and_evaluate(best_genome, bundle, final_dir, "frozen")
         self._write_json(final_dir / "eval_result.json", final_result.model_dump(mode="json"))
+        self._write_json(run_dir / "run_metadata.json", self._run_metadata(final_result))
         lineage.record_freeze(
             generation,
             final_result.promotion_score,
@@ -799,3 +805,16 @@ class EvolutionLoop:
         if result.failures:
             return "; ".join(result.failures[:3])
         return "Candidate satisfied visible requirements with acceptable complexity."
+
+    def _run_metadata(self, final_result: EvaluationResult) -> dict:
+        mode = "offline deterministic" if self.settings.offline_mode else "openai-backed"
+        return {
+            "run_mode": mode,
+            "model": self.settings.model,
+            "endpoint": self.model_client.endpoint,
+            "offline_mode": self.settings.offline_mode,
+            "fallback_used": self.model_client.fallback_used,
+            "model_calls": self.model_client.model_calls,
+            "structured_output_repairs": self.model_client.structured_output_repairs,
+            "total_estimated_cost": final_result.cost_estimate,
+        }

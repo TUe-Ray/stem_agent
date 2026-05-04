@@ -5,6 +5,7 @@ from pathlib import Path
 from stemos.genome.models import Genome
 from stemos.kernel.evaluator import EvaluationResult
 from stemos.evolution.lineage import LineageLog
+from stemos.evolution.visuals import VisualizationBuilder
 
 
 class ReportBuilder:
@@ -98,4 +99,5 @@ class ReportBuilder:
         )
         path = run_dir / "report.md"
         path.write_text("\n".join(content), encoding="utf-8")
+        VisualizationBuilder().visualize(run_dir, update_report=True)
         return path
