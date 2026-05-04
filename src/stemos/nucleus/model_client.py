@@ -31,6 +31,7 @@ class ModelClient:
         self.endpoint = endpoint or os.getenv("STEMOS_OPENAI_ENDPOINT", "auto")
         self.model_calls = 0
         self.fallback_used = False
+        self.responses_api_available: bool | None = None
         self.structured_output_repairs = 0
 
     def call(
@@ -85,6 +86,7 @@ class ModelClient:
             if self.endpoint == "responses" or not self._is_responses_scope_error(exc):
                 raise
             self.fallback_used = True
+            self.responses_api_available = False
             return self._chat_completions_response(client, prompt, response_schema)
 
     def _responses_response(
@@ -107,9 +109,11 @@ class ModelClient:
                     }
                 },
             )
+            self.responses_api_available = True
             return json.loads(response.output_text)
 
         response = client.responses.create(model=self.model, input=prompt, tools=tools)
+        self.responses_api_available = True
         return response.output_text
 
     def _chat_completions_response(

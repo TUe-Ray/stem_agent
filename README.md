@@ -162,7 +162,7 @@ stemos aggregate runs/openai_001 runs/openai_002 runs/openai_003
 - Guardian selection board
 - OpenAI run metadata without API keys
 
-`stemos visualize` writes reviewer-facing files under `runs/<run_id>/visuals/`, including `evolution_timeline.md`, `organism_shape.md`, `harness_before_after.md`, `guardian_selection_board.md`, `output_comparison.md`, and an optional `visual_report.html`.
+`stemos visualize` writes reviewer-facing files under `runs/<run_id>/visuals/`, including `evolution_timeline.md`, `organism_shape.md`, `harness_before_after.md`, `guardian_selection_board.md`, `output_comparison.md`, and `visual_report.md`.
 
 ## Safe Stop Controls
 
@@ -201,18 +201,28 @@ Forbidden imports for generated tools include:
 ## Example Run
 
 ```bash
-stemos evolve scenarios/tiny_task_operator --run-id demo_001
-stemos compare runs/demo_001
+export STEMOS_OFFLINE_MODE=false
+export STEMOS_MODEL=gpt-4.1-mini
+export STEMOS_OPENAI_ENDPOINT=chat_completions
+
+stemos evolve scenarios/toy_structured_answer --run-id openai_002
+stemos visualize runs/openai_002
+stemos compare runs/openai_002
 ```
 
-Expected shape:
+Observed OpenAI-backed result:
 
 ```text
-Baseline score: 0.34
-Final score: 0.87
+Baseline score: 0.1049
+Final score: 0.9727
 Promoted mutations:
-  - modify_self_evaluation -> self_evaluation
-  - modify_environment -> environment
+  - modify_self_evaluation
+  - modify_environment
+  - add_workflow_step review_against_requirements
+  - add_workflow_step revise_final_output
+  - add_quality_gate required_sections_gate
+  - create_tool requirement_sections_checker
 Rejected or rolled back mutations:
-  - mutation_rejected create_tool -> tools.generated
+  - unsafe generated tool rejected
+  - redundant role rolled back
 ```

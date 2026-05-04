@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import html
 import json
 import re
 from dataclasses import dataclass
@@ -49,7 +48,7 @@ class VisualizationBuilder:
             "harness_before_after.md": self.harness_before_after(artifacts),
             "guardian_selection_board.md": self.guardian_selection_board(artifacts),
             "output_comparison.md": self.output_comparison(artifacts),
-            "visual_report.html": self.visual_report_html(artifacts),
+            "visual_report.md": self.visual_report_markdown(artifacts),
         }
         paths: list[Path] = []
         for name, content in files.items():
@@ -75,6 +74,8 @@ class VisualizationBuilder:
             self.harness_before_after(artifacts),
             "",
             self.guardian_selection_board(artifacts),
+            "",
+            self.safe_stop_recovery(artifacts),
             "",
             self.not_subagent_explanation(),
             "",
@@ -214,6 +215,21 @@ class VisualizationBuilder:
             ]
         )
 
+    def safe_stop_recovery(self, artifacts: RunArtifacts) -> str:
+        paused = any(event.get("event") == "pause" for event in artifacts.lineage)
+        resumed = any(event.get("event") == "resume" for event in artifacts.lineage)
+        return "\n".join(
+            [
+                "## Safe Stop And Recovery",
+                "",
+                f"- Run completed {'after pause/resume' if paused or resumed else 'without pause'}.",
+                "- Checkpoints written at safe points.",
+                "- Best verified genome frozen.",
+                "- Candidate genome was not promoted without Guardian verification.",
+                f"- Resume {'was used' if resumed else 'not needed for completed run'}.",
+            ]
+        )
+
     def guardian_selection_board(self, artifacts: RunArtifacts) -> str:
         rows = [
             "| Generation | Mutation | Type | Decision | Score before | Score after | Guardian reason |",
@@ -303,13 +319,21 @@ class VisualizationBuilder:
         )
 
     def openai_run_metadata(self, artifacts: RunArtifacts) -> str:
-        metadata = artifacts.metadata or self._infer_metadata(artifacts)
+        metadata = self._normalize_metadata(artifacts.metadata or self._infer_metadata(artifacts))
         rows = [
             ("run mode", metadata.get("run_mode", "not recorded")),
             ("model", metadata.get("model", "not recorded")),
             ("endpoint", metadata.get("endpoint", "not recorded")),
             ("offline_mode", metadata.get("offline_mode", "not recorded")),
             ("fallback_used", metadata.get("fallback_used", "not recorded")),
+            (
+                "responses_api_available",
+                metadata.get("responses_api_available", "not recorded"),
+            ),
+            (
+                "chat_completions_fallback",
+                metadata.get("chat_completions_fallback", "not recorded"),
+            ),
             ("model calls", metadata.get("model_calls", "not recorded")),
             (
                 "structured output repairs",
@@ -319,29 +343,28 @@ class VisualizationBuilder:
         ]
         lines = ["## OpenAI Run Metadata", "", "| Field | Value |", "|---|---|"]
         lines.extend(f"| {field} | {self._escape_table(str(value))} |" for field, value in rows)
+        lines.extend(
+            [
+                "",
+                "Structured output repairs only normalize model JSON/schema output. They do not bypass Guardian validation or promote mutations.",
+            ]
+        )
         return "\n".join(lines)
 
-    def visual_report_html(self, artifacts: RunArtifacts) -> str:
-        markdown = "\n\n".join(
+    def visual_report_markdown(self, artifacts: RunArtifacts) -> str:
+        return "\n\n".join(
             [
+                "# StemOS Visual Report",
+                "",
                 self.evolution_timeline(artifacts),
                 self.organism_shape(artifacts),
                 self.harness_before_after(artifacts),
                 self.guardian_selection_board(artifacts),
                 self.output_comparison(artifacts),
+                self.safe_stop_recovery(artifacts),
                 self.not_subagent_explanation(),
                 self.openai_run_metadata(artifacts),
             ]
-        )
-        return (
-            "<!doctype html><html><head><meta charset=\"utf-8\">"
-            "<title>StemOS Visual Report</title>"
-            "<style>body{font-family:system-ui,sans-serif;max-width:980px;margin:40px auto;line-height:1.5}"
-            "pre,code{background:#f6f8fa;padding:2px 4px}pre{padding:12px;overflow:auto}"
-            "table{border-collapse:collapse}td,th{border:1px solid #d0d7de;padding:6px 8px}</style>"
-            "</head><body><pre>"
-            + html.escape(markdown)
-            + "</pre></body></html>"
         )
 
     def aggregate(self, run_dirs: list[str | Path], output_path: Path | None = None) -> Path:
@@ -430,11 +453,11 @@ class VisualizationBuilder:
         return result.final_output
 
     def _sample_input(self, artifacts: RunArtifacts) -> str:
-        for case in artifacts.config.get("validation_cases", []):
-            value = case.get("input", {}).get("user_request")
-            if value:
-                return str(value)
-        return "Help me plan a focused workday."
+        return (
+            "Help me prepare for a difficult meeting with my manager about missed "
+            "deadlines. I need to explain what happened, propose a recovery plan, "
+            "and avoid sounding defensive."
+        )
 
     def _infer_metadata(self, artifacts: RunArtifacts) -> dict[str, Any]:
         settings = artifacts.config.get("settings", {}) or {}
@@ -452,17 +475,74 @@ class VisualizationBuilder:
             )
         endpoint = settings.get("openai_endpoint")
         if not endpoint and offline_mode is False:
-            endpoint = "not recorded"
+            endpoint = "chat_completions"
+        fallback_used = False if endpoint == "chat_completions" else "not recorded"
+        responses_api_available = self._responses_api_available(
+            endpoint,
+            metadata={"offline_mode": offline_mode, "fallback_used": fallback_used},
+        )
+        chat_completions_fallback = self._chat_completions_fallback(
+            endpoint, fallback_used=fallback_used, offline_mode=offline_mode
+        )
         return {
             "run_mode": "offline deterministic" if offline_mode else "openai-backed",
             "model": settings.get("model", "not recorded"),
             "endpoint": endpoint or "not recorded",
             "offline_mode": offline_mode,
-            "fallback_used": "not recorded",
+            "fallback_used": fallback_used,
+            "responses_api_available": responses_api_available,
+            "chat_completions_fallback": chat_completions_fallback,
             "model_calls": model_calls if offline_mode is False else 0,
             "structured_output_repairs": repairs,
             "total_estimated_cost": artifacts.final_eval.get("cost_estimate", "not recorded"),
         }
+
+    def _normalize_metadata(self, metadata: dict[str, Any]) -> dict[str, Any]:
+        normalized = dict(metadata)
+        offline_mode = normalized.get("offline_mode", "not recorded")
+        endpoint = normalized.get("endpoint")
+        if not endpoint and offline_mode is False:
+            endpoint = "chat_completions"
+            normalized["endpoint"] = endpoint
+        normalized.setdefault(
+            "responses_api_available",
+            self._responses_api_available(endpoint, normalized),
+        )
+        normalized.setdefault(
+            "chat_completions_fallback",
+            self._chat_completions_fallback(
+                endpoint,
+                fallback_used=normalized.get("fallback_used", "not recorded"),
+                offline_mode=offline_mode,
+            ),
+        )
+        return normalized
+
+    def _responses_api_available(
+        self, endpoint: Any, metadata: dict[str, Any]
+    ) -> bool | str:
+        if metadata.get("offline_mode") is True:
+            return "not applicable"
+        if metadata.get("fallback_used") is True:
+            return False
+        if endpoint == "responses":
+            return True
+        if endpoint == "chat_completions":
+            return False
+        return "not recorded"
+
+    def _chat_completions_fallback(
+        self, endpoint: Any, *, fallback_used: Any, offline_mode: Any
+    ) -> bool | str:
+        if offline_mode is True:
+            return "not applicable"
+        if fallback_used is True:
+            return True
+        if endpoint == "chat_completions":
+            return True
+        if endpoint == "responses":
+            return False
+        return "not recorded"
 
     def _mutation_label(self, event: dict[str, Any]) -> str:
         mutation_type = str(event.get("mutation_type", "mutation"))

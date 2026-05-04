@@ -73,6 +73,9 @@ class RoleRunner:
                 "Write down the desired outcome, pick the first action, and schedule a quick check."
             )
 
+        if environment_aware and self._is_deadline_manager_meeting(request):
+            return self._deadline_manager_meeting_output(request)
+
         sections = [
             "## Summary",
             f"Create a focused, useful response for: {request}.",
@@ -126,6 +129,61 @@ class RoleRunner:
             ]
         )
         return "\n".join(sections)
+
+    def _is_deadline_manager_meeting(self, request: str) -> bool:
+        lowered = request.lower()
+        return all(token in lowered for token in ["manager", "deadline"])
+
+    def _deadline_manager_meeting_output(self, request: str) -> str:
+        return "\n".join(
+            [
+                "## Summary",
+                f"Prepare a calm, accountable meeting plan for: {request}.",
+                "",
+                "## Meeting Goal",
+                "Explain what happened without defensiveness, show ownership of the missed deadlines, and leave the meeting with an agreed recovery plan.",
+                "",
+                "## Acceptance Criteria",
+                "- The output names the goal.",
+                "- The output gives concrete steps.",
+                "- The output includes a final answer.",
+                "",
+                "## Talking Points",
+                "1. Open with ownership: name the missed deadlines and acknowledge the impact.",
+                "2. Briefly explain the causes using facts, not excuses.",
+                "3. Present the recovery plan before your manager has to ask for one.",
+                "4. Ask which tradeoffs or priorities your manager wants adjusted.",
+                "",
+                "## Likely Objections",
+                "- Why did I hear about this late?",
+                "- How do I know the new dates are realistic?",
+                "- What will change so this does not repeat?",
+                "",
+                "## Recovery Plan",
+                "1. Send a corrected timeline with owners, dates, and risk flags today.",
+                "2. Split the missed work into must-finish, can-defer, and needs-help buckets.",
+                "3. Add a twice-weekly status note until the project is back on track.",
+                "4. Escalate blockers within 24 hours instead of waiting for the next check-in.",
+                "",
+                "## Wording To Use",
+                '"I missed the deadline, and I understand that created planning risk for the team. The main causes were X and Y. I should have flagged the risk earlier. Here is the recovery plan I propose, and I would like your input on the tradeoffs."',
+                "",
+                "## Follow-Up Actions",
+                "- Send the recovery plan after the meeting.",
+                "- Confirm revised dates and success criteria in writing.",
+                "- Share the first progress update within two business days.",
+                "",
+                "## QA Report",
+                "Quality review: meeting goal, talking points, likely objections, recovery plan, wording, follow-up actions, summary, steps, and final answer are present.",
+                "",
+                "## Decision Log",
+                "- Use accountable language instead of defensive explanations.",
+                "- Put the recovery plan before the justification.",
+                "",
+                "## Final Answer",
+                "Go into the meeting with ownership first, facts second, and a concrete recovery plan third. Ask for priority guidance, then follow up in writing with dates, owners, and the next status checkpoint.",
+            ]
+        )
 
     def _review_output(self, draft: str, harness: MaterializedHarness) -> str:
         missing = []

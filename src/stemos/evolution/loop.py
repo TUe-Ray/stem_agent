@@ -808,12 +808,25 @@ class EvolutionLoop:
 
     def _run_metadata(self, final_result: EvaluationResult) -> dict:
         mode = "offline deterministic" if self.settings.offline_mode else "openai-backed"
+        endpoint = self.model_client.endpoint
+        responses_api_available = self.model_client.responses_api_available
+        if self.settings.offline_mode:
+            responses_api_available = None
+        elif endpoint == "chat_completions":
+            responses_api_available = False
+        chat_completions_fallback = (
+            False
+            if self.settings.offline_mode
+            else bool(self.model_client.fallback_used or endpoint == "chat_completions")
+        )
         return {
             "run_mode": mode,
             "model": self.settings.model,
-            "endpoint": self.model_client.endpoint,
+            "endpoint": endpoint,
             "offline_mode": self.settings.offline_mode,
             "fallback_used": self.model_client.fallback_used,
+            "responses_api_available": responses_api_available,
+            "chat_completions_fallback": chat_completions_fallback,
             "model_calls": self.model_client.model_calls,
             "structured_output_repairs": self.model_client.structured_output_repairs,
             "total_estimated_cost": final_result.cost_estimate,
