@@ -73,6 +73,17 @@ Offline deterministic mode is enabled by default and does not require real OpenA
 export STEMOS_OFFLINE_MODE=true
 ```
 
+For an OpenAI key that can use Chat Completions but not the Responses API, use:
+
+```bash
+export OPENAI_API_KEY="..."
+export STEMOS_OFFLINE_MODE=false
+export STEMOS_MODEL=gpt-4.1-mini
+export STEMOS_OPENAI_ENDPOINT=chat_completions
+```
+
+`STEMOS_OPENAI_ENDPOINT=auto` first tries the Responses API, then falls back to Chat Completions if the key is missing `api.responses.write` scope.
+
 ## Provide A Scenario
 
 Create a new scenario package:

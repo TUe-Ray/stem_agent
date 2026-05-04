@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 
 class Settings(BaseModel):
-    model: str = Field(default_factory=lambda: os.getenv("STEMOS_MODEL", "gpt-5.5"))
+    model: str = Field(default_factory=lambda: os.getenv("STEMOS_MODEL", "gpt-4.1-mini"))
     max_cost_usd: float = Field(
         default_factory=lambda: float(os.getenv("STEMOS_MAX_COST_USD", "2.0"))
     )
