@@ -103,6 +103,23 @@ Stronger demo:
 stemos evolve scenarios/tiny_task_operator --run-id demo_001
 ```
 
+Optional Git provenance is off by default:
+
+```bash
+stemos evolve scenarios/toy_structured_answer --run-id demo_001 --git-branch --git-commit
+```
+
+This creates a local branch named `stemos/run/<run_id>` and commits only at safe evolution points such as baseline evaluation, promoted mutations, rejected or rolled-back mutations, generation completion, pause/resume, and final freeze. Git is provenance only; runtime recovery still uses checkpoint files under `runs/<run_id>/checkpoint/latest/`.
+
+Push is never automatic unless explicitly requested:
+
+```bash
+stemos evolve scenarios/toy_structured_answer --run-id demo_001 --git-branch --git-commit --git-push
+stemos push-run demo_001
+```
+
+Before committing or pushing, StemOS scans staged files for `.env`, `OPENAI_API_KEY`, common secret patterns, and large temporary files.
+
 The run writes:
 
 - `runs/<run_id>/config_snapshot.yaml`
@@ -128,6 +145,20 @@ stemos compare runs/demo_001
 - frozen genome path
 - before/after comparison
 - lineage narrative explaining how the harness differentiated
+
+## Safe Stop Controls
+
+Each run has a control file at `runs/<run_id>/control.json`.
+
+```bash
+stemos pause demo_001
+stemos resume demo_001
+stemos status demo_001
+stemos freeze-now demo_001
+stemos abort demo_001
+```
+
+The evolution loop checks `control.json` at safe points. Pause saves a checkpoint and exits cleanly. Resume validates the scenario hash and continues from `checkpoint/latest/state.json`. Freeze-now freezes the best verified genome, never an unverified candidate. Abort saves state and does not promote the current candidate.
 
 ## Execute A Frozen Harness
 

@@ -7,10 +7,12 @@ from typing import Optional
 import typer
 import yaml
 
+from stemos.evolution.control import EvolutionControl
 from stemos.evolution.loop import EvolutionLoop
 from stemos.genome.loader import load_genome
 from stemos.harness.builder import HarnessBuilder
 from stemos.harness.runner import HarnessRunner
+from stemos.kernel.versioning import GitProvenance, GitRunConfig
 from stemos.scenarios.loader import load_scenario
 from stemos.scenarios.schema import TaskCase
 
@@ -89,9 +91,22 @@ def init_scenario(path: Path) -> None:
 
 
 @app.command()
-def evolve(scenario_path: Path, run_id: str = typer.Option(..., "--run-id")) -> None:
-    result = EvolutionLoop().evolve(scenario_path, run_id)
+def evolve(
+    scenario_path: Path,
+    run_id: str = typer.Option(..., "--run-id"),
+    git_branch: bool = typer.Option(False, "--git-branch"),
+    git_commit: bool = typer.Option(False, "--git-commit"),
+    git_push: bool = typer.Option(False, "--git-push"),
+) -> None:
+    result = EvolutionLoop().evolve(
+        scenario_path,
+        run_id,
+        git_branch=git_branch,
+        git_commit=git_commit,
+        git_push=git_push,
+    )
     typer.echo(f"Run directory: {result.run_dir}")
+    typer.echo(f"Status: {result.status}")
     typer.echo(f"Baseline score: {result.baseline_score:.4f}")
     typer.echo(f"Final score: {result.final_score:.4f}")
     typer.echo(f"Frozen genome: {result.frozen_genome_path}")
@@ -150,6 +165,92 @@ def execute(
     case = TaskCase(id="execute_001", input={"user_request": input})
     result = HarnessRunner().run_case(harness, case)
     typer.echo(result.final_output)
+
+
+@app.command("pause")
+def pause_run(run_id: str) -> None:
+    state = EvolutionControl(Path("runs") / run_id, run_id).write_command("pause")
+    typer.echo(f"Pause requested for {run_id}: {state.status}")
+
+
+@app.command("resume")
+def resume_run(
+    run_id: str,
+    git_branch: bool = typer.Option(False, "--git-branch"),
+    git_commit: bool = typer.Option(False, "--git-commit"),
+    git_push: bool = typer.Option(False, "--git-push"),
+) -> None:
+    control = EvolutionControl(Path("runs") / run_id, run_id)
+    control.write_command("resume", status="REQUESTED")
+    result = EvolutionLoop().resume(
+        run_id,
+        git_branch=git_branch,
+        git_commit=git_commit,
+        git_push=git_push,
+    )
+    typer.echo(f"Run directory: {result.run_dir}")
+    typer.echo(f"Status: {result.status}")
+    typer.echo(f"Final score: {result.final_score:.4f}")
+
+
+@app.command("status")
+def status_run(run_id: str) -> None:
+    control = EvolutionControl(Path("runs") / run_id, run_id)
+    typer.echo(control.read().model_dump_json(indent=2))
+
+
+@app.command("freeze-now")
+def freeze_now_run(
+    run_id: str,
+    git_branch: bool = typer.Option(False, "--git-branch"),
+    git_commit: bool = typer.Option(False, "--git-commit"),
+) -> None:
+    control = EvolutionControl(Path("runs") / run_id, run_id)
+    control.write_command("freeze_now")
+    try:
+        result = EvolutionLoop().freeze_now(
+            run_id,
+            git_branch=git_branch,
+            git_commit=git_commit,
+        )
+    except FileNotFoundError:
+        typer.echo(f"Freeze-now requested for active run {run_id}")
+        return
+    typer.echo(f"Frozen genome: {result.frozen_genome_path}")
+    typer.echo(f"Report: {result.report_path}")
+
+
+@app.command("abort")
+def abort_run(
+    run_id: str,
+    freeze_best: bool = typer.Option(False, "--freeze-best"),
+) -> None:
+    command = "freeze_now" if freeze_best else "abort"
+    state = EvolutionControl(Path("runs") / run_id, run_id).write_command(
+        command,
+        freeze_best=freeze_best,
+    )
+    typer.echo(f"{command} requested for {run_id}: {state.status}")
+
+
+@app.command("push-run")
+def push_run(run_id: str, remote: str = typer.Option("origin", "--remote")) -> None:
+    git = GitProvenance(
+        GitRunConfig(
+            run_id=run_id,
+            run_dir=Path("runs") / run_id,
+            branch_enabled=True,
+            commit_enabled=False,
+            push_enabled=True,
+            remote=remote,
+        )
+    )
+    result = git.start()
+    if result.allowed:
+        result = git.push()
+    if not result.allowed:
+        raise typer.BadParameter(result.reason)
+    typer.echo(result.reason)
 
 
 def _read_eval(path: Path) -> dict:
