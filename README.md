@@ -25,6 +25,8 @@ StemOS does not hard-code bug fixing, research, QA, or any other task domain. It
 
 The genome is the developmental blueprint. It can encode roles, workflow, tools, memory, self-evaluation, quality gates, retry policy, and environment layout.
 
+StemOS may evolve roles, but roles are not predefined subagents. They are phenotypic structures produced by genome mutations and retained only if Guardian fitness improves. In the demo, adding more roles is not automatically rewarded; harmful or redundant roles are rolled back.
+
 ## Immutable vs Mutable Boundary
 
 Immutable Guardian kernel:

@@ -65,6 +65,7 @@ class EvolutionLoop:
 
         diagnosis = self.nucleus.diagnose(bundle.scenario)
         genome = self.nucleus.attach_diagnosis(load_default_genome(), diagnosis, bundle.scenario)
+        baseline_genome = genome
         save_genome(genome, run_dir / "baseline_genome.yaml")
 
         best_genome = genome
@@ -128,6 +129,14 @@ class EvolutionLoop:
             promoted_this_generation = False
             candidate_result = current_result
             for index, mutation in enumerate(plan.proposed_mutations):
+                lineage.record_proposed_mutation(
+                    generation,
+                    mutation.mutation_type,
+                    mutation.target,
+                    mutation.rationale,
+                    mutation.expected_improvement,
+                    mutation.risk,
+                )
                 validation = self.guardian.validate_mutation(
                     mutation, genome=genome, scenario=bundle.scenario
                 )
@@ -140,9 +149,23 @@ class EvolutionLoop:
                     )
                     continue
 
-                mutated_genome = self.guardian.apply_mutation_safely(genome, mutation)
                 mutation_dir = generation_dir / f"mutation_{index:02d}"
                 mutation_dir.mkdir(parents=True, exist_ok=True)
+                if mutation.mutation_type in {"create_tool", "edit_tool"}:
+                    activation, activated_mutation = self.guardian.activate_generated_tool(
+                        mutation, mutation_dir / "generated_tools"
+                    )
+                    if not activation.allowed:
+                        lineage.record_rejected_mutation(
+                            generation,
+                            mutation.mutation_type,
+                            mutation.target,
+                            activation.reason,
+                        )
+                        continue
+                    mutation = activated_mutation
+
+                mutated_genome = self.guardian.apply_mutation_safely(genome, mutation)
                 save_genome(mutated_genome, mutation_dir / "genome.yaml")
                 mutated_result = self._run_and_evaluate(
                     mutated_genome, bundle, mutation_dir, "candidate"
@@ -209,6 +232,7 @@ class EvolutionLoop:
             run_dir=run_dir,
             baseline=baseline_result,
             final=final_result,
+            baseline_genome=baseline_genome,
             frozen_genome=best_genome,
             lineage=lineage,
             frozen_path=frozen_path,

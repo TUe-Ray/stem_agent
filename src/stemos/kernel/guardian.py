@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import re
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +77,44 @@ class Guardian:
 
         return ValidationResult.allow("mutation is inside mutable genome boundary")
 
+    def activate_generated_tool(
+        self, mutation: MutationProposal, tool_dir: Path
+    ) -> tuple[ValidationResult, MutationProposal]:
+        """Write, statically check, test, and path-fill a generated tool mutation."""
+        if mutation.mutation_type not in {"create_tool", "edit_tool"}:
+            return ValidationResult.allow("not a generated tool mutation"), mutation
+
+        validation = self.validate_mutation(mutation)
+        if not validation.allowed:
+            return validation, mutation
+
+        patch = deepcopy(mutation.patch)
+        name = patch["name"]
+        code = patch.get("code")
+        test_code = patch.get("test_code")
+        if not code or not test_code:
+            return ValidationResult.reject("Generated tool activation requires code and test_code"), mutation
+
+        tool_dir.mkdir(parents=True, exist_ok=True)
+        (tool_dir / "__init__.py").write_text("", encoding="utf-8")
+        tool_path = tool_dir / f"{name}.py"
+        test_path = tool_dir / f"test_{name}.py"
+        tool_path.write_text(code, encoding="utf-8")
+        test_path.write_text(test_code, encoding="utf-8")
+
+        static_validation = self.sandbox.validate_generated_tool_code(code)
+        if not static_validation.allowed:
+            return static_validation, mutation
+
+        test_validation = self.sandbox.run_generated_tool_tests(tool_dir)
+        if not test_validation.allowed:
+            return test_validation, mutation
+
+        patch["path"] = str(tool_path)
+        patch["test_path"] = str(test_path)
+        activated = mutation.model_copy(update={"patch": patch}, deep=True)
+        return ValidationResult.allow("generated tool activated after static checks and tests"), activated
+
     def apply_mutation_safely(self, genome: Genome, mutation: MutationProposal) -> Genome:
         mutated = genome.model_copy(deep=True)
         mutated.genome_version += 1
@@ -143,6 +182,9 @@ class Guardian:
 
     def _validate_tool_mutation(self, mutation: MutationProposal) -> ValidationResult:
         patch = mutation.patch
+        name = str(patch.get("name", ""))
+        if not name or not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
+            return ValidationResult.reject("Generated tool name must be a valid Python identifier")
         if not patch.get("test_code") and not patch.get("test_path"):
             return ValidationResult.reject("Generated tools require tests before activation")
         if patch.get("code"):

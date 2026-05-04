@@ -44,10 +44,11 @@ class GuardianFitnessEvaluator:
         validation_runs = validation_runs or []
         complexity_penalty = self._complexity_penalty(genome)
         train_cases = [
-            self._evaluate_case(scenario, run, complexity_penalty) for run in train_runs
+            self._evaluate_case(genome, scenario, run, complexity_penalty)
+            for run in train_runs
         ]
         validation_cases = [
-            self._evaluate_case(scenario, run, complexity_penalty)
+            self._evaluate_case(genome, scenario, run, complexity_penalty)
             for run in validation_runs
         ]
         train_score = self._mean([case.score for case in train_cases])
@@ -60,8 +61,8 @@ class GuardianFitnessEvaluator:
             promotion_score = train_score
             split_policy = "train_only"
         else:
-            promotion_score = (0.35 * train_score) + (0.65 * validation_score)
-            split_policy = "weighted_train_validation_35_65"
+            promotion_score = (0.40 * train_score) + (0.60 * validation_score)
+            split_policy = "weighted_train_validation_40_60"
 
         all_cases = train_cases + validation_cases
         metrics = self._mean_metrics([case.metrics for case in all_cases])
@@ -83,6 +84,7 @@ class GuardianFitnessEvaluator:
 
     def _evaluate_case(
         self,
+        genome: Genome,
         scenario: Scenario,
         run: HarnessRunResult,
         complexity_penalty: float,
@@ -93,23 +95,36 @@ class GuardianFitnessEvaluator:
         )
         scenario_success = self._scenario_success(scenario, output)
         format_validity = self._format_validity(output)
-        robustness = 0.0 if run.blocked else self._robustness(scenario, output)
+        artifact_presence = self._artifact_presence(run)
+        self_review_usage = self._self_review_usage(run, output)
+        workflow_completion = self._workflow_completion(genome, run)
+        quality_gate_usage = self._quality_gate_usage(run)
+        generated_tool_usage = self._generated_tool_usage(run)
         cost_penalty = min(run.cost_estimate / 5.0, 1.0)
 
         raw_score = (
-            0.40 * requirement_coverage
-            + 0.25 * scenario_success
-            + 0.20 * format_validity
-            + 0.10 * robustness
-            - 0.05 * cost_penalty
+            0.28 * requirement_coverage
+            + 0.14 * format_validity
+            + 0.12 * artifact_presence
+            + 0.16 * self_review_usage
+            + 0.14 * workflow_completion
+            + 0.08 * quality_gate_usage
+            + 0.08 * generated_tool_usage
+            - 0.03 * cost_penalty
             - 0.05 * complexity_penalty
         )
+        if run.blocked:
+            raw_score -= 0.15
         score = self._clamp(raw_score)
         metrics = {
             "requirement_coverage": requirement_coverage,
             "scenario_success": scenario_success,
             "format_validity": format_validity,
-            "robustness": robustness,
+            "artifact_presence": artifact_presence,
+            "self_review_usage": self_review_usage,
+            "workflow_completion": workflow_completion,
+            "quality_gate_usage": quality_gate_usage,
+            "generated_tool_usage": generated_tool_usage,
             "cost_penalty": cost_penalty,
             "complexity_penalty": complexity_penalty,
         }
@@ -195,6 +210,55 @@ class GuardianFitnessEvaluator:
         if len(output.split()) >= 25:
             score += 0.2
         return self._clamp(score)
+
+    def _artifact_presence(self, run: HarnessRunResult) -> float:
+        for trace in run.traces:
+            if trace.get("event") == "environment_materialized" and trace.get("artifacts"):
+                return 1.0
+        output = run.final_output.lower()
+        artifact_markers = ["acceptance criteria", "qa report", "decision log", "draft output"]
+        return min(sum(1 for marker in artifact_markers if marker in output) / 3.0, 1.0)
+
+    def _self_review_usage(self, run: HarnessRunResult, output: str) -> float:
+        output_lower = output.lower()
+        score = 0.0
+        if "check the draft" in output_lower or "quality review" in output_lower:
+            score += 0.25
+        if "review notes applied" in output_lower:
+            score += 0.25
+        if any(trace.get("step_id") == "review_against_requirements" for trace in run.traces):
+            score += 0.25
+        if any(trace.get("event") == "quality_gate" and trace.get("passed") for trace in run.traces):
+            score += 0.25
+        return self._clamp(score)
+
+    def _workflow_completion(self, genome: Genome, run: HarnessRunResult) -> float:
+        workflow_steps = [trace for trace in run.traces if trace.get("event") == "workflow_step"]
+        if not genome.workflow:
+            return 0.0
+        completed_ratio = len(workflow_steps) / len(genome.workflow)
+        score = min(completed_ratio, 1.0) * 0.35
+        completed_ids = {str(trace.get("step_id")) for trace in workflow_steps}
+        if "review_against_requirements" in completed_ids:
+            score += 0.25
+        if "revise_final_output" in completed_ids:
+            score += 0.30
+        if run.final_output == run.outputs.get("final_output", ""):
+            score += 0.10
+        return self._clamp(score)
+
+    def _quality_gate_usage(self, run: HarnessRunResult) -> float:
+        gate_traces = [trace for trace in run.traces if trace.get("event") == "quality_gate"]
+        if not gate_traces:
+            return 0.0
+        passed = sum(1 for trace in gate_traces if trace.get("passed"))
+        return passed / len(gate_traces)
+
+    def _generated_tool_usage(self, run: HarnessRunResult) -> float:
+        for trace in run.traces:
+            if trace.get("event") == "quality_gate" and trace.get("generated_tool"):
+                return 1.0
+        return 0.0
 
     def _complexity_penalty(self, genome: Genome) -> float:
         generated_tools = genome.tools.get("generated", []) or []

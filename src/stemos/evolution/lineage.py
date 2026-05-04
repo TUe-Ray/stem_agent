@@ -35,6 +35,25 @@ class LineageLog:
             mutation_count=mutation_count,
         )
 
+    def record_proposed_mutation(
+        self,
+        generation: int,
+        mutation_type: str,
+        target: str,
+        rationale: str,
+        expected_improvement: str,
+        risk: str,
+    ) -> None:
+        self.record(
+            "mutation_proposed",
+            generation=generation,
+            mutation_type=mutation_type,
+            target=target,
+            rationale=rationale,
+            expected_improvement=expected_improvement,
+            risk=risk,
+        )
+
     def record_rejected_mutation(self, generation: int, mutation_type: str, target: str, reason: str) -> None:
         self.record(
             "mutation_rejected",
@@ -114,6 +133,11 @@ class LineageLog:
             if kind == "evaluation":
                 lines.append(
                     f"- Generation {event['generation']} evaluated at {event['score']}: {event['summary']}"
+                )
+            elif kind == "mutation_proposed":
+                lines.append(
+                    "- Nucleus proposed "
+                    f"{event['mutation_type']} on {event['target']}: {event['rationale']}"
                 )
             elif kind == "mutation_promoted":
                 lines.append(

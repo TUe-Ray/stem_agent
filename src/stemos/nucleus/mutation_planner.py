@@ -86,10 +86,7 @@ class MutationPlanner:
                     },
                 )
             )
-        elif (
-            not genome.environment.required_artifacts
-            and self._scenario_benefits_from_environment(scenario)
-        ):
+        elif not genome.environment.required_artifacts:
             mutations.append(
                 MutationProposal(
                     mutation_type="modify_environment",
@@ -124,6 +121,72 @@ class MutationPlanner:
                     },
                 )
             )
+        elif not self._workflow_has(genome, "review_against_requirements"):
+            mutations.append(
+                MutationProposal(
+                    mutation_type="add_workflow_step",
+                    target="workflow",
+                    rationale="The harness currently produces final output without explicit review.",
+                    expected_improvement="Improve requirement coverage and reduce missing sections.",
+                    risk="Adds cost and complexity.",
+                    patch={
+                        "id": "review_against_requirements",
+                        "role": "Founder",
+                        "action": "Review the draft or final output against the scenario requirements and write missing sections or revision notes.",
+                        "input_from": ["solve_task"],
+                        "output_key": "review_notes",
+                    },
+                )
+            )
+        elif not self._workflow_has(genome, "revise_final_output"):
+            mutations.append(
+                MutationProposal(
+                    mutation_type="add_workflow_step",
+                    target="workflow",
+                    rationale="Review notes should affect the delivered output.",
+                    expected_improvement="Create a real revise-before-final loop.",
+                    risk="May duplicate content if poorly executed.",
+                    patch={
+                        "id": "revise_final_output",
+                        "role": "Founder",
+                        "action": "Revise the final answer using review notes, scenario constraints, and success criteria.",
+                        "input_from": ["solve_task", "review_notes"],
+                        "output_key": "final_output",
+                    },
+                )
+            )
+        elif not genome.quality_gates:
+            mutations.append(
+                MutationProposal(
+                    mutation_type="add_quality_gate",
+                    target="quality_gates",
+                    rationale="The harness should not finish without checking required output structure.",
+                    expected_improvement="Reduce missing required sections.",
+                    risk="May reject valid outputs if too strict.",
+                    patch={
+                        "name": "required_sections_gate",
+                        "description": "Check that the output contains required scenario sections before final delivery.",
+                        "check_type": "schema",
+                        "required": True,
+                    },
+                )
+            )
+        elif "requirement_sections_checker" not in self._generated_tool_names(genome):
+            mutations.append(
+                MutationProposal(
+                    mutation_type="create_tool",
+                    target="tools.generated",
+                    rationale="Add a safe checker tool that can support evolved quality gates.",
+                    expected_improvement="Improve self-review evidence while staying inside the sandbox.",
+                    risk="Adds one generated tool and a small complexity penalty.",
+                    patch={
+                        "name": "requirement_sections_checker",
+                        "description": "Check whether output appears to cover scenario requirements.",
+                        "code": self._safe_requirement_checker_code(),
+                        "test_code": self._safe_requirement_checker_test(),
+                    },
+                )
+            )
         elif (
             "RequirementChecker" not in {role.name for role in genome.roles}
             and "RequirementChecker" not in lineage_summary
@@ -154,16 +217,53 @@ class MutationPlanner:
             proposed_mutations=mutations[: scenario.evolution.max_mutations_per_generation],
         )
 
-    def _scenario_benefits_from_environment(self, scenario: Scenario) -> bool:
-        text = " ".join(
-            [
-                scenario.name,
-                scenario.scenario.description,
-                *scenario.expected_output.requirements,
-                *scenario.constraints,
-            ]
-        ).lower()
-        return any(
-            token in text
-            for token in ["artifact", "acceptance", "qa", "decision", "operator", "task"]
+    def _workflow_has(self, genome: Genome, step_id: str) -> bool:
+        return any(step.id == step_id for step in genome.workflow)
+
+    def _generated_tool_names(self, genome: Genome) -> set[str]:
+        names: set[str] = set()
+        for spec in genome.tools.get("generated", []) or []:
+            if isinstance(spec, dict) and spec.get("name"):
+                names.add(str(spec["name"]))
+            elif getattr(spec, "name", None):
+                names.add(str(spec.name))
+        return names
+
+    def _safe_requirement_checker_code(self) -> str:
+        return (
+            "from typing import Any, Dict\n\n"
+            "def run(input_data: Dict[str, Any]) -> Dict[str, Any]:\n"
+            "    output = str(input_data.get(\"output\", \"\")).lower()\n"
+            "    requirements = input_data.get(\"requirements\", [])\n"
+            "    missing = []\n"
+            "    for req in requirements:\n"
+            "        req_text = str(req).lower()\n"
+            "        important_words = [\n"
+            "            word.strip(\".,:;!?()[]{}\")\n"
+            "            for word in req_text.split()\n"
+            "            if len(word.strip(\".,:;!?()[]{}\")) >= 5\n"
+            "        ]\n"
+            "        if important_words and not any(word in output for word in important_words):\n"
+            "            missing.append(req)\n"
+            "    total = max(len(requirements), 1)\n"
+            "    score = 1.0 - (len(missing) / total)\n"
+            "    return {\"passed\": len(missing) == 0, \"missing\": missing, \"score\": score}\n"
+        )
+
+    def _safe_requirement_checker_test(self) -> str:
+        return (
+            "from requirement_sections_checker import run\n\n"
+            "def test_requirement_sections_checker_detects_missing_requirement():\n"
+            "    result = run({\n"
+            "        \"output\": \"Summary: hello\",\n"
+            "        \"requirements\": [\"Must include a short summary\", \"Must include concrete steps\"],\n"
+            "    })\n"
+            "    assert result[\"passed\"] is False\n"
+            "    assert \"Must include concrete steps\" in result[\"missing\"]\n\n"
+            "def test_requirement_sections_checker_accepts_covered_output():\n"
+            "    result = run({\n"
+            "        \"output\": \"Summary with concrete steps and final answer\",\n"
+            "        \"requirements\": [\"Must include summary\", \"Must include concrete steps\"],\n"
+            "    })\n"
+            "    assert result[\"score\"] >= 0.5\n"
         )

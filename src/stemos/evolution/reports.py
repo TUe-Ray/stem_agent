@@ -14,6 +14,7 @@ class ReportBuilder:
         run_dir: Path,
         baseline: EvaluationResult,
         final: EvaluationResult,
+        baseline_genome: Genome,
         frozen_genome: Genome,
         lineage: LineageLog,
         frozen_path: Path,
@@ -24,6 +25,13 @@ class ReportBuilder:
             for event in lineage.events
             if event["event"] in {"mutation_rejected", "mutation_rolled_back"}
         ]
+        generated_tool_rejections = [
+            event
+            for event in lineage.events
+            if event["event"] == "mutation_rejected"
+            and event.get("mutation_type") == "create_tool"
+        ]
+        accepted_generated_tools = frozen_genome.tools.get("generated", []) or []
         content = [
             "# StemOS Evolution Report",
             "",
@@ -34,6 +42,27 @@ class ReportBuilder:
             f"- Evolved genome score: {final.promotion_score:.4f}",
             f"- Frozen genome: `{frozen_path}`",
             f"- Promotion split policy: {final.split_policy}",
+            "",
+            "## Organism Shape",
+            "",
+            "### Initial organism",
+            f"- Roles: {len(baseline_genome.roles)}",
+            f"- Workflow steps: {len(baseline_genome.workflow)}",
+            f"- Self-evaluation: {'enabled' if baseline_genome.self_evaluation.get('enabled') else 'disabled'}",
+            f"- Quality gates: {len(baseline_genome.quality_gates)}",
+            f"- Generated tools: {len(baseline_genome.tools.get('generated', []) or [])}",
+            f"- Environment artifacts: {len(baseline_genome.environment.required_artifacts)}",
+            "",
+            "### Final organism",
+            f"- Roles: {len(frozen_genome.roles)}",
+            f"- Workflow steps: {len(frozen_genome.workflow)}",
+            f"- Self-evaluation: {'enabled' if frozen_genome.self_evaluation.get('enabled') else 'disabled'}",
+            f"- Quality gates: {len(frozen_genome.quality_gates)}",
+            f"- Generated tools: {len(accepted_generated_tools)} accepted, {len(generated_tool_rejections)} rejected",
+            f"- Environment artifacts: {len(frozen_genome.environment.required_artifacts)}",
+            "",
+            "## Why This Is Evolution, Not Subagent Orchestration",
+            "StemOS does not start with a hand-written set of PM/Engineer/QA agents. It starts with a minimal Founder genome. Every new role, workflow step, quality gate, tool, or workspace artifact must appear as a mutation. Guardian evaluates the mutated harness and only promotes changes that improve fitness.",
             "",
             "## Promoted Mutations",
         ]

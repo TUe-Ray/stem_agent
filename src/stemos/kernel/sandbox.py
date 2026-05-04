@@ -46,6 +46,7 @@ class Sandbox:
         return ValidationResult.allow("shell command spec is bounded")
 
     def run_generated_tool_tests(self, tool_dir: Path, timeout_seconds: int = 10) -> ValidationResult:
+        tool_dir = tool_dir.resolve()
         if not tool_dir.exists():
             return ValidationResult.reject(f"Generated tool directory does not exist: {tool_dir}")
 
@@ -53,13 +54,13 @@ class Sandbox:
             sys.executable,
             "-m",
             "pytest",
-            str(tool_dir),
+            ".",
             "-q",
         ]
         try:
             completed = subprocess.run(
                 command,
-                cwd=tool_dir.parent,
+                cwd=tool_dir,
                 timeout=timeout_seconds,
                 text=True,
                 capture_output=True,

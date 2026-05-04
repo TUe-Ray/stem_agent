@@ -30,6 +30,13 @@ class HarnessRunner:
         traces: list[dict[str, Any]] = []
         attempts = int(harness.retry_policy.get("max_attempts", 1))
         attempts = max(attempts, 1)
+        if harness.environment.required_artifacts:
+            traces.append(
+                {
+                    "event": "environment_materialized",
+                    "artifacts": list(harness.environment.required_artifacts),
+                }
+            )
 
         for step in harness.workflow:
             role = harness.roles[step.role]
@@ -37,24 +44,27 @@ class HarnessRunner:
             result = self.role_runner.run(role, step, step_input, memory, harness)
             output_key = step.output_key or step.id
             outputs[output_key] = result
+            outputs[step.id] = result
             traces.append(
                 {
+                    "event": "workflow_step",
                     "step_id": step.id,
                     "role": role.name,
                     "output_key": output_key,
                     "attempts": attempts,
                 }
             )
-            gate_result = self._run_quality_gates(harness, outputs)
-            if gate_result:
+            gate_traces, gate_failure = self._run_quality_gates(harness, outputs)
+            traces.extend(gate_traces)
+            if gate_failure:
                 return HarnessRunResult(
                     case_id=case.id,
-                    final_output=result,
+                    final_output=self.extract_final(outputs),
                     outputs=outputs,
                     traces=traces,
                     cost_estimate=self._estimate_cost(traces),
                     blocked=True,
-                    block_reason=gate_result,
+                    block_reason=gate_failure,
                 )
 
         return HarnessRunResult(
@@ -80,14 +90,74 @@ class HarnessRunner:
 
     def _run_quality_gates(
         self, harness: MaterializedHarness, outputs: dict[str, str]
-    ) -> str | None:
-        final = self.extract_final(outputs).lower()
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        if "final_output" not in outputs:
+            return [], None
+
+        final_output = self.extract_final(outputs)
+        final = final_output.lower()
+        traces: list[dict[str, Any]] = []
         for gate in harness.quality_gates:
             if not gate.required:
                 continue
-            if gate.check_type == "schema" and "final" not in final:
-                return f"Required schema quality gate failed: {gate.name}"
-        return None
+            passed = True
+            missing: list[str] = []
+            generated_tool = None
+
+            checker_tools = harness.tool_registry.get(["requirement_sections_checker"])
+            if checker_tools:
+                generated_tool = checker_tools[0].name
+                result = checker_tools[0].run(
+                    {
+                        "output": final_output,
+                        "requirements": harness.scenario.expected_output.requirements,
+                    }
+                )
+                passed = bool(result.get("passed"))
+                missing = [str(item) for item in result.get("missing", [])]
+            elif gate.check_type == "schema":
+                missing = self._missing_required_sections(harness, final)
+                passed = not missing
+
+            trace = {
+                "event": "quality_gate",
+                "gate": gate.name,
+                "check_type": gate.check_type,
+                "passed": passed,
+                "missing": missing,
+            }
+            if generated_tool:
+                trace["generated_tool"] = generated_tool
+            traces.append(trace)
+
+            if not passed:
+                return traces, f"Required quality gate failed: {gate.name}"
+        return traces, None
 
     def _estimate_cost(self, traces: list[dict[str, Any]]) -> float:
-        return round(len(traces) * 0.01, 4)
+        workflow_cost = sum(1 for trace in traces if trace.get("event") == "workflow_step") * 0.01
+        gate_cost = sum(1 for trace in traces if trace.get("event") == "quality_gate") * 0.002
+        return round(workflow_cost + gate_cost, 4)
+
+    def _missing_required_sections(
+        self, harness: MaterializedHarness, output: str
+    ) -> list[str]:
+        missing: list[str] = []
+        checks = {
+            "summary": ["summary"],
+            "step": ["steps", "1.", "- "],
+            "final": ["final answer", "final output", "recommendation"],
+            "acceptance": ["acceptance criteria", "acceptance"],
+            "qa": ["qa report", "quality review", "review"],
+            "decision": ["decision log", "decision"],
+        }
+        for requirement in harness.scenario.expected_output.requirements:
+            req = requirement.lower()
+            passed = True
+            for key, needles in checks.items():
+                if key in req:
+                    passed = any(needle in output for needle in needles)
+                    break
+            if not passed:
+                missing.append(requirement)
+        return missing

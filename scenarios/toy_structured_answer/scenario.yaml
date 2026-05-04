@@ -42,7 +42,7 @@ success_criteria:
     description: "Does it avoid unnecessary steps?"
 
 evolution:
-  max_generations: 5
+  max_generations: 7
   patience: 2
   min_delta: 0.03
   max_mutations_per_generation: 4
