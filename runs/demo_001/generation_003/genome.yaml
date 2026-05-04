@@ -1,18 +1,16 @@
-genome_version: 2
-name: tiny_task_operator_seed
-scenario_name: tiny_task_operator
+genome_version: 3
+name: toy_structured_answer_seed
+scenario_name: toy_structured_answer
 task_diagnosis:
-  task_type: tiny task operation harness
+  task_type: general structured response generation
   expected_task_solving_pattern: Read the input, extract requirements, draft an answer,
     check it against scenario requirements, and return a final output.
   likely_failure_modes:
   - missing required output sections
   - low actionability
-  - losing intermediate task decisions
   likely_needed_capabilities:
   - structured drafting
   - requirement checking
-  - workspace artifact planning
   initial_architecture_hypothesis: Start with a Founder role, then evolve self-evaluation,
     environment artifacts, and review steps only if fitness shows gaps.
   initial_evaluation_hypothesis: Use immutable Guardian fitness for coverage, usefulness,
@@ -36,6 +34,13 @@ workflow:
   input_from:
   - understanding
   output_key: final_output
+- id: review_against_requirements
+  role: Founder
+  action: Review the draft or final output against the scenario requirements and write
+    missing sections or revision notes.
+  input_from:
+  - solve_task
+  output_key: review_notes
 tools:
   builtin:
   - call_model
@@ -49,16 +54,13 @@ self_evaluation:
   enabled: true
   rubric:
   - Must include a short summary
-  - Must include acceptance criteria
   - Must include concrete steps
-  - Must include QA report
-  - Must include decision log
   - Must include final answer
 retry_policy:
   max_attempts: 1
   revise_on_failure: false
 stop_rule:
-  max_generations: 5
+  max_generations: 7
   patience: 2
   min_delta: 0.03
 environment:

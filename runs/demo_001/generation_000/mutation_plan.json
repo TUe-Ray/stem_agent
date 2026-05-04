@@ -1,10 +1,8 @@
 {
   "failure_patterns": [
     "Missing requirement: Must include a short summary",
-    "Missing requirement: Must include acceptance criteria",
     "Missing requirement: Must include concrete steps",
-    "Missing requirement: Must include QA report",
-    "Missing requirement: Must include decision log"
+    "Missing requirement: Must include final answer"
   ],
   "proposed_mutations": [
     {
@@ -14,10 +12,7 @@
         "enabled": true,
         "rubric": [
           "Must include a short summary",
-          "Must include acceptance criteria",
           "Must include concrete steps",
-          "Must include QA report",
-          "Must include decision log",
           "Must include final answer"
         ]
       },

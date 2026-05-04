@@ -1,0 +1,21 @@
+{
+  "failure_patterns": [],
+  "proposed_mutations": [
+    {
+      "expected_improvement": "May improve review quality.",
+      "mutation_type": "add_role",
+      "patch": {
+        "allowed_tools": [
+          "call_model"
+        ],
+        "description": "Checks whether output satisfies scenario requirements.",
+        "instructions": "Compare the draft against scenario requirements and report missing sections.",
+        "name": "RequirementChecker"
+      },
+      "rationale": "Add an explicit reviewer role after self-evaluation has stabilized.",
+      "risk": "Could add complexity without improving immutable fitness.",
+      "target": "roles"
+    }
+  ],
+  "summary": "Offline deterministic Nucleus plan based on repeated failure patterns."
+}

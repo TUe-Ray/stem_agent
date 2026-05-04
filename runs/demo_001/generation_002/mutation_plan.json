@@ -2,19 +2,20 @@
   "failure_patterns": [],
   "proposed_mutations": [
     {
-      "expected_improvement": "May improve review quality.",
-      "mutation_type": "add_role",
+      "expected_improvement": "Improve requirement coverage and reduce missing sections.",
+      "mutation_type": "add_workflow_step",
       "patch": {
-        "allowed_tools": [
-          "call_model"
+        "action": "Review the draft or final output against the scenario requirements and write missing sections or revision notes.",
+        "id": "review_against_requirements",
+        "input_from": [
+          "solve_task"
         ],
-        "description": "Checks whether output satisfies scenario requirements.",
-        "instructions": "Compare the draft against scenario requirements and report missing sections.",
-        "name": "RequirementChecker"
+        "output_key": "review_notes",
+        "role": "Founder"
       },
-      "rationale": "Add an explicit reviewer role after self-evaluation has stabilized.",
-      "risk": "Could add complexity without improving immutable fitness.",
-      "target": "roles"
+      "rationale": "The harness currently produces final output without explicit review.",
+      "risk": "Adds cost and complexity.",
+      "target": "workflow"
     }
   ],
   "summary": "Offline deterministic Nucleus plan based on repeated failure patterns."

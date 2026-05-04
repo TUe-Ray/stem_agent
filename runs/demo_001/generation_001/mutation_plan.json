@@ -1,9 +1,5 @@
 {
-  "failure_patterns": [
-    "Missing requirement: Must include acceptance criteria",
-    "Missing requirement: Must include QA report",
-    "Missing requirement: Must include decision log"
-  ],
+  "failure_patterns": [],
   "proposed_mutations": [
     {
       "expected_improvement": "Improve task-operation structure and validation score.",

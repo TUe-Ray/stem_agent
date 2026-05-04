@@ -1,0 +1,110 @@
+genome_version: 5
+name: toy_structured_answer_seed
+scenario_name: toy_structured_answer
+task_diagnosis:
+  task_type: general structured response generation
+  expected_task_solving_pattern: Read the input, extract requirements, draft an answer,
+    check it against scenario requirements, and return a final output.
+  likely_failure_modes:
+  - missing required output sections
+  - low actionability
+  likely_needed_capabilities:
+  - structured drafting
+  - requirement checking
+  initial_architecture_hypothesis: Start with a Founder role, then evolve self-evaluation,
+    environment artifacts, and review steps only if fitness shows gaps.
+  initial_evaluation_hypothesis: Use immutable Guardian fitness for coverage, usefulness,
+    format, robustness, cost, and complexity; use genome self-evaluation only inside
+    candidate harnesses.
+roles:
+- name: Founder
+  description: A general-purpose problem solver.
+  instructions: Solve the task directly and return a useful answer.
+  allowed_tools:
+  - call_model
+workflow:
+- id: understand_task
+  role: Founder
+  action: Read the task input and identify what is being asked.
+  input_from: []
+  output_key: understanding
+- id: solve_task
+  role: Founder
+  action: Produce the final output.
+  input_from:
+  - understanding
+  output_key: final_output
+- id: review_against_requirements
+  role: Founder
+  action: Review the draft or final output against the scenario requirements and write
+    missing sections or revision notes.
+  input_from:
+  - solve_task
+  output_key: review_notes
+- id: revise_final_output
+  role: Founder
+  action: Revise the final answer using review notes, scenario constraints, and success
+    criteria.
+  input_from:
+  - solve_task
+  - review_notes
+  output_key: final_output
+tools:
+  builtin:
+  - call_model
+  generated: []
+memory:
+  type: ephemeral
+  schema:
+    notes: string
+quality_gates:
+- name: required_sections_gate
+  description: Check that the output contains required scenario sections before final
+    delivery.
+  check_type: schema
+  required: true
+self_evaluation:
+  enabled: true
+  rubric:
+  - Must include a short summary
+  - Must include concrete steps
+  - Must include final answer
+retry_policy:
+  max_attempts: 1
+  revise_on_failure: false
+stop_rule:
+  max_generations: 7
+  patience: 2
+  min_delta: 0.03
+environment:
+  workspace_layout:
+  - artifacts
+  required_artifacts:
+  - artifacts/acceptance_criteria.md
+  - artifacts/draft_output.md
+  - artifacts/qa_report.md
+  - artifacts/decision_log.md
+  - artifacts/final_output.md
+  artifact_purpose:
+    artifacts/acceptance_criteria.md: Track scenario requirements.
+    artifacts/draft_output.md: Hold the candidate draft.
+    artifacts/qa_report.md: Record mutable self-evaluation notes.
+    artifacts/decision_log.md: Explain important harness decisions.
+    artifacts/final_output.md: Store the final response.
+  file_templates:
+    artifacts/acceptance_criteria.md: '# Acceptance Criteria
+
+      '
+    artifacts/draft_output.md: '# Draft Output
+
+      '
+    artifacts/qa_report.md: '# QA Report
+
+      '
+    artifacts/decision_log.md: '# Decision Log
+
+      '
+    artifacts/final_output.md: '# Final Output
+
+      '
+  cleanup_policy: keep_run_artifacts

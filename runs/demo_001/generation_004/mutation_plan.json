@@ -1,0 +1,19 @@
+{
+  "failure_patterns": [],
+  "proposed_mutations": [
+    {
+      "expected_improvement": "Reduce missing required sections.",
+      "mutation_type": "add_quality_gate",
+      "patch": {
+        "check_type": "schema",
+        "description": "Check that the output contains required scenario sections before final delivery.",
+        "name": "required_sections_gate",
+        "required": true
+      },
+      "rationale": "The harness should not finish without checking required output structure.",
+      "risk": "May reject valid outputs if too strict.",
+      "target": "quality_gates"
+    }
+  ],
+  "summary": "Offline deterministic Nucleus plan based on repeated failure patterns."
+}

@@ -1,0 +1,19 @@
+{
+  "failure_patterns": [],
+  "proposed_mutations": [
+    {
+      "expected_improvement": "Improve self-review evidence while staying inside the sandbox.",
+      "mutation_type": "create_tool",
+      "patch": {
+        "code": "from typing import Any, Dict\n\ndef run(input_data: Dict[str, Any]) -> Dict[str, Any]:\n    output = str(input_data.get(\"output\", \"\")).lower()\n    requirements = input_data.get(\"requirements\", [])\n    missing = []\n    for req in requirements:\n        req_text = str(req).lower()\n        important_words = [\n            word.strip(\".,:;!?()[]{}\")\n            for word in req_text.split()\n            if len(word.strip(\".,:;!?()[]{}\")) >= 5\n        ]\n        if important_words and not any(word in output for word in important_words):\n            missing.append(req)\n    total = max(len(requirements), 1)\n    score = 1.0 - (len(missing) / total)\n    return {\"passed\": len(missing) == 0, \"missing\": missing, \"score\": score}\n",
+        "description": "Check whether output appears to cover scenario requirements.",
+        "name": "requirement_sections_checker",
+        "test_code": "from requirement_sections_checker import run\n\ndef test_requirement_sections_checker_detects_missing_requirement():\n    result = run({\n        \"output\": \"Summary: hello\",\n        \"requirements\": [\"Must include a short summary\", \"Must include concrete steps\"],\n    })\n    assert result[\"passed\"] is False\n    assert \"Must include concrete steps\" in result[\"missing\"]\n\ndef test_requirement_sections_checker_accepts_covered_output():\n    result = run({\n        \"output\": \"Summary with concrete steps and final answer\",\n        \"requirements\": [\"Must include summary\", \"Must include concrete steps\"],\n    })\n    assert result[\"score\"] >= 0.5\n"
+      },
+      "rationale": "Add a safe checker tool that can support evolved quality gates.",
+      "risk": "Adds one generated tool and a small complexity penalty.",
+      "target": "tools.generated"
+    }
+  ],
+  "summary": "Offline deterministic Nucleus plan based on repeated failure patterns."
+}

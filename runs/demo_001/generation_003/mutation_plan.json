@@ -1,0 +1,23 @@
+{
+  "failure_patterns": [],
+  "proposed_mutations": [
+    {
+      "expected_improvement": "Create a real revise-before-final loop.",
+      "mutation_type": "add_workflow_step",
+      "patch": {
+        "action": "Revise the final answer using review notes, scenario constraints, and success criteria.",
+        "id": "revise_final_output",
+        "input_from": [
+          "solve_task",
+          "review_notes"
+        ],
+        "output_key": "final_output",
+        "role": "Founder"
+      },
+      "rationale": "Review notes should affect the delivered output.",
+      "risk": "May duplicate content if poorly executed.",
+      "target": "workflow"
+    }
+  ],
+  "summary": "Offline deterministic Nucleus plan based on repeated failure patterns."
+}

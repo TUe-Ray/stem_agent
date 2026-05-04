@@ -1,1 +1,1 @@
-Start by choosing one practical priority for: Create a tiny operator plan for preparing tomorrow's focus list.. Write down the desired outcome, pick the first action, and schedule a quick check.
+Start by choosing one practical priority for: Help me prepare for a difficult meeting.. Write down the desired outcome, pick the first action, and schedule a quick check.

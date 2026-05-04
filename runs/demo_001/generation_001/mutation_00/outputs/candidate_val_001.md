@@ -1,5 +1,5 @@
 ## Summary
-Create a focused, useful response for: Create a tiny operator plan for preparing tomorrow's focus list..
+Create a focused, useful response for: Help me prepare for a difficult meeting..
 
 ## Acceptance Criteria
 - The output names the goal.

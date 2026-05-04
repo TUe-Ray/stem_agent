@@ -1,1 +1,1 @@
-Start by choosing one practical priority for: Make a compact plan for organizing meeting notes after a call.. Write down the desired outcome, pick the first action, and schedule a quick check.
+Start by choosing one practical priority for: I need to organize my messy project notes.. Write down the desired outcome, pick the first action, and schedule a quick check.

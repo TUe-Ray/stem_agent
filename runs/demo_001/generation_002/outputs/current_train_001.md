@@ -1,5 +1,5 @@
 ## Summary
-Create a focused, useful response for: Turn cleaning up my downloads folder into a tiny task plan..
+Create a focused, useful response for: Help me plan a simple morning routine..
 
 ## Acceptance Criteria
 - The output names the goal.

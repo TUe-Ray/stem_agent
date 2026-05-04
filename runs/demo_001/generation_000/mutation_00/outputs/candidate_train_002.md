@@ -1,5 +1,5 @@
 ## Summary
-Create a focused, useful response for: Make a compact plan for organizing meeting notes after a call..
+Create a focused, useful response for: I need to organize my messy project notes..
 
 ## Steps
 1. Clarify the desired outcome in one sentence.
