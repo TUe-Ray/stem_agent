@@ -1,0 +1,37 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments and local installs
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/
+
+# StemOS runtime scratch space
+workspace/*
+!workspace/.gitkeep
+
+# Keep curated demo artifacts, but ignore ad-hoc run outputs by default.
+runs/*
+!runs/.gitkeep
+!runs/demo_001/
+!runs/demo_001/**
