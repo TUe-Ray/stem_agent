@@ -1,0 +1,44 @@
+{
+  "failure_patterns": [
+    "Missing requirement: Must include acceptance criteria",
+    "Missing requirement: Must include QA report",
+    "Missing requirement: Must include decision log"
+  ],
+  "proposed_mutations": [
+    {
+      "expected_improvement": "Improve task-operation structure and validation score.",
+      "mutation_type": "modify_environment",
+      "patch": {
+        "artifact_purpose": {
+          "artifacts/acceptance_criteria.md": "Track scenario requirements.",
+          "artifacts/decision_log.md": "Explain important harness decisions.",
+          "artifacts/draft_output.md": "Hold the candidate draft.",
+          "artifacts/final_output.md": "Store the final response.",
+          "artifacts/qa_report.md": "Record mutable self-evaluation notes."
+        },
+        "cleanup_policy": "keep_run_artifacts",
+        "file_templates": {
+          "artifacts/acceptance_criteria.md": "# Acceptance Criteria\n",
+          "artifacts/decision_log.md": "# Decision Log\n",
+          "artifacts/draft_output.md": "# Draft Output\n",
+          "artifacts/final_output.md": "# Final Output\n",
+          "artifacts/qa_report.md": "# QA Report\n"
+        },
+        "required_artifacts": [
+          "artifacts/acceptance_criteria.md",
+          "artifacts/draft_output.md",
+          "artifacts/qa_report.md",
+          "artifacts/decision_log.md",
+          "artifacts/final_output.md"
+        ],
+        "workspace_layout": [
+          "artifacts"
+        ]
+      },
+      "rationale": "The harness needs persistent task artifacts to preserve acceptance criteria, draft, QA, decisions, and final output.",
+      "risk": "More artifacts add complexity, so Guardian fitness should penalize overgrowth.",
+      "target": "environment"
+    }
+  ],
+  "summary": "Offline deterministic Nucleus plan based on repeated failure patterns."
+}

@@ -1,0 +1,43 @@
+{
+  "failure_patterns": [
+    "Missing requirement: Must include a short summary",
+    "Missing requirement: Must include acceptance criteria",
+    "Missing requirement: Must include concrete steps",
+    "Missing requirement: Must include QA report",
+    "Missing requirement: Must include decision log"
+  ],
+  "proposed_mutations": [
+    {
+      "expected_improvement": "Improve requirement coverage without changing Guardian fitness.",
+      "mutation_type": "modify_self_evaluation",
+      "patch": {
+        "enabled": true,
+        "rubric": [
+          "Must include a short summary",
+          "Must include acceptance criteria",
+          "Must include concrete steps",
+          "Must include QA report",
+          "Must include decision log",
+          "Must include final answer"
+        ]
+      },
+      "rationale": "Previous runs missed required output sections.",
+      "risk": "The harness may spend extra effort reviewing its own draft.",
+      "target": "self_evaluation"
+    },
+    {
+      "expected_improvement": "Could improve artifact awareness.",
+      "mutation_type": "create_tool",
+      "patch": {
+        "code": "import os\n\ndef run(input_data):\n    return {'cwd': os.getcwd()}\n",
+        "description": "Unsafe demo tool that Guardian should reject.",
+        "name": "unsafe_workspace_probe",
+        "test_code": "def test_unsafe_workspace_probe():\n    assert True\n"
+      },
+      "rationale": "Try to inspect workspace files for extra context.",
+      "risk": "Unsafe filesystem access must be blocked by Guardian.",
+      "target": "tools.generated"
+    }
+  ],
+  "summary": "Offline deterministic Nucleus plan based on repeated failure patterns."
+}

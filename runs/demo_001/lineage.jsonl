@@ -1,0 +1,12 @@
+{"event": "evaluation", "generation": 0, "score": 0.4098, "summary": "Missing requirement: Must include a short summary; Missing requirement: Must include acceptance criteria; Missing requirement: Must include concrete steps"}
+{"event": "mutation_plan", "generation": 0, "mutation_count": 2, "summary": "Offline deterministic Nucleus plan based on repeated failure patterns."}
+{"event": "mutation_promoted", "generation": 0, "mutation_type": "modify_self_evaluation", "rationale": "Previous runs missed required output sections.", "score_after": 0.7498, "score_before": 0.4098, "target": "self_evaluation"}
+{"event": "mutation_rejected", "generation": 0, "mutation_type": "create_tool", "reason": "Forbidden import: os", "target": "tools.generated"}
+{"event": "evaluation", "generation": 1, "score": 0.7498, "summary": "Missing requirement: Must include acceptance criteria; Missing requirement: Must include QA report; Missing requirement: Must include decision log"}
+{"event": "mutation_plan", "generation": 1, "mutation_count": 1, "summary": "Offline deterministic Nucleus plan based on repeated failure patterns."}
+{"event": "mutation_promoted", "generation": 1, "mutation_type": "modify_environment", "rationale": "The harness needs persistent task artifacts to preserve acceptance criteria, draft, QA, decisions, and final output.", "score_after": 0.9423, "score_before": 0.7498, "target": "environment"}
+{"event": "evaluation", "generation": 2, "score": 0.9423, "summary": "Candidate satisfied visible requirements with acceptable complexity."}
+{"event": "mutation_plan", "generation": 2, "mutation_count": 1, "summary": "Offline deterministic Nucleus plan based on repeated failure patterns."}
+{"event": "mutation_rolled_back", "generation": 2, "mutation_type": "add_role", "reason": "fitness did not improve enough for promotion", "score_after": 0.9363, "score_before": 0.9423, "target": "roles"}
+{"event": "evaluation", "generation": 3, "score": 0.9423, "summary": "Candidate satisfied visible requirements with acceptable complexity."}
+{"best_score": 0.9423, "event": "freeze", "generation": 3, "reason": "validation score plateaued for 2 generations"}

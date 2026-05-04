@@ -1,0 +1,2 @@
+{"id":"train_001","input":{"user_request":"Help me plan a simple morning routine."},"reference_notes":"Should include summary, steps, and final recommendation."}
+{"id":"train_002","input":{"user_request":"I need to organize my messy project notes."},"reference_notes":"Should give concrete organization method."}

@@ -1,0 +1,1 @@
+Start by choosing one practical priority for: Turn cleaning up my downloads folder into a tiny task plan.. Write down the desired outcome, pick the first action, and schedule a quick check.

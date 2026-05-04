@@ -1,0 +1,129 @@
+{
+  "case_results": [
+    {
+      "case_id": "train_001",
+      "failures": [
+        "Missing requirement: Must include a short summary",
+        "Missing requirement: Must include acceptance criteria",
+        "Missing requirement: Must include concrete steps",
+        "Missing requirement: Must include QA report",
+        "Missing requirement: Must include decision log",
+        "Missing requirement: Must include final answer"
+      ],
+      "final_output": "Start by choosing one practical priority for: Turn cleaning up my downloads folder into a tiny task plan.. Write down the desired outcome, pick the first action, and schedule a quick check.",
+      "metrics": {
+        "complexity_penalty": 0.0,
+        "cost_penalty": 0.004,
+        "format_validity": 0.3,
+        "requirement_coverage": 0.0,
+        "robustness": 1.0,
+        "scenario_success": 0.9999999999999999
+      },
+      "score": 0.40979999999999994
+    },
+    {
+      "case_id": "train_002",
+      "failures": [
+        "Missing requirement: Must include a short summary",
+        "Missing requirement: Must include acceptance criteria",
+        "Missing requirement: Must include concrete steps",
+        "Missing requirement: Must include QA report",
+        "Missing requirement: Must include decision log",
+        "Missing requirement: Must include final answer"
+      ],
+      "final_output": "Start by choosing one practical priority for: Make a compact plan for organizing meeting notes after a call.. Write down the desired outcome, pick the first action, and schedule a quick check.",
+      "metrics": {
+        "complexity_penalty": 0.0,
+        "cost_penalty": 0.004,
+        "format_validity": 0.3,
+        "requirement_coverage": 0.0,
+        "robustness": 1.0,
+        "scenario_success": 0.9999999999999999
+      },
+      "score": 0.40979999999999994
+    },
+    {
+      "case_id": "val_001",
+      "failures": [
+        "Missing requirement: Must include a short summary",
+        "Missing requirement: Must include acceptance criteria",
+        "Missing requirement: Must include concrete steps",
+        "Missing requirement: Must include QA report",
+        "Missing requirement: Must include decision log",
+        "Missing requirement: Must include final answer"
+      ],
+      "final_output": "Start by choosing one practical priority for: Create a tiny operator plan for preparing tomorrow's focus list.. Write down the desired outcome, pick the first action, and schedule a quick check.",
+      "metrics": {
+        "complexity_penalty": 0.0,
+        "cost_penalty": 0.004,
+        "format_validity": 0.3,
+        "requirement_coverage": 0.0,
+        "robustness": 1.0,
+        "scenario_success": 0.9999999999999999
+      },
+      "score": 0.40979999999999994
+    },
+    {
+      "case_id": "val_002",
+      "failures": [
+        "Missing requirement: Must include a short summary",
+        "Missing requirement: Must include acceptance criteria",
+        "Missing requirement: Must include concrete steps",
+        "Missing requirement: Must include QA report",
+        "Missing requirement: Must include decision log",
+        "Missing requirement: Must include final answer"
+      ],
+      "final_output": "Start by choosing one practical priority for: Turn fixing a messy README into a small task workflow.. Write down the desired outcome, pick the first action, and schedule a quick check.",
+      "metrics": {
+        "complexity_penalty": 0.0,
+        "cost_penalty": 0.004,
+        "format_validity": 0.3,
+        "requirement_coverage": 0.0,
+        "robustness": 1.0,
+        "scenario_success": 0.9999999999999999
+      },
+      "score": 0.40979999999999994
+    }
+  ],
+  "complexity_penalty": 0.0,
+  "cost_estimate": 0.08,
+  "failures": [
+    "Missing requirement: Must include a short summary",
+    "Missing requirement: Must include acceptance criteria",
+    "Missing requirement: Must include concrete steps",
+    "Missing requirement: Must include QA report",
+    "Missing requirement: Must include decision log",
+    "Missing requirement: Must include final answer",
+    "Missing requirement: Must include a short summary",
+    "Missing requirement: Must include acceptance criteria",
+    "Missing requirement: Must include concrete steps",
+    "Missing requirement: Must include QA report",
+    "Missing requirement: Must include decision log",
+    "Missing requirement: Must include final answer",
+    "Missing requirement: Must include a short summary",
+    "Missing requirement: Must include acceptance criteria",
+    "Missing requirement: Must include concrete steps",
+    "Missing requirement: Must include QA report",
+    "Missing requirement: Must include decision log",
+    "Missing requirement: Must include final answer",
+    "Missing requirement: Must include a short summary",
+    "Missing requirement: Must include acceptance criteria",
+    "Missing requirement: Must include concrete steps",
+    "Missing requirement: Must include QA report",
+    "Missing requirement: Must include decision log",
+    "Missing requirement: Must include final answer"
+  ],
+  "metrics": {
+    "complexity_penalty": 0.0,
+    "cost_penalty": 0.004,
+    "format_validity": 0.3,
+    "requirement_coverage": 0.0,
+    "robustness": 1.0,
+    "scenario_success": 0.9999999999999999
+  },
+  "promotion_score": 0.40979999999999994,
+  "score": 0.40979999999999994,
+  "split_policy": "weighted_train_validation_35_65",
+  "train_score": 0.40979999999999994,
+  "validation_score": 0.40979999999999994
+}

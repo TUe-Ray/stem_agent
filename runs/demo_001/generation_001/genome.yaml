@@ -1,0 +1,69 @@
+genome_version: 1
+name: tiny_task_operator_seed
+scenario_name: tiny_task_operator
+task_diagnosis:
+  task_type: tiny task operation harness
+  expected_task_solving_pattern: Read the input, extract requirements, draft an answer,
+    check it against scenario requirements, and return a final output.
+  likely_failure_modes:
+  - missing required output sections
+  - low actionability
+  - losing intermediate task decisions
+  likely_needed_capabilities:
+  - structured drafting
+  - requirement checking
+  - workspace artifact planning
+  initial_architecture_hypothesis: Start with a Founder role, then evolve self-evaluation,
+    environment artifacts, and review steps only if fitness shows gaps.
+  initial_evaluation_hypothesis: Use immutable Guardian fitness for coverage, usefulness,
+    format, robustness, cost, and complexity; use genome self-evaluation only inside
+    candidate harnesses.
+roles:
+- name: Founder
+  description: A general-purpose problem solver.
+  instructions: Solve the task directly and return a useful answer.
+  allowed_tools:
+  - call_model
+workflow:
+- id: understand_task
+  role: Founder
+  action: Read the task input and identify what is being asked.
+  input_from: []
+  output_key: understanding
+- id: solve_task
+  role: Founder
+  action: Produce the final output.
+  input_from:
+  - understanding
+  output_key: final_output
+tools:
+  builtin:
+  - call_model
+  generated: []
+memory:
+  type: ephemeral
+  schema:
+    notes: string
+quality_gates: []
+self_evaluation:
+  enabled: true
+  rubric:
+  - Must include a short summary
+  - Must include acceptance criteria
+  - Must include concrete steps
+  - Must include QA report
+  - Must include decision log
+  - Must include final answer
+retry_policy:
+  max_attempts: 1
+  revise_on_failure: false
+stop_rule:
+  max_generations: 5
+  patience: 2
+  min_delta: 0.03
+environment:
+  workspace_layout: []
+  required_artifacts: []
+  artifact_purpose: {}
+  file_templates: {}
+  cleanup_policy: keep_run_artifacts

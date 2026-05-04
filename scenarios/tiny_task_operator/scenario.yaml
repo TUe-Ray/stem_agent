@@ -1,0 +1,55 @@
+scenario:
+  name: "tiny_task_operator"
+  description: "Turn a small user request into a compact operating plan with artifacts and a final answer."
+  task_class: "tiny task operation harness"
+
+input_format:
+  type: "text"
+  fields:
+    - name: "user_request"
+      required: true
+
+expected_output:
+  type: "markdown"
+  requirements:
+    - "Must include a short summary"
+    - "Must include acceptance criteria"
+    - "Must include concrete steps"
+    - "Must include QA report"
+    - "Must include decision log"
+    - "Must include final answer"
+
+constraints:
+  - "Do not ask unnecessary clarification questions"
+  - "Prefer actionable output"
+  - "Keep the task operator compact"
+
+available_builtin_tools:
+  - "call_model"
+  - "read_file"
+  - "write_file"
+  - "inspect_workspace"
+
+success_criteria:
+  - name: "requirement_coverage"
+    weight: 0.4
+    description: "Required task-operation sections are present."
+  - name: "operator_usefulness"
+    weight: 0.3
+    description: "The plan can be executed directly."
+  - name: "format_validity"
+    weight: 0.2
+    description: "Markdown sections are readable."
+  - name: "cost_efficiency"
+    weight: 0.1
+    description: "The harness stays compact."
+
+evolution:
+  max_generations: 5
+  patience: 2
+  min_delta: 0.03
+  max_mutations_per_generation: 4
+  max_cost_usd: 2.0
+  max_workflow_steps: 8
+  max_roles: 6
+  max_environment_artifacts: 8

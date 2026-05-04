@@ -1,0 +1,2 @@
+{"id":"train_001","input":{"user_request":"Turn cleaning up my downloads folder into a tiny task plan."},"reference_notes":"Should include acceptance criteria, steps, QA, decision log, and final answer."}
+{"id":"train_002","input":{"user_request":"Make a compact plan for organizing meeting notes after a call."},"reference_notes":"Should preserve decisions and final output."}

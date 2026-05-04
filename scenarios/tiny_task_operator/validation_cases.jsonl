@@ -1,0 +1,2 @@
+{"id":"val_001","input":{"user_request":"Create a tiny operator plan for preparing tomorrow's focus list."},"reference_notes":"Should use artifacts and remain compact."}
+{"id":"val_002","input":{"user_request":"Turn fixing a messy README into a small task workflow."},"reference_notes":"Should be actionable and include QA."}

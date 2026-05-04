@@ -1,0 +1,41 @@
+scenario:
+  name: "blank_template"
+  description: "A blank template for a future StemOS scenario."
+  task_class: "general task class"
+
+input_format:
+  type: "text"
+  fields:
+    - name: "user_request"
+      required: true
+
+expected_output:
+  type: "markdown"
+  requirements:
+    - "Must include a short summary"
+    - "Must include concrete steps"
+    - "Must include final answer"
+
+constraints:
+  - "Prefer actionable output"
+
+available_builtin_tools:
+  - "call_model"
+
+success_criteria:
+  - name: "requirement_coverage"
+    weight: 0.5
+    description: "Output satisfies required sections."
+  - name: "usefulness"
+    weight: 0.5
+    description: "Output is useful and actionable."
+
+evolution:
+  max_generations: 5
+  patience: 2
+  min_delta: 0.03
+  max_mutations_per_generation: 4
+  max_cost_usd: 2.0
+  max_workflow_steps: 8
+  max_roles: 6
+  max_environment_artifacts: 8
