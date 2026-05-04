@@ -28,7 +28,10 @@ class _FakeResponses:
 
 
 class _FakeCompletions:
+    last_kwargs = None
+
     def create(self, **kwargs):
+        _FakeCompletions.last_kwargs = kwargs
         if "response_format" in kwargs:
             return _FakeChatResponse(json.dumps({"ok": True}))
         return _FakeChatResponse("OK")
@@ -76,3 +79,51 @@ def test_settings_default_model_is_chat_completions_friendly(monkeypatch):
     monkeypatch.delenv("STEMOS_MODEL", raising=False)
 
     assert Settings().model == "gpt-4.1-mini"
+
+
+def test_strict_chat_schema_disallows_extra_properties_recursively():
+    client = ModelClient()
+    schema = {
+        "type": "object",
+        "properties": {
+            "outer": {
+                "type": "object",
+                "properties": {
+                    "inner": {"type": "string"},
+                },
+            },
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}},
+                },
+            },
+        },
+    }
+
+    normalized = client._normalize_strict_json_schema(schema)
+
+    assert normalized["additionalProperties"] is False
+    assert normalized["required"] == ["outer", "items"]
+    assert normalized["properties"]["outer"]["additionalProperties"] is False
+    assert normalized["properties"]["outer"]["required"] == ["inner"]
+    assert normalized["properties"]["items"]["items"]["additionalProperties"] is False
+    assert normalized["properties"]["items"]["items"]["required"] == ["name"]
+
+
+def test_chat_completions_uses_json_object_for_freeform_patch(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(model_client_module, "OpenAI", _FakeOpenAI, raising=False)
+
+    client = ModelClient(model="gpt-4.1-mini", offline=False, endpoint="chat_completions")
+    client.call(
+        "Return JSON",
+        response_schema={
+            "type": "object",
+            "properties": {"patch": {"type": "object"}},
+            "required": ["patch"],
+        },
+    )
+
+    assert _FakeCompletions.last_kwargs["response_format"] == {"type": "json_object"}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -56,8 +57,13 @@ class Sandbox:
             "pytest",
             ".",
             "-q",
+            "--capture=no",
+            "-p",
+            "no:cacheprovider",
         ]
         try:
+            env = os.environ.copy()
+            env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
             completed = subprocess.run(
                 command,
                 cwd=tool_dir,
@@ -65,6 +71,7 @@ class Sandbox:
                 text=True,
                 capture_output=True,
                 check=False,
+                env=env,
             )
         except subprocess.TimeoutExpired:
             return ValidationResult.reject("Generated tool tests timed out")

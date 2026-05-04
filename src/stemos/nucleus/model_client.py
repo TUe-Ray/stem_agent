@@ -115,14 +115,25 @@ class ModelClient:
             "messages": [{"role": "user", "content": prompt}],
         }
         if response_schema:
-            kwargs["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "stemos_structured_output",
-                    "schema": response_schema,
-                    "strict": True,
-                },
-            }
+            if self._has_freeform_object(response_schema):
+                kwargs["messages"] = [
+                    {
+                        "role": "user",
+                        "content": "Return only valid JSON matching the requested schema.\n"
+                        + prompt,
+                    }
+                ]
+                kwargs["response_format"] = {"type": "json_object"}
+            else:
+                normalized_schema = self._normalize_strict_json_schema(response_schema)
+                kwargs["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "stemos_structured_output",
+                        "schema": normalized_schema,
+                        "strict": True,
+                    },
+                }
         response = client.chat.completions.create(**kwargs)
         content = response.choices[0].message.content or ""
         if response_schema:
@@ -132,3 +143,33 @@ class ModelClient:
     def _is_responses_scope_error(self, exc: Exception) -> bool:
         text = str(exc).lower()
         return any(hint in text for hint in RESPONSES_SCOPE_HINTS)
+
+    def _normalize_strict_json_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
+        """Make Pydantic JSON schema acceptable to strict Chat Completions."""
+        normalized = json.loads(json.dumps(schema))
+        self._force_no_additional_properties(normalized)
+        return normalized
+
+    def _has_freeform_object(self, schema: Any) -> bool:
+        if isinstance(schema, dict):
+            if (
+                schema.get("type") == "object"
+                and not schema.get("properties")
+                and schema.get("additionalProperties") is not False
+            ):
+                return True
+            return any(self._has_freeform_object(value) for value in schema.values())
+        if isinstance(schema, list):
+            return any(self._has_freeform_object(item) for item in schema)
+        return False
+
+    def _force_no_additional_properties(self, node: Any) -> None:
+        if isinstance(node, dict):
+            if node.get("type") == "object" or "properties" in node:
+                node["additionalProperties"] = False
+                node["required"] = list(node.get("properties", {}).keys())
+            for value in node.values():
+                self._force_no_additional_properties(value)
+        elif isinstance(node, list):
+            for item in node:
+                self._force_no_additional_properties(item)

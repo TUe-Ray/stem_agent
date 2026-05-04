@@ -45,7 +45,17 @@ class MutationPlanner:
             NUCLEUS_SYSTEM_PROMPT + "\n" + str(payload),
             response_schema=MutationPlan.model_json_schema(),
         )
-        return MutationPlan.model_validate(result)
+        if isinstance(result, dict) and "mutation_plan" in result:
+            result = result["mutation_plan"]
+        try:
+            return MutationPlan.model_validate(result)
+        except Exception:
+            return self._deterministic_plan(
+                scenario=scenario,
+                genome=genome,
+                failure_patterns=failure_patterns,
+                lineage_summary=lineage_summary,
+            )
 
     def _deterministic_plan(
         self,
