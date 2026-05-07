@@ -35,3 +35,5 @@ runs/*
 !runs/.gitkeep
 !runs/demo_001/
 !runs/demo_001/**
+runs/demo_001/visuals/training_progress.md
+openai_002_review_bundle.tar.gz
