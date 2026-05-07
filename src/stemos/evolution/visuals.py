@@ -43,6 +43,7 @@ class VisualizationBuilder:
         visuals_dir.mkdir(parents=True, exist_ok=True)
 
         files = {
+            "training_progress.md": self.training_progress(artifacts.run_dir),
             "evolution_timeline.md": self.evolution_timeline(artifacts),
             "organism_shape.md": self.organism_shape(artifacts),
             "harness_before_after.md": self.harness_before_after(artifacts),
@@ -60,12 +61,22 @@ class VisualizationBuilder:
             self.embed_in_report(artifacts.run_dir, self.report_visual_block(artifacts))
         return paths
 
+    def progress(self, run_dir: str | Path) -> Path:
+        run_path = Path(run_dir)
+        visuals_dir = run_path / "visuals"
+        visuals_dir.mkdir(parents=True, exist_ok=True)
+        path = visuals_dir / "training_progress.md"
+        path.write_text(self.training_progress(run_path), encoding="utf-8")
+        return path
+
     def report_visual_block(self, artifacts: RunArtifacts) -> str:
         sections = [
             VISUALS_START,
             "## Visual Overview",
             "",
             self.openai_run_metadata(artifacts),
+            "",
+            self.training_progress(artifacts.run_dir),
             "",
             self.evolution_timeline(artifacts),
             "",
@@ -82,6 +93,35 @@ class VisualizationBuilder:
             VISUALS_END,
         ]
         return "\n".join(sections).rstrip() + "\n"
+
+    def training_progress(self, run_dir: str | Path) -> str:
+        run_path = Path(run_dir)
+        lineage = self._read_lineage_optional(run_path / "lineage.jsonl")
+        generation_rows = self._generation_progress_rows(run_path, lineage)
+        decision_rows = self._decision_progress_rows(lineage)
+        best_score = max((row["promotion_score"] for row in generation_rows), default=0.0)
+        latest_generation = generation_rows[-1]["generation"] if generation_rows else "none"
+        status = self._progress_status(run_path, lineage)
+
+        return "\n".join(
+            [
+                "# StemOS Training Progress",
+                "",
+                f"- Run: `{run_path}`",
+                f"- Status: {status}",
+                f"- Latest generation: {latest_generation}",
+                f"- Best observed promotion score: {best_score:.4f}",
+                "",
+                self._score_chart(generation_rows),
+                "",
+                self._score_table(generation_rows),
+                "",
+                self._decision_timeline(decision_rows),
+                "",
+                self._decision_table(decision_rows),
+                "",
+            ]
+        ).rstrip() + "\n"
 
     def embed_in_report(self, run_dir: Path, block: str) -> None:
         report_path = run_dir / "report.md"
@@ -398,6 +438,186 @@ class VisualizationBuilder:
         path.write_text(content, encoding="utf-8")
         return path
 
+    def _generation_progress_rows(
+        self, run_dir: Path, lineage: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        rows_by_generation: dict[int, dict[str, Any]] = {}
+        for generation_dir in sorted(run_dir.glob("generation_*")):
+            if not generation_dir.is_dir():
+                continue
+            try:
+                generation = int(generation_dir.name.split("_", 1)[1])
+            except (IndexError, ValueError):
+                continue
+            eval_path = generation_dir / "eval_result.json"
+            if not eval_path.exists():
+                continue
+            data = self._read_json(eval_path)
+            rows_by_generation[generation] = {
+                "generation": generation,
+                "promotion_score": float(data.get("promotion_score", data.get("score", 0.0))),
+                "train_score": float(data.get("train_score", 0.0)),
+                "validation_score": data.get("validation_score"),
+                "summary": "",
+            }
+
+        for event in lineage:
+            if event.get("event") != "evaluation":
+                continue
+            generation = event.get("generation")
+            if generation is None:
+                continue
+            row = rows_by_generation.setdefault(
+                int(generation),
+                {
+                    "generation": int(generation),
+                    "promotion_score": float(event.get("score", 0.0)),
+                    "train_score": 0.0,
+                    "validation_score": None,
+                    "summary": "",
+                },
+            )
+            row["summary"] = str(event.get("summary", ""))
+
+        return [rows_by_generation[key] for key in sorted(rows_by_generation)]
+
+    def _decision_progress_rows(self, lineage: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for event in lineage:
+            kind = event.get("event")
+            if kind not in {
+                "mutation_promoted",
+                "mutation_rejected",
+                "mutation_rolled_back",
+                "freeze",
+            }:
+                continue
+            rows.append(
+                {
+                    "generation": event.get("generation", ""),
+                    "decision": {
+                        "mutation_promoted": "promoted",
+                        "mutation_rejected": "rejected",
+                        "mutation_rolled_back": "rolled back",
+                        "freeze": "frozen",
+                    }.get(str(kind), str(kind)),
+                    "mutation_type": event.get("mutation_type", ""),
+                    "target": event.get("target", ""),
+                    "score_before": event.get("score_before", ""),
+                    "score_after": event.get("score_after", event.get("best_score", "")),
+                    "reason": event.get("reason") or event.get("rationale") or "",
+                }
+            )
+        return rows
+
+    def _progress_status(self, run_dir: Path, lineage: list[dict[str, Any]]) -> str:
+        if any(event.get("event") == "freeze" for event in lineage):
+            return "frozen"
+        control_path = run_dir / "control.json"
+        if control_path.exists():
+            try:
+                control = self._read_json(control_path)
+                return str(control.get("status") or control.get("command") or "running")
+            except json.JSONDecodeError:
+                return "control file unreadable"
+        if lineage:
+            return "in progress or stopped before freeze"
+        return "no progress recorded yet"
+
+    def _score_chart(self, rows: list[dict[str, Any]]) -> str:
+        if not rows:
+            return "\n".join(
+                [
+                    "## Promotion Score Chart",
+                    "",
+                    "No generation scores recorded yet.",
+                ]
+            )
+        generations = ", ".join(str(row["generation"]) for row in rows)
+        scores = ", ".join(f"{row['promotion_score']:.4f}" for row in rows)
+        return "\n".join(
+            [
+                "## Promotion Score Chart",
+                "",
+                "```mermaid",
+                "xychart-beta",
+                '  title "Promotion score by generation"',
+                f"  x-axis [{generations}]",
+                '  y-axis "score" 0 --> 1',
+                f"  line [{scores}]",
+                "```",
+            ]
+        )
+
+    def _score_table(self, rows: list[dict[str, Any]]) -> str:
+        table = [
+            "## Generation Scores",
+            "",
+            "| Generation | Promotion | Train | Validation | Summary |",
+            "|---:|---:|---:|---:|---|",
+        ]
+        if not rows:
+            table.append("| | | | | No scores recorded yet. |")
+            return "\n".join(table)
+        for row in rows:
+            validation = row.get("validation_score")
+            validation_text = "" if validation is None else f"{float(validation):.4f}"
+            table.append(
+                "| {generation} | {promotion:.4f} | {train:.4f} | {validation} | {summary} |".format(
+                    generation=row["generation"],
+                    promotion=row["promotion_score"],
+                    train=row["train_score"],
+                    validation=validation_text,
+                    summary=self._escape_table(str(row.get("summary", ""))),
+                )
+            )
+        return "\n".join(table)
+
+    def _decision_timeline(self, rows: list[dict[str, Any]]) -> str:
+        if not rows:
+            return "\n".join(
+                [
+                    "## Decision Timeline",
+                    "",
+                    "No mutation decisions recorded yet.",
+                ]
+            )
+        lines = ["## Decision Timeline", "", "```mermaid", "timeline", "  title Mutation decisions"]
+        for row in rows:
+            generation = row.get("generation", "")
+            decision = row.get("decision", "")
+            mutation = row.get("mutation_type") or "run"
+            target = row.get("target") or "best genome"
+            lines.append(
+                f"  generation {generation} : {decision} {mutation} on {target}"
+            )
+        lines.append("```")
+        return "\n".join(lines)
+
+    def _decision_table(self, rows: list[dict[str, Any]]) -> str:
+        table = [
+            "## Mutation Decisions",
+            "",
+            "| Generation | Decision | Mutation | Target | Score before | Score after | Reason |",
+            "|---:|---|---|---|---:|---:|---|",
+        ]
+        if not rows:
+            table.append("| | | | | | | No decisions recorded yet. |")
+            return "\n".join(table)
+        for row in rows:
+            table.append(
+                "| {generation} | {decision} | {mutation} | {target} | {before} | {after} | {reason} |".format(
+                    generation=row.get("generation", ""),
+                    decision=self._escape_table(str(row.get("decision", ""))),
+                    mutation=self._escape_table(str(row.get("mutation_type", ""))),
+                    target=self._escape_table(str(row.get("target", ""))),
+                    before=row.get("score_before", ""),
+                    after=row.get("score_after", ""),
+                    reason=self._escape_table(str(row.get("reason", ""))),
+                )
+            )
+        return "\n".join(table)
+
     def _load_artifacts(self, run_dir: Path) -> RunArtifacts:
         baseline_genome = load_genome(run_dir / "baseline_genome.yaml")
         frozen_genome = load_genome(run_dir / "frozen_genome.yaml")
@@ -600,3 +820,8 @@ class VisualizationBuilder:
             for line in path.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
+
+    def _read_lineage_optional(self, path: Path) -> list[dict[str, Any]]:
+        if not path.exists():
+            return []
+        return self._read_lineage(path)

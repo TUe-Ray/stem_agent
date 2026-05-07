@@ -1,0 +1,64 @@
+scenario:
+  name: "hard_scenario"
+  description: "Evolve a robust task-operator harness for ambiguous, high-stakes requests with explicit risk, dependency, and rollback handling."
+  task_class: "complex task operation harness"
+
+input_format:
+  type: "text"
+  fields:
+    - name: "user_request"
+      required: true
+
+expected_output:
+  type: "markdown"
+  requirements:
+    - "Must include a short summary"
+    - "Must include assumptions and unknowns"
+    - "Must include acceptance criteria"
+    - "Must include concrete steps"
+    - "Must include dependencies and owners"
+    - "Must include risk register with mitigations"
+    - "Must include verification checklist"
+    - "Must include fallback recovery plan"
+    - "Must include QA report"
+    - "Must include decision log"
+    - "Must include final answer"
+
+constraints:
+  - "Do not ask unnecessary clarification questions"
+  - "Prefer actionable output under uncertainty"
+  - "Explicitly handle tradeoffs and risk"
+  - "Keep output operational and auditable"
+
+available_builtin_tools:
+  - "call_model"
+  - "read_file"
+  - "write_file"
+  - "inspect_workspace"
+
+success_criteria:
+  - name: "requirement_coverage"
+    weight: 0.3
+    description: "Required sections and control surfaces are present."
+  - name: "operational_depth"
+    weight: 0.2
+    description: "Plan has owners, dependencies, and checkpoints."
+  - name: "risk_and_recovery"
+    weight: 0.2
+    description: "Risks, mitigations, and fallback recovery paths are explicit and realistic."
+  - name: "verification_quality"
+    weight: 0.2
+    description: "Verification is concrete, testable, and tied to acceptance."
+  - name: "cost_efficiency"
+    weight: 0.1
+    description: "Harness avoids unnecessary complexity."
+
+evolution:
+  max_generations: 10
+  patience: 3
+  min_delta: 0.02
+  max_mutations_per_generation: 5
+  max_cost_usd: 12.0
+  max_workflow_steps: 10
+  max_roles: 8
+  max_environment_artifacts: 10

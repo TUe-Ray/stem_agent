@@ -56,33 +56,82 @@ Nucleus may evolve mutable self-evaluation. It must never modify immutable Guard
 
 ## Setup
 
+StemOS requires Python 3.10 or newer. The default setup runs in offline deterministic
+mode and does not require an OpenAI API key.
+
+### 1. Create a virtual environment
+
 ```bash
 git clone <repo-url>
-cd stemos
-python -m venv .venv
+cd stem_agent
+python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
+```
+
+### 2. Install the package
+
+For local development and tests:
+
+```bash
 pip install -e ".[dev]"
+```
+
+For OpenAI-backed runs, install the optional OpenAI adapter too:
+
+```bash
+pip install -e ".[dev,openai]"
+```
+
+### 3. Configure environment variables
+
+Copy the example file:
+
+```bash
 cp .env.example .env
-export OPENAI_API_KEY=""
-pytest
 ```
 
-Offline deterministic mode is enabled by default and does not require real OpenAI calls:
+The app reads settings from environment variables. A `.env` file is a convenient
+template, but it is not loaded automatically by this repo. To load it in your shell:
 
 ```bash
-export STEMOS_OFFLINE_MODE=true
+set -a
+source .env
+set +a
 ```
 
-For an OpenAI key that can use Chat Completions but not the Responses API, use:
+For offline deterministic mode, keep:
 
 ```bash
-export OPENAI_API_KEY="..."
-export STEMOS_OFFLINE_MODE=false
-export STEMOS_MODEL=gpt-4.1-mini
-export STEMOS_OPENAI_ENDPOINT=chat_completions
+STEMOS_OFFLINE_MODE=true
+OPENAI_API_KEY=
+```
+
+For OpenAI-backed runs with Chat Completions, set:
+
+```bash
+OPENAI_API_KEY=...
+STEMOS_OFFLINE_MODE=false
+STEMOS_MODEL=gpt-4.1-mini
+STEMOS_OPENAI_ENDPOINT=chat_completions
 ```
 
 `STEMOS_OPENAI_ENDPOINT=auto` first tries the Responses API, then falls back to Chat Completions if the key is missing `api.responses.write` scope.
+
+### 4. Verify the install
+
+```bash
+python -m pytest
+stemos --help
+stemos evolve scenarios/toy_structured_answer --run-id smoke_001
+stemos execute runs/smoke_001/frozen_genome.yaml --input "Help me plan a focused workday." --stream-trace
+```
+
+If the `stemos` command is not found, confirm the virtual environment is active:
+
+```bash
+source .venv/bin/activate
+```
 
 ## Provide A Scenario
 
@@ -108,10 +157,23 @@ Smoke test:
 stemos evolve scenarios/toy_structured_answer --run-id smoke_001
 ```
 
+To watch agent outputs and Nucleus/Guardian decisions while evolution runs:
+
+```bash
+stemos evolve scenarios/toy_structured_answer --run-id smoke_001 --stream-training-transcript
+```
+
 Stronger demo:
 
 ```bash
 stemos evolve scenarios/tiny_task_operator --run-id demo_001
+```
+
+Harder benchmark scenario:
+
+```bash
+stemos evolve scenarios/hard_scenario --run-id hard_001 --stream-training-transcript
+stemos progress runs/hard_001
 ```
 
 Optional Git provenance is off by default:
@@ -146,6 +208,7 @@ The run writes:
 stemos inspect runs/demo_001
 stemos compare runs/demo_001
 stemos visualize runs/demo_001
+stemos progress runs/demo_001
 stemos aggregate runs/openai_001 runs/openai_002 runs/openai_003
 ```
 
@@ -162,7 +225,13 @@ stemos aggregate runs/openai_001 runs/openai_002 runs/openai_003
 - Guardian selection board
 - OpenAI run metadata without API keys
 
-`stemos visualize` writes reviewer-facing files under `runs/<run_id>/visuals/`, including `evolution_timeline.md`, `organism_shape.md`, `harness_before_after.md`, `guardian_selection_board.md`, `output_comparison.md`, and `visual_report.md`.
+`stemos progress` writes or refreshes `runs/<run_id>/visuals/training_progress.md`, which includes a promotion-score chart, generation score table, and mutation decision timeline. It can be used while a run is still in progress:
+
+```bash
+watch -n 2 'stemos progress runs/smoke_001'
+```
+
+`stemos visualize` writes reviewer-facing files under `runs/<run_id>/visuals/`, including `training_progress.md`, `evolution_timeline.md`, `organism_shape.md`, `harness_before_after.md`, `guardian_selection_board.md`, `output_comparison.md`, and `visual_report.md`.
 
 ## Safe Stop Controls
 

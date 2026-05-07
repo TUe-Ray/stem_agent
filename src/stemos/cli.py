@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional
 
 import typer
 import yaml
@@ -98,14 +99,41 @@ def evolve(
     git_branch: bool = typer.Option(False, "--git-branch"),
     git_commit: bool = typer.Option(False, "--git-commit"),
     git_push: bool = typer.Option(False, "--git-push"),
+    progress_bar: bool = typer.Option(
+        True,
+        "--progress-bar/--no-progress-bar",
+        help="Show a live generation progress bar during evolution.",
+    ),
+    stream_training_transcript: bool = typer.Option(
+        False,
+        "--stream-training-transcript",
+        help="Print agent outputs and Nucleus/Guardian decisions during evolution.",
+    ),
 ) -> None:
-    result = EvolutionLoop().evolve(
-        scenario_path,
-        run_id,
-        git_branch=git_branch,
-        git_commit=git_commit,
-        git_push=git_push,
-    )
+    scenario = load_scenario(scenario_path).scenario
+    sinks: list[Callable[[dict[str, Any]], None]] = []
+    progress = None
+    if progress_bar:
+        progress = _TrainingProgressBar(
+            total_generations=max(int(scenario.evolution.max_generations), 1),
+        )
+        sinks.append(progress.on_event)
+    if stream_training_transcript:
+        sinks.append(_echo_training_transcript_event)
+    event_sink = _compose_event_sinks(sinks)
+    result = None
+    try:
+        result = EvolutionLoop().evolve(
+            scenario_path,
+            run_id,
+            git_branch=git_branch,
+            git_commit=git_commit,
+            git_push=git_push,
+            event_sink=event_sink,
+        )
+    finally:
+        if progress:
+            progress.finish(status=result.status if result else "stopped")
     typer.echo(f"Run directory: {result.run_dir}")
     typer.echo(f"Status: {result.status}")
     typer.echo(f"Baseline score: {result.baseline_score:.4f}")
@@ -158,6 +186,12 @@ def visualize(run_path: Path) -> None:
 
 
 @app.command()
+def progress(run_path: Path) -> None:
+    path = VisualizationBuilder().progress(run_path)
+    typer.echo(f"Training progress written to {path}")
+
+
+@app.command()
 def aggregate(run_paths: list[Path]) -> None:
     path = VisualizationBuilder().aggregate(run_paths)
     typer.echo(f"Aggregate report: {path}")
@@ -168,6 +202,26 @@ def execute(
     frozen_genome: Path,
     input: str = typer.Option(..., "--input"),
     scenario_path: Optional[Path] = typer.Option(None, "--scenario-path"),
+    show_trace: bool = typer.Option(
+        False,
+        "--show-trace",
+        help="Show observable role execution state after the final output.",
+    ),
+    show_transcript: bool = typer.Option(
+        False,
+        "--show-transcript",
+        help="Show a readable agent transcript after the final output.",
+    ),
+    stream_trace: bool = typer.Option(
+        False,
+        "--stream-trace",
+        help="Print observable role execution state as the harness runs.",
+    ),
+    stream_transcript: bool = typer.Option(
+        False,
+        "--stream-transcript",
+        help="Print a readable agent transcript as the harness runs.",
+    ),
 ) -> None:
     genome = load_genome(frozen_genome)
     scenario_root = scenario_path or _infer_scenario_path(frozen_genome)
@@ -178,8 +232,22 @@ def execute(
         workspace_dir=frozen_genome.parent / "execute_workspace",
     )
     case = TaskCase(id="execute_001", input={"user_request": input})
-    result = HarnessRunner().run_case(harness, case)
+    trace_sink = None
+    if stream_transcript:
+        trace_sink = _echo_transcript_event
+    elif stream_trace:
+        trace_sink = _echo_trace_event
+    result = HarnessRunner().run_case(harness, case, trace_sink=trace_sink)
+    if stream_trace or stream_transcript:
+        typer.echo("")
+        typer.echo("## Final Output")
     typer.echo(result.final_output)
+    if show_trace:
+        typer.echo("")
+        typer.echo(_format_execution_trace(result.traces))
+    if show_transcript:
+        typer.echo("")
+        typer.echo(_format_execution_transcript(result.traces))
 
 
 @app.command("pause")
@@ -272,6 +340,305 @@ def _read_eval(path: Path) -> dict:
     if not path.exists():
         raise typer.BadParameter(f"Missing evaluation result: {path}")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _format_execution_trace(traces: list[dict]) -> str:
+    lines = ["## Execution Trace"]
+    for trace in traces:
+        event_text = _format_trace_event(trace)
+        if event_text:
+            lines.extend(event_text.splitlines())
+    return "\n".join(lines)
+
+
+def _format_execution_transcript(traces: list[dict]) -> str:
+    lines = ["## Agent Transcript"]
+    for trace in traces:
+        event_text = _format_transcript_event(trace)
+        if event_text:
+            lines.extend(event_text.splitlines())
+            lines.append("")
+    if lines[-1] == "":
+        lines.pop()
+    return "\n".join(lines)
+
+
+def _echo_training_transcript_event(event: dict) -> None:
+    event_text = _format_training_transcript_event(event)
+    if event_text:
+        typer.echo(event_text)
+        typer.echo("")
+
+
+def _compose_event_sinks(
+    sinks: list[Callable[[dict[str, Any]], None]],
+) -> Callable[[dict[str, Any]], None] | None:
+    active = [sink for sink in sinks if sink is not None]
+    if not active:
+        return None
+
+    def _sink(event: dict[str, Any]) -> None:
+        for sink in active:
+            sink(event)
+
+    return _sink
+
+
+class _TrainingProgressBar:
+    def __init__(self, total_generations: int) -> None:
+        self.total_generations = max(total_generations, 1)
+        self.completed = 0
+        self._render("starting")
+
+    def on_event(self, event: dict[str, Any]) -> None:
+        kind = event.get("event")
+        if kind == "generation_start":
+            generation = int(event.get("generation", 0))
+            self.completed = min(generation, self.total_generations)
+            self._render("running")
+        elif kind == "evaluation_complete" and event.get("label") == "current":
+            generation = int(event.get("generation", 0))
+            self.completed = min(generation + 1, self.total_generations)
+            self._render("running")
+        elif kind == "freeze":
+            self.completed = self.total_generations
+            self._render("frozen")
+
+    def finish(self, status: str) -> None:
+        if self.completed < self.total_generations and status == "FROZEN":
+            self.completed = self.total_generations
+        self._render(status.lower())
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+
+    def _render(self, state: str) -> None:
+        width = 28
+        ratio = self.completed / self.total_generations
+        filled = int(ratio * width)
+        bar = "#" * filled + "-" * (width - filled)
+        sys.stdout.write(
+            "\r"
+            f"Training progress [{bar}] {self.completed}/{self.total_generations} ({state})"
+        )
+        sys.stdout.flush()
+
+
+def _echo_trace_event(trace: dict) -> None:
+    event_text = _format_trace_event(trace)
+    if event_text:
+        typer.echo(event_text)
+
+
+def _echo_transcript_event(trace: dict) -> None:
+    event_text = _format_transcript_event(trace)
+    if event_text:
+        typer.echo(event_text)
+        typer.echo("")
+
+
+def _format_trace_event(trace: dict) -> str:
+    event = trace.get("event")
+    if event == "workflow_step":
+        observation = trace.get("agent_observation", {})
+        return "\n".join(
+            [
+                f"- Role: {trace.get('role', 'unknown')}",
+                f"  Step: {trace.get('step_id', 'unknown')}",
+                f"  Goal: {observation.get('goal') or trace.get('step_action', '')}",
+                f"  Context: {observation.get('available_context', '')}",
+                "  Output: "
+                f"{observation.get('output_summary') or trace.get('output_summary', '')}",
+                f"  Boundary: {observation.get('reasoning_boundary', '')}",
+            ]
+        )
+    if event == "quality_gate":
+        missing = trace.get("missing") or []
+        missing_text = ", ".join(str(item) for item in missing) if missing else "none"
+        return "\n".join(
+            [
+                f"- Quality gate: {trace.get('gate', 'unknown')}",
+                f"  Passed: {trace.get('passed')}",
+                f"  Missing: {missing_text}",
+            ]
+        )
+    if event == "environment_materialized":
+        artifacts = ", ".join(str(item) for item in trace.get("artifacts", []))
+        return f"- Environment artifacts: {artifacts}"
+    return ""
+
+
+def _format_training_transcript_event(event: dict) -> str:
+    event_type = event.get("event")
+    generation = event.get("generation")
+    prefix = _training_prefix(generation)
+    if event_type == "evolution_start":
+        mode = "resume" if event.get("resume") else "new run"
+        return "\n".join(
+            [
+                "[Training / start]",
+                f"Scenario: {event.get('scenario')}",
+                f"Run: {event.get('run_id')} ({mode})",
+            ]
+        )
+    if event_type == "generation_start":
+        return "\n".join(
+            [
+                f"{prefix} / generation_start]",
+                f"Genome version: {event.get('genome_version')}",
+            ]
+        )
+    if event_type == "evaluation_start":
+        return "\n".join(
+            [
+                f"{prefix} / {event.get('label')}_evaluation]",
+                f"Genome version: {event.get('genome_version')}",
+                _mutation_context(event),
+            ]
+        ).rstrip()
+    if event_type == "harness_trace":
+        trace_text = _format_transcript_event(event.get("trace", {}))
+        if not trace_text:
+            return ""
+        case_header = (
+            f"{prefix} / {event.get('label')} / {event.get('split')}:{event.get('case_id')}]"
+        )
+        mutation = _mutation_context(event)
+        body = [case_header]
+        if mutation:
+            body.append(mutation)
+        body.extend(trace_text.splitlines())
+        return "\n".join(body)
+    if event_type == "evaluation_complete":
+        validation_score = event.get("validation_score")
+        validation_text = (
+            "none" if validation_score is None else f"{float(validation_score):.4f}"
+        )
+        return "\n".join(
+            [
+                f"{prefix} / evaluation_complete]",
+                f"Label: {event.get('label')}",
+                f"Promotion score: {float(event.get('score', 0.0)):.4f}",
+                f"Train score: {float(event.get('train_score', 0.0)):.4f}",
+                f"Validation score: {validation_text}",
+            ]
+        )
+    if event_type == "mutation_plan":
+        failures = event.get("failure_patterns") or []
+        failure_text = "; ".join(str(item) for item in failures) if failures else "none"
+        return "\n".join(
+            [
+                f"{prefix} / Nucleus]",
+                f"Plan: {event.get('summary')}",
+                f"Proposed mutations: {event.get('proposed_count')}",
+                f"Observed failure patterns: {failure_text}",
+            ]
+        )
+    if event_type == "mutation_proposed":
+        return "\n".join(
+            [
+                f"{prefix} / Nucleus proposes mutation {event.get('index')}]",
+                f"Type: {event.get('mutation_type')} -> {event.get('target')}",
+                f"Why: {event.get('rationale')}",
+                f"Expected improvement: {event.get('expected_improvement')}",
+                f"Risk: {event.get('risk')}",
+            ]
+        )
+    if event_type == "mutation_rejected":
+        return "\n".join(
+            [
+                f"{prefix} / Guardian rejects mutation {event.get('index')}]",
+                f"Type: {event.get('mutation_type')} -> {event.get('target')}",
+                f"Reason: {event.get('reason')}",
+            ]
+        )
+    if event_type == "mutation_promoted":
+        return "\n".join(
+            [
+                f"{prefix} / Guardian promotes mutation {event.get('index')}]",
+                f"Type: {event.get('mutation_type')} -> {event.get('target')}",
+                f"Score: {float(event.get('old_score', 0.0)):.4f} -> "
+                f"{float(event.get('new_score', 0.0)):.4f}",
+                f"Why: {event.get('rationale')}",
+            ]
+        )
+    if event_type == "mutation_rolled_back":
+        return "\n".join(
+            [
+                f"{prefix} / Guardian rolls back mutation {event.get('index')}]",
+                f"Type: {event.get('mutation_type')} -> {event.get('target')}",
+                f"Score: {float(event.get('old_score', 0.0)):.4f} -> "
+                f"{float(event.get('new_score', 0.0)):.4f}",
+                f"Reason: {event.get('reason')}",
+            ]
+        )
+    if event_type == "freeze_recommended":
+        return "\n".join(
+            [
+                f"{prefix} / Nucleus]",
+                f"Recommended freeze: {event.get('reason')}",
+            ]
+        )
+    if event_type == "freeze":
+        return "\n".join(
+            [
+                f"{prefix} / freeze]",
+                f"Frozen score: {float(event.get('score', 0.0)):.4f}",
+                f"Reason: {event.get('reason')}",
+            ]
+        )
+    return ""
+
+
+def _training_prefix(generation: object) -> str:
+    if generation is None:
+        return "[Training"
+    return f"[Training / generation {generation}"
+
+
+def _mutation_context(event: dict) -> str:
+    mutation_index = event.get("mutation_index")
+    if mutation_index is None:
+        return ""
+    return f"Mutation candidate: {mutation_index}"
+
+
+def _format_transcript_event(trace: dict) -> str:
+    event = trace.get("event")
+    if event == "environment_materialized":
+        artifacts = ", ".join(str(item) for item in trace.get("artifacts", []))
+        return "\n".join(
+            [
+                "[Harness / environment]",
+                f"Prepared workspace artifacts: {artifacts}",
+            ]
+        )
+    if event == "workflow_step":
+        observation = trace.get("agent_observation", {})
+        role = trace.get("role", "unknown")
+        step_id = trace.get("step_id", "unknown")
+        goal = observation.get("goal") or trace.get("step_action", "")
+        context = observation.get("available_context", "")
+        output = observation.get("output_summary") or trace.get("output_summary", "")
+        return "\n".join(
+            [
+                f"[{role} / {step_id}]",
+                f"Goal: {goal}",
+                f"I can see: {context}",
+                f"I produced: {output}",
+                "Note: this is visible execution state, not hidden chain-of-thought.",
+            ]
+        )
+    if event == "quality_gate":
+        missing = trace.get("missing") or []
+        missing_text = ", ".join(str(item) for item in missing) if missing else "none"
+        return "\n".join(
+            [
+                f"[Guardian / {trace.get('gate', 'quality_gate')}]",
+                f"Passed: {trace.get('passed')}",
+                f"Missing requirements: {missing_text}",
+            ]
+        )
+    return ""
 
 
 def _infer_scenario_path(frozen_genome: Path) -> Path:

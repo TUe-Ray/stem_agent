@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, Callable
 
 import yaml
 from pydantic import BaseModel
@@ -71,6 +72,7 @@ class EvolutionLoop:
         git_branch: bool = False,
         git_commit: bool = False,
         git_push: bool = False,
+        event_sink: Callable[[dict[str, Any]], None] | None = None,
     ) -> EvolutionRunResult:
         run_dir = self.runs_root / run_id
         scenario_path = self._scenario_path_from_run(run_dir)
@@ -81,6 +83,7 @@ class EvolutionLoop:
             git_commit=git_commit,
             git_push=git_push,
             resume=True,
+            event_sink=event_sink,
         )
 
     def freeze_now(
@@ -137,10 +140,20 @@ class EvolutionLoop:
         git_commit: bool = False,
         git_push: bool = False,
         resume: bool = False,
+        event_sink: Callable[[dict[str, Any]], None] | None = None,
     ) -> EvolutionRunResult:
         bundle = load_scenario(scenario_path)
         run_dir = self.runs_root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
+        self._emit_event(
+            event_sink,
+            {
+                "event": "evolution_start",
+                "run_id": run_id,
+                "scenario": bundle.scenario.name,
+                "resume": resume,
+            },
+        )
         control = EvolutionControl(run_dir, run_id)
         git = GitProvenance(
             GitRunConfig(
@@ -203,11 +216,37 @@ class EvolutionLoop:
             generation_dir = run_dir / f"generation_{generation:03d}"
             generation_dir.mkdir(parents=True, exist_ok=True)
             save_genome(genome, generation_dir / "genome.yaml")
+            self._emit_event(
+                event_sink,
+                {
+                    "event": "generation_start",
+                    "generation": generation,
+                    "genome_version": genome.genome_version,
+                },
+            )
 
-            current_result = self._run_and_evaluate(genome, bundle, generation_dir, "current")
+            current_result = self._run_and_evaluate(
+                genome,
+                bundle,
+                generation_dir,
+                "current",
+                generation=generation,
+                event_sink=event_sink,
+            )
             history.append(current_result)
             budget.record(current_result.cost_estimate)
             self._write_json(generation_dir / "eval_result.json", current_result.model_dump(mode="json"))
+            self._emit_event(
+                event_sink,
+                {
+                    "event": "evaluation_complete",
+                    "generation": generation,
+                    "label": "current",
+                    "score": current_result.promotion_score,
+                    "train_score": current_result.train_score,
+                    "validation_score": current_result.validation_score,
+                },
+            )
 
             if baseline_result is None:
                 baseline_result = current_result
@@ -283,9 +322,27 @@ class EvolutionLoop:
             lineage.record_mutation_plan(
                 generation, plan.summary, len(plan.proposed_mutations)
             )
+            self._emit_event(
+                event_sink,
+                {
+                    "event": "mutation_plan",
+                    "generation": generation,
+                    "summary": plan.summary,
+                    "proposed_count": len(plan.proposed_mutations),
+                    "failure_patterns": plan.failure_patterns,
+                },
+            )
 
             if not plan.proposed_mutations:
                 stop_reason = "Nucleus recommended freeze"
+                self._emit_event(
+                    event_sink,
+                    {
+                        "event": "freeze_recommended",
+                        "generation": generation,
+                        "reason": stop_reason,
+                    },
+                )
                 break
 
             promoted_this_generation = False
@@ -299,6 +356,19 @@ class EvolutionLoop:
                     mutation.expected_improvement,
                     mutation.risk,
                 )
+                self._emit_event(
+                    event_sink,
+                    {
+                        "event": "mutation_proposed",
+                        "generation": generation,
+                        "index": index,
+                        "mutation_type": mutation.mutation_type,
+                        "target": mutation.target,
+                        "rationale": mutation.rationale,
+                        "expected_improvement": mutation.expected_improvement,
+                        "risk": mutation.risk,
+                    },
+                )
                 validation = self.guardian.validate_mutation(
                     mutation, genome=genome, scenario=bundle.scenario
                 )
@@ -308,6 +378,17 @@ class EvolutionLoop:
                         mutation.mutation_type,
                         mutation.target,
                         validation.reason,
+                    )
+                    self._emit_event(
+                        event_sink,
+                        {
+                            "event": "mutation_rejected",
+                            "generation": generation,
+                            "index": index,
+                            "mutation_type": mutation.mutation_type,
+                            "target": mutation.target,
+                            "reason": validation.reason,
+                        },
                     )
                     self._save_checkpoint(
                         control,
@@ -358,6 +439,17 @@ class EvolutionLoop:
                             mutation.target,
                             activation.reason,
                         )
+                        self._emit_event(
+                            event_sink,
+                            {
+                                "event": "mutation_rejected",
+                                "generation": generation,
+                                "index": index,
+                                "mutation_type": mutation.mutation_type,
+                                "target": mutation.target,
+                                "reason": activation.reason,
+                            },
+                        )
                         self._save_checkpoint(
                             control,
                             scenario_hash,
@@ -398,7 +490,13 @@ class EvolutionLoop:
                 mutated_genome = self.guardian.apply_mutation_safely(genome, mutation)
                 save_genome(mutated_genome, mutation_dir / "genome.yaml")
                 mutated_result = self._run_and_evaluate(
-                    mutated_genome, bundle, mutation_dir, "candidate"
+                    mutated_genome,
+                    bundle,
+                    mutation_dir,
+                    "candidate",
+                    generation=generation,
+                    mutation_index=index,
+                    event_sink=event_sink,
                 )
                 budget.record(mutated_result.cost_estimate)
                 self._write_json(
@@ -418,6 +516,19 @@ class EvolutionLoop:
                         candidate_result.promotion_score,
                         mutated_result.promotion_score,
                         mutation.rationale,
+                    )
+                    self._emit_event(
+                        event_sink,
+                        {
+                            "event": "mutation_promoted",
+                            "generation": generation,
+                            "index": index,
+                            "mutation_type": mutation.mutation_type,
+                            "target": mutation.target,
+                            "old_score": candidate_result.promotion_score,
+                            "new_score": mutated_result.promotion_score,
+                            "rationale": mutation.rationale,
+                        },
                     )
                     genome = mutated_genome
                     candidate_result = mutated_result
@@ -473,6 +584,19 @@ class EvolutionLoop:
                         candidate_result.promotion_score,
                         mutated_result.promotion_score,
                         "fitness did not improve enough for promotion",
+                    )
+                    self._emit_event(
+                        event_sink,
+                        {
+                            "event": "mutation_rolled_back",
+                            "generation": generation,
+                            "index": index,
+                            "mutation_type": mutation.mutation_type,
+                            "target": mutation.target,
+                            "old_score": candidate_result.promotion_score,
+                            "new_score": mutated_result.promotion_score,
+                            "reason": "fitness did not improve enough for promotion",
+                        },
                     )
                     self._save_checkpoint(
                         control,
@@ -558,6 +682,7 @@ class EvolutionLoop:
             best_genome=best_genome,
             stop_reason=stop_reason,
             status="FROZEN",
+            event_sink=event_sink,
         )
         control.set_status("FROZEN", message=stop_reason)
         git.commit_safe("StemOS final freeze", [run_dir])
@@ -580,18 +705,35 @@ class EvolutionLoop:
         best_genome: Genome,
         stop_reason: str,
         status: str,
+        event_sink: Callable[[dict[str, Any]], None] | None = None,
     ) -> EvolutionRunResult:
         frozen_path = run_dir / "frozen_genome.yaml"
         save_genome(best_genome, frozen_path)
         final_dir = run_dir / "final_evaluation"
         final_dir.mkdir(exist_ok=True)
-        final_result = self._run_and_evaluate(best_genome, bundle, final_dir, "frozen")
+        final_result = self._run_and_evaluate(
+            best_genome,
+            bundle,
+            final_dir,
+            "frozen",
+            generation=generation,
+            event_sink=event_sink,
+        )
         self._write_json(final_dir / "eval_result.json", final_result.model_dump(mode="json"))
         self._write_json(run_dir / "run_metadata.json", self._run_metadata(final_result))
         lineage.record_freeze(
             generation,
             final_result.promotion_score,
             stop_reason,
+        )
+        self._emit_event(
+            event_sink,
+            {
+                "event": "freeze",
+                "generation": generation,
+                "score": final_result.promotion_score,
+                "reason": stop_reason,
+            },
         )
         report_path = ReportBuilder().write_report(
             run_dir=run_dir,
@@ -750,16 +892,56 @@ class EvolutionLoop:
         bundle: ScenarioBundle,
         generation_dir: Path,
         label: str,
+        *,
+        generation: int | None = None,
+        mutation_index: int | None = None,
+        event_sink: Callable[[dict[str, Any]], None] | None = None,
     ) -> EvaluationResult:
+        self._emit_event(
+            event_sink,
+            {
+                "event": "evaluation_start",
+                "generation": generation,
+                "label": label,
+                "mutation_index": mutation_index,
+                "genome_version": genome.genome_version,
+            },
+        )
         workspace_dir = generation_dir / f"{label}_workspace"
         harness = self.harness_builder.materialize(
             genome,
             bundle.scenario,
             workspace_dir=workspace_dir,
         )
-        train_runs = [self.harness_runner.run_case(harness, case) for case in bundle.train_cases]
+        train_runs = [
+            self.harness_runner.run_case(
+                harness,
+                case,
+                trace_sink=self._case_trace_sink(
+                    event_sink,
+                    generation=generation,
+                    label=label,
+                    split="train",
+                    case_id=case.id,
+                    mutation_index=mutation_index,
+                ),
+            )
+            for case in bundle.train_cases
+        ]
         validation_runs = [
-            self.harness_runner.run_case(harness, case) for case in bundle.validation_cases
+            self.harness_runner.run_case(
+                harness,
+                case,
+                trace_sink=self._case_trace_sink(
+                    event_sink,
+                    generation=generation,
+                    label=label,
+                    split="validation",
+                    case_id=case.id,
+                    mutation_index=mutation_index,
+                ),
+            )
+            for case in bundle.validation_cases
         ]
         self._write_runs(generation_dir, label, train_runs + validation_runs)
         return self.guardian.evaluate_candidate(
@@ -768,6 +950,42 @@ class EvolutionLoop:
             train_runs,
             validation_runs,
         )
+
+    def _case_trace_sink(
+        self,
+        event_sink: Callable[[dict[str, Any]], None] | None,
+        *,
+        generation: int | None,
+        label: str,
+        split: str,
+        case_id: str,
+        mutation_index: int | None,
+    ) -> Callable[[dict[str, Any]], None] | None:
+        if event_sink is None:
+            return None
+
+        def sink(trace: dict[str, Any]) -> None:
+            event_sink(
+                {
+                    "event": "harness_trace",
+                    "generation": generation,
+                    "label": label,
+                    "split": split,
+                    "case_id": case_id,
+                    "mutation_index": mutation_index,
+                    "trace": trace,
+                }
+            )
+
+        return sink
+
+    def _emit_event(
+        self,
+        event_sink: Callable[[dict[str, Any]], None] | None,
+        event: dict[str, Any],
+    ) -> None:
+        if event_sink:
+            event_sink(event)
 
     def _write_config_snapshot(self, run_dir: Path, bundle: ScenarioBundle) -> None:
         snapshot = {

@@ -87,6 +87,34 @@ def test_lineage_contains_rejected_or_rolled_back_mutation(tmp_path):
     assert "mutation_rejected" in lineage or "mutation_rolled_back" in lineage
 
 
+def test_evolution_loop_can_stream_training_events(tmp_path):
+    loop = EvolutionLoop(
+        settings=Settings(offline_mode=True),
+        runs_root=tmp_path / "runs",
+    )
+    events = []
+
+    loop.evolve(
+        "scenarios/toy_structured_answer",
+        "stream_training_001",
+        event_sink=events.append,
+    )
+
+    event_types = {event["event"] for event in events}
+    assert "harness_trace" in event_types
+    assert "mutation_plan" in event_types
+    assert "mutation_proposed" in event_types
+    assert "mutation_promoted" in event_types
+    assert "mutation_rejected" in event_types
+    harness_event = next(event for event in events if event["event"] == "harness_trace")
+    assert harness_event["case_id"]
+    assert harness_event["trace"]["event"] in {
+        "environment_materialized",
+        "workflow_step",
+        "quality_gate",
+    }
+
+
 def test_tiny_task_operator_demo_has_lineage_narrative_and_environment(tmp_path):
     loop = EvolutionLoop(
         settings=Settings(offline_mode=True),
@@ -124,16 +152,26 @@ def test_frozen_harness_can_execute_new_input(tmp_path):
         workspace_dir=tmp_path / "execute_workspace",
     )
 
+    streamed_traces = []
     run = HarnessRunner().run_case(
         harness,
         TaskCase(
             id="new_input",
             input={"user_request": "Help me plan a focused workday."},
         ),
+        trace_sink=streamed_traces.append,
     )
 
     assert "## Summary" in run.final_output
     assert "## Final Answer" in run.final_output
+    workflow_traces = [trace for trace in run.traces if trace["event"] == "workflow_step"]
+    assert workflow_traces
+    assert workflow_traces[0]["agent_observation"]["goal"]
+    assert (
+        "hidden chain-of-thought is not recorded"
+        in workflow_traces[0]["agent_observation"]["reasoning_boundary"]
+    )
+    assert streamed_traces == run.traces
 
 
 def test_frozen_harness_execute_uses_final_output_step(tmp_path):

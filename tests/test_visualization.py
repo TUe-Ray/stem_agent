@@ -17,6 +17,7 @@ def test_visualize_generates_reviewer_visuals(tmp_path):
     report = result.report_path.read_text(encoding="utf-8")
 
     assert "evolution_timeline.md" in names
+    assert "training_progress.md" in names
     assert "organism_shape.md" in names
     assert "harness_before_after.md" in names
     assert "guardian_selection_board.md" in names
@@ -27,6 +28,12 @@ def test_visualize_generates_reviewer_visuals(tmp_path):
     assert "## Safe Stop And Recovery" in report
     assert "## Guardian Selection Board" in report
     assert "Roles are not predefined subagents" in report
+    progress = (result.run_dir / "visuals" / "training_progress.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Promotion Score Chart" in progress
+    assert "Generation Scores" in progress
+    assert "Mutation Decisions" in progress
 
 
 def test_aggregate_compares_runs(tmp_path):
@@ -44,6 +51,27 @@ def test_aggregate_compares_runs(tmp_path):
     assert "aggregate_001" in content
     assert "aggregate_002" in content
     assert "Final organism shape" in content
+
+
+def test_progress_visualization_handles_partial_run(tmp_path):
+    run_dir = tmp_path / "runs" / "partial_001"
+    generation_dir = run_dir / "generation_000"
+    generation_dir.mkdir(parents=True)
+    (run_dir / "lineage.jsonl").write_text(
+        '{"event":"evaluation","generation":0,"score":0.25,"summary":"first pass"}\n',
+        encoding="utf-8",
+    )
+    (generation_dir / "eval_result.json").write_text(
+        '{"promotion_score":0.25,"train_score":0.2,"validation_score":0.3}\n',
+        encoding="utf-8",
+    )
+
+    path = VisualizationBuilder().progress(run_dir)
+    content = path.read_text(encoding="utf-8")
+
+    assert path.name == "training_progress.md"
+    assert "in progress or stopped before freeze" in content
+    assert "| 0 | 0.2500 | 0.2000 | 0.3000 | first pass |" in content
 
 
 def test_output_comparison_uses_specific_manager_deadline_sample(tmp_path):

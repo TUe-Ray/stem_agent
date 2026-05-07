@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from pydantic import BaseModel, Field
 
+from stemos.genome.models import RoleSpec, WorkflowStep
 from stemos.harness.builder import MaterializedHarness
 from stemos.harness.memory import MemoryStore
 from stemos.harness.role_runner import RoleRunner
@@ -24,18 +25,25 @@ class HarnessRunner:
     def __init__(self, role_runner: RoleRunner | None = None):
         self.role_runner = role_runner or RoleRunner()
 
-    def run_case(self, harness: MaterializedHarness, case: TaskCase) -> HarnessRunResult:
+    def run_case(
+        self,
+        harness: MaterializedHarness,
+        case: TaskCase,
+        trace_sink: Callable[[dict[str, Any]], None] | None = None,
+    ) -> HarnessRunResult:
         memory = MemoryStore(harness.memory_layout)
         outputs: dict[str, str] = {}
         traces: list[dict[str, Any]] = []
         attempts = int(harness.retry_policy.get("max_attempts", 1))
         attempts = max(attempts, 1)
         if harness.environment.required_artifacts:
-            traces.append(
+            self._record_trace(
+                traces,
                 {
                     "event": "environment_materialized",
                     "artifacts": list(harness.environment.required_artifacts),
-                }
+                },
+                trace_sink,
             )
 
         for step in harness.workflow:
@@ -45,17 +53,21 @@ class HarnessRunner:
             output_key = step.output_key or step.id
             outputs[output_key] = result
             outputs[step.id] = result
-            traces.append(
-                {
-                    "event": "workflow_step",
-                    "step_id": step.id,
-                    "role": role.name,
-                    "output_key": output_key,
-                    "attempts": attempts,
-                }
+            self._record_trace(
+                traces,
+                self._workflow_step_trace(
+                    role=role,
+                    step=step,
+                    step_input=step_input,
+                    output_key=output_key,
+                    output=result,
+                    attempts=attempts,
+                ),
+                trace_sink,
             )
             gate_traces, gate_failure = self._run_quality_gates(harness, outputs)
-            traces.extend(gate_traces)
+            for trace in gate_traces:
+                self._record_trace(traces, trace, trace_sink)
             if gate_failure:
                 return HarnessRunResult(
                     case_id=case.id,
@@ -87,6 +99,75 @@ class HarnessRunner:
         if not outputs:
             return ""
         return next(reversed(outputs.values()))
+
+    def _record_trace(
+        self,
+        traces: list[dict[str, Any]],
+        trace: dict[str, Any],
+        trace_sink: Callable[[dict[str, Any]], None] | None,
+    ) -> None:
+        traces.append(trace)
+        if trace_sink:
+            trace_sink(trace)
+
+    def _workflow_step_trace(
+        self,
+        *,
+        role: RoleSpec,
+        step: WorkflowStep,
+        step_input: dict[str, Any],
+        output_key: str,
+        output: str,
+        attempts: int,
+    ) -> dict[str, Any]:
+        previous_outputs = step_input.get("previous_outputs", {})
+        case_input = step_input.get("case_input", {})
+        return {
+            "event": "workflow_step",
+            "step_id": step.id,
+            "role": role.name,
+            "role_description": role.description,
+            "step_action": step.action,
+            "input_from": list(step.input_from),
+            "input_keys": {
+                "case_input": sorted(str(key) for key in case_input.keys()),
+                "previous_outputs": sorted(str(key) for key in previous_outputs.keys()),
+            },
+            "agent_observation": {
+                "goal": step.action,
+                "available_context": self._summarize_input(step_input),
+                "output_summary": self._summarize_text(output),
+                "reasoning_boundary": (
+                    "Visible execution state only; hidden chain-of-thought is not recorded."
+                ),
+            },
+            "output_key": output_key,
+            "output_summary": self._summarize_text(output),
+            "attempts": attempts,
+            "status": "completed",
+        }
+
+    def _summarize_input(self, step_input: dict[str, Any]) -> str:
+        case_input = step_input.get("case_input", {})
+        previous_outputs = step_input.get("previous_outputs", {})
+        parts: list[str] = []
+        if case_input:
+            parts.append("case_input=" + self._summarize_mapping(case_input))
+        if previous_outputs:
+            parts.append("previous_outputs=" + self._summarize_mapping(previous_outputs))
+        return "; ".join(parts) if parts else "no prior context"
+
+    def _summarize_mapping(self, mapping: dict[str, Any]) -> str:
+        summaries = []
+        for key, value in mapping.items():
+            summaries.append(f"{key}: {self._summarize_text(str(value), limit=90)}")
+        return " | ".join(summaries)
+
+    def _summarize_text(self, text: str, *, limit: int = 160) -> str:
+        compact = " ".join(text.split())
+        if len(compact) <= limit:
+            return compact
+        return compact[: limit - 3].rstrip() + "..."
 
     def _run_quality_gates(
         self, harness: MaterializedHarness, outputs: dict[str, str]
