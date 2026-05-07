@@ -11,10 +11,12 @@ import yaml
 from stemos.evolution.control import EvolutionControl
 from stemos.evolution.loop import EvolutionLoop
 from stemos.evolution.visuals import VisualizationBuilder
+from stemos.benchmarks.gsm8k import download_gsm8k_sample
 from stemos.genome.loader import load_genome
 from stemos.harness.builder import HarnessBuilder
 from stemos.harness.runner import HarnessRunner
 from stemos.kernel.versioning import GitProvenance, GitRunConfig
+from stemos.kernel.versioning import GenomeArchive
 from stemos.scenarios.loader import load_scenario
 from stemos.scenarios.schema import TaskCase
 
@@ -92,6 +94,39 @@ def init_scenario(path: Path) -> None:
     typer.echo(f"Initialized scenario at {path}")
 
 
+@app.command("init-benchmark")
+def init_benchmark(
+    name: str,
+    n_train: int = typer.Option(30, "--n-train"),
+    n_val: int = typer.Option(20, "--n-val"),
+    seed: int = typer.Option(42, "--seed"),
+) -> None:
+    if name != "gsm8k_mini":
+        raise typer.BadParameter("Supported benchmark: gsm8k_mini")
+    path = Path("scenarios") / name
+    path.mkdir(parents=True, exist_ok=True)
+    all_cases, _ = download_gsm8k_sample(n_train=n_train + n_val + 10, n_val=0, seed=seed)
+    train_cases = [dict(item, id=f"train_{index + 1:03d}") for index, item in enumerate(all_cases[:n_train])]
+    val_cases = [
+        dict(item, id=f"val_{index + 1:03d}")
+        for index, item in enumerate(all_cases[n_train : n_train + n_val])
+    ]
+    hidden_cases = [
+        dict(item, id=f"hidden_{index + 1:03d}")
+        for index, item in enumerate(all_cases[n_train + n_val : n_train + n_val + 10])
+    ]
+    train_inputs = {json.dumps(item["input"], sort_keys=True) for item in train_cases}
+    val_inputs = {json.dumps(item["input"], sort_keys=True) for item in val_cases}
+    if train_inputs & val_inputs:
+        raise RuntimeError("GSM8K train/validation split overlap detected")
+    scenario = _gsm8k_scenario_yaml()
+    (path / "scenario.yaml").write_text(yaml.safe_dump(scenario, sort_keys=False), encoding="utf-8")
+    _write_jsonl(path / "train_cases.jsonl", train_cases)
+    _write_jsonl(path / "validation_cases.jsonl", val_cases)
+    _write_jsonl(path / "hidden_cases.jsonl", hidden_cases)
+    typer.echo(f"Initialized benchmark at {path}")
+
+
 @app.command()
 def evolve(
     scenario_path: Path,
@@ -147,11 +182,17 @@ def inspect(run_path: Path) -> None:
     lineage_path = run_path / "lineage.jsonl"
     report_path = run_path / "report.md"
     if report_path.exists():
-        typer.echo(report_path.read_text(encoding="utf-8"))
+        report = report_path.read_text(encoding="utf-8")
+        if "## Genome Archive" not in report:
+            report += "\n\n## Genome Archive\n" + GenomeArchive(run_dir=run_path).to_markdown_table() + "\n"
+        typer.echo(report)
         return
     if not lineage_path.exists():
         raise typer.BadParameter(f"Missing run artifacts at {run_path}")
     typer.echo(lineage_path.read_text(encoding="utf-8"))
+    typer.echo("")
+    typer.echo("## Genome Archive")
+    typer.echo(GenomeArchive(run_dir=run_path).to_markdown_table())
 
 
 @app.command()
@@ -159,6 +200,10 @@ def compare(run_path: Path) -> None:
     baseline = _read_eval(run_path / "generation_000" / "eval_result.json")
     final = _read_eval(run_path / "final_evaluation" / "eval_result.json")
     typer.echo(f"Baseline score: {baseline['promotion_score']:.4f}")
+    baseline_score_path = run_path / "baseline_genome_score.json"
+    if baseline_score_path.exists():
+        baseline_score = json.loads(baseline_score_path.read_text(encoding="utf-8"))
+        typer.echo(f"Baseline genome score: {float(baseline_score['score']):.4f}")
     typer.echo(f"Final score: {final['promotion_score']:.4f}")
     typer.echo(f"Improvement: {final['promotion_score'] - baseline['promotion_score']:.4f}")
     lineage_path = run_path / "lineage.jsonl"
@@ -340,6 +385,81 @@ def _read_eval(path: Path) -> dict:
     if not path.exists():
         raise typer.BadParameter(f"Missing evaluation result: {path}")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.write_text(
+        "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+
+def _gsm8k_scenario_yaml() -> dict[str, Any]:
+    return {
+        "scenario": {
+            "name": "gsm8k_mini",
+            "description": "Grade school math word problems requiring multi-step arithmetic reasoning",
+            "task_class": "structured_reasoning",
+        },
+        "input_format": {
+            "type": "text",
+            "fields": [{"name": "problem", "required": True}],
+        },
+        "expected_output": {
+            "type": "markdown",
+            "requirements": [
+                "Must show arithmetic reasoning steps",
+                "Must include the final numeric answer",
+            ],
+        },
+        "evaluation_criteria": [
+            {
+                "name": "correct_answer",
+                "weight": 0.7,
+                "method": "exact_match_after_extraction",
+            },
+            {
+                "name": "reasoning_steps_present",
+                "weight": 0.2,
+                "method": "regex_check",
+                "pattern": r"\d+.*[\+\-\*\/].*\d+",
+            },
+            {
+                "name": "no_hallucinated_numbers",
+                "weight": 0.1,
+                "method": "llm_judge",
+            },
+        ],
+        "constraints": ["Show concise work before the final answer."],
+        "available_builtin_tools": ["call_model"],
+        "success_criteria": [
+            {
+                "name": "correct_answer",
+                "weight": 0.7,
+                "description": "Extracted final answer matches the gold answer.",
+            },
+            {
+                "name": "reasoning_steps_present",
+                "weight": 0.2,
+                "description": "Output includes visible arithmetic reasoning.",
+            },
+            {
+                "name": "no_hallucinated_numbers",
+                "weight": 0.1,
+                "description": "Reasoning does not introduce unsupported numbers.",
+            },
+        ],
+        "evolution": {
+            "max_generations": 10,
+            "patience": 4,
+            "min_delta": 0.03,
+            "max_mutations_per_generation": 4,
+            "max_cost_usd": 2.0,
+            "max_workflow_steps": 8,
+            "max_roles": 6,
+            "max_environment_artifacts": 8,
+        },
+    }
 
 
 def _format_execution_trace(traces: list[dict]) -> str:

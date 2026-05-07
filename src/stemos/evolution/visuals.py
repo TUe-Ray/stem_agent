@@ -48,6 +48,7 @@ class VisualizationBuilder:
             "organism_shape.md": self.organism_shape(artifacts),
             "harness_before_after.md": self.harness_before_after(artifacts),
             "guardian_selection_board.md": self.guardian_selection_board(artifacts),
+            "hidden_eval_vs_train.md": self.hidden_eval_vs_train(artifacts),
             "output_comparison.md": self.output_comparison(artifacts),
             "visual_report.md": self.visual_report_markdown(artifacts),
         }
@@ -85,6 +86,8 @@ class VisualizationBuilder:
             self.harness_before_after(artifacts),
             "",
             self.guardian_selection_board(artifacts),
+            "",
+            self.hidden_eval_vs_train(artifacts),
             "",
             self.safe_stop_recovery(artifacts),
             "",
@@ -303,6 +306,68 @@ class VisualizationBuilder:
             )
         return "\n".join(["## Guardian Selection Board", "", *rows])
 
+    def hidden_eval_vs_train(self, artifacts: RunArtifacts) -> str:
+        hidden_rows = self._hidden_eval_rows(artifacts.run_dir)
+        train_rows = self._generation_progress_rows(artifacts.run_dir, artifacts.lineage)
+        if not hidden_rows:
+            return "\n".join(
+                [
+                    "## Hidden Eval vs Train Eval over Generations",
+                    "",
+                    "No hidden evaluation scores recorded yet.",
+                ]
+            )
+        generations = sorted(
+            {
+                int(row["generation"])
+                for row in hidden_rows
+                if row.get("generation") is not None
+            }
+            | {int(row["generation"]) for row in train_rows}
+        )
+        train_by_generation = {int(row["generation"]): float(row["train_score"]) for row in train_rows}
+        hidden_by_generation: dict[int, float] = {}
+        for row in hidden_rows:
+            if row.get("generation") is not None:
+                hidden_by_generation[int(row["generation"])] = float(row["hidden_score"])
+        x_axis = ", ".join(str(item) for item in generations)
+        train_line = ", ".join(f"{train_by_generation.get(item, 0.0):.4f}" for item in generations)
+        hidden_line = ", ".join(f"{hidden_by_generation.get(item, 0.0):.4f}" for item in generations)
+        table = [
+            "| Generation | Train eval | Hidden eval | Genome ID |",
+            "|---:|---:|---:|---|",
+        ]
+        genome_by_generation = {
+            int(row["generation"]): str(row.get("genome_id", ""))
+            for row in hidden_rows
+            if row.get("generation") is not None
+        }
+        for generation in generations:
+            table.append(
+                "| {generation} | {train:.4f} | {hidden:.4f} | `{genome}` |".format(
+                    generation=generation,
+                    train=train_by_generation.get(generation, 0.0),
+                    hidden=hidden_by_generation.get(generation, 0.0),
+                    genome=genome_by_generation.get(generation, ""),
+                )
+            )
+        return "\n".join(
+            [
+                "## Hidden Eval vs Train Eval over Generations",
+                "",
+                "```mermaid",
+                "xychart-beta",
+                '  title "Hidden Eval vs Train Eval over Generations"',
+                f"  x-axis [{x_axis}]",
+                '  y-axis "score" 0 --> 1',
+                f"  line \"train\" [{train_line}]",
+                f"  line \"hidden\" [{hidden_line}]",
+                "```",
+                "",
+                *table,
+            ]
+        )
+
     def output_comparison(self, artifacts: RunArtifacts) -> str:
         sample_input = self._sample_input(artifacts)
         baseline_output = self._run_output(
@@ -400,6 +465,7 @@ class VisualizationBuilder:
                 self.organism_shape(artifacts),
                 self.harness_before_after(artifacts),
                 self.guardian_selection_board(artifacts),
+                self.hidden_eval_vs_train(artifacts),
                 self.output_comparison(artifacts),
                 self.safe_stop_recovery(artifacts),
                 self.not_subagent_explanation(),
@@ -825,3 +891,13 @@ class VisualizationBuilder:
         if not path.exists():
             return []
         return self._read_lineage(path)
+
+    def _hidden_eval_rows(self, run_dir: Path) -> list[dict[str, Any]]:
+        path = run_dir / "hidden_eval_log.jsonl"
+        if not path.exists():
+            return []
+        return [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
