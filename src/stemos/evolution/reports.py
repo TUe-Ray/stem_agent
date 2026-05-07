@@ -6,6 +6,7 @@ from stemos.genome.models import Genome
 from stemos.kernel.evaluator import EvaluationResult
 from stemos.evolution.lineage import LineageLog
 from stemos.evolution.visuals import VisualizationBuilder
+from stemos.kernel.versioning import GenomeArchive
 
 
 class ReportBuilder:
@@ -65,7 +66,7 @@ class ReportBuilder:
             "## Why This Is Evolution, Not Subagent Orchestration",
             "StemOS does not start with a hand-written set of PM/Engineer/QA agents. It starts with a minimal Founder genome. Every new role, workflow step, quality gate, tool, or workspace artifact must appear as a mutation. Guardian evaluates the mutated harness and only promotes changes that improve fitness.",
             "",
-            "## Promoted Mutations",
+                "## Promoted Mutations",
         ]
         if promoted:
             for event in promoted:
@@ -85,6 +86,9 @@ class ReportBuilder:
 
         content.extend(
             [
+                "",
+                "## Genome Archive",
+                GenomeArchive(run_dir=run_dir).to_markdown_table(),
                 "",
                 "## Frozen Harness Shape",
                 f"- Roles: {', '.join(role.name for role in frozen_genome.roles)}",

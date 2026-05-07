@@ -20,11 +20,12 @@ from stemos.harness.runner import HarnessRunResult, HarnessRunner
 from stemos.kernel.budget import BudgetTracker
 from stemos.kernel.evaluator import EvaluationResult
 from stemos.kernel.guardian import Guardian
-from stemos.kernel.versioning import GitProvenance, GitRunConfig
+from stemos.kernel.versioning import GenomeArchive, GitProvenance, GitRunConfig
 from stemos.nucleus.commander import NucleusCommander
 from stemos.nucleus.failure_analyzer import FailureAnalyzer
 from stemos.nucleus.model_client import ModelClient
 from stemos.nucleus.mutation_planner import MutationPlanner
+from stemos.nucleus.nucleus import select_operator
 from stemos.nucleus.scenario_interpreter import ScenarioInterpreter
 from stemos.scenarios.loader import ScenarioBundle, load_scenario
 
@@ -145,6 +146,9 @@ class EvolutionLoop:
         bundle = load_scenario(scenario_path)
         run_dir = self.runs_root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
+        self.model_client.configure_run(run_dir)
+        self.guardian.configure_run(run_dir)
+        self.guardian.configure_hidden_evaluation(bundle.path)
         self._emit_event(
             event_sink,
             {
@@ -193,6 +197,9 @@ class EvolutionLoop:
                 else None
             )
             patience_left = state.patience_left
+            archive = GenomeArchive.from_snapshot(state.archive, run_dir=run_dir)
+            current_parent_id = state.current_parent_id
+            stagnation_count = state.stagnation_count
             start_generation = state.next_generation
             stop_reason = state.stop_reason or "maximum generations reached"
             lineage.record("resume", generation=start_generation, summary="Resumed from checkpoint")
@@ -200,15 +207,27 @@ class EvolutionLoop:
         else:
             self._write_config_snapshot(run_dir, bundle)
             diagnosis = self.nucleus.diagnose(bundle.scenario)
-            genome = self.nucleus.attach_diagnosis(load_default_genome(), diagnosis, bundle.scenario)
+            seed_genome = (
+                self._gsm8k_baseline_genome(bundle.scenario.name)
+                if bundle.scenario.name == "gsm8k_mini"
+                else load_default_genome()
+            )
+            genome = self.nucleus.attach_diagnosis(seed_genome, diagnosis, bundle.scenario)
             baseline_genome = genome
             save_genome(genome, run_dir / "baseline_genome.yaml")
             best_genome = genome
             best_result = None
             baseline_result = None
             patience_left = bundle.scenario.evolution.patience
+            archive = GenomeArchive(max_size=10, run_dir=run_dir)
+            current_parent_id = None
+            stagnation_count = 0
             start_generation = 0
             stop_reason = "maximum generations reached"
+        self._active_archive = archive
+        self._active_parent_id = current_parent_id
+        self._active_stagnation_count = stagnation_count
+        last_archive_best_score = archive.best()[2] if len(archive) else None
 
         history: list[EvaluationResult] = []
 
@@ -250,6 +269,41 @@ class EvolutionLoop:
 
             if baseline_result is None:
                 baseline_result = current_result
+                self._write_json(
+                    run_dir / "baseline_genome_score.json",
+                    {
+                        "genome_id": current_parent_id,
+                        "score": baseline_result.promotion_score,
+                        "train_score": baseline_result.train_score,
+                        "validation_score": baseline_result.validation_score,
+                    },
+                )
+
+            if current_parent_id is None:
+                current_parent_id = archive.add(
+                    genome.model_dump(mode="json"),
+                    current_result.promotion_score,
+                    generation,
+                    parent_id=None,
+                )
+                self._active_parent_id = current_parent_id
+                if baseline_result is current_result:
+                    self._write_json(
+                        run_dir / "baseline_genome_score.json",
+                        {
+                            "genome_id": current_parent_id,
+                            "score": baseline_result.promotion_score,
+                            "train_score": baseline_result.train_score,
+                            "validation_score": baseline_result.validation_score,
+                        },
+                    )
+                    self.guardian.hidden_baseline_score = self._run_hidden_evaluation(
+                        genome,
+                        bundle,
+                        generation_dir / "hidden_baseline_workspace",
+                        current_parent_id,
+                        generation=generation,
+                    )
 
             summary = self._evaluation_summary(current_result)
             lineage.record_evaluation(generation, current_result.promotion_score, summary)
@@ -308,6 +362,7 @@ class EvolutionLoop:
                 break
 
             failure_patterns = self.nucleus.failure_analyzer.analyze(current_result)
+            operator = select_operator(archive, stagnation_count)
             plan = self.nucleus.plan(
                 scenario=bundle.scenario,
                 genome=genome,
@@ -317,6 +372,8 @@ class EvolutionLoop:
                 failure_patterns=failure_patterns,
                 budget_remaining=budget.remaining_usd,
                 lineage_summary=lineage.summary(),
+                operator=operator,
+                archive=archive,
             )
             self._write_json(generation_dir / "mutation_plan.json", plan.model_dump(mode="json"))
             lineage.record_mutation_plan(
@@ -330,6 +387,7 @@ class EvolutionLoop:
                     "summary": plan.summary,
                     "proposed_count": len(plan.proposed_mutations),
                     "failure_patterns": plan.failure_patterns,
+                    "operator_type": operator.name,
                 },
             )
 
@@ -355,6 +413,7 @@ class EvolutionLoop:
                     mutation.rationale,
                     mutation.expected_improvement,
                     mutation.risk,
+                    operator_type=operator.name,
                 )
                 self._emit_event(
                     event_sink,
@@ -367,6 +426,7 @@ class EvolutionLoop:
                         "rationale": mutation.rationale,
                         "expected_improvement": mutation.expected_improvement,
                         "risk": mutation.risk,
+                        "operator_type": operator.name,
                     },
                 )
                 validation = self.guardian.validate_mutation(
@@ -378,6 +438,7 @@ class EvolutionLoop:
                         mutation.mutation_type,
                         mutation.target,
                         validation.reason,
+                        operator_type=operator.name,
                     )
                     self._emit_event(
                         event_sink,
@@ -388,6 +449,7 @@ class EvolutionLoop:
                             "mutation_type": mutation.mutation_type,
                             "target": mutation.target,
                             "reason": validation.reason,
+                            "operator_type": operator.name,
                         },
                     )
                     self._save_checkpoint(
@@ -438,6 +500,7 @@ class EvolutionLoop:
                             mutation.mutation_type,
                             mutation.target,
                             activation.reason,
+                            operator_type=operator.name,
                         )
                         self._emit_event(
                             event_sink,
@@ -448,6 +511,7 @@ class EvolutionLoop:
                                 "mutation_type": mutation.mutation_type,
                                 "target": mutation.target,
                                 "reason": activation.reason,
+                                "operator_type": operator.name,
                             },
                         )
                         self._save_checkpoint(
@@ -489,6 +553,71 @@ class EvolutionLoop:
 
                 mutated_genome = self.guardian.apply_mutation_safely(genome, mutation)
                 save_genome(mutated_genome, mutation_dir / "genome.yaml")
+                safety_validation = self.guardian.validate_candidate_safety(
+                    genome,
+                    mutated_genome,
+                    bundle.scenario,
+                    train_cases=[case.model_dump(mode="json") for case in bundle.train_cases],
+                    run_dir=run_dir,
+                )
+                if not safety_validation.allowed:
+                    self.guardian.rollback(f"generation_{generation:03d}_mutation_{index:02d}")
+                    lineage.record_rejected_mutation(
+                        generation,
+                        mutation.mutation_type,
+                        mutation.target,
+                        safety_validation.reason,
+                        operator_type=operator.name,
+                        mutation_rejected_by="safety_validator",
+                    )
+                    self._emit_event(
+                        event_sink,
+                        {
+                            "event": "mutation_rejected",
+                            "generation": generation,
+                            "index": index,
+                            "mutation_type": mutation.mutation_type,
+                            "target": mutation.target,
+                            "reason": safety_validation.reason,
+                            "operator_type": operator.name,
+                            "mutation_rejected_by": "safety_validator",
+                        },
+                    )
+                    self._save_checkpoint(
+                        control,
+                        scenario_hash,
+                        generation,
+                        generation,
+                        "mutation_rejected_by_safety_validator",
+                        genome,
+                        best_genome,
+                        baseline_result,
+                        best_result,
+                        patience_left,
+                        stop_reason,
+                    )
+                    git.commit_safe(
+                        f"StemOS safety-rejected {mutation.mutation_type}", [run_dir]
+                    )
+                    control_result = self._handle_control_safe_point(
+                        control=control,
+                        git=git,
+                        bundle=bundle,
+                        run_dir=run_dir,
+                        generation=generation,
+                        genome=genome,
+                        best_genome=best_genome,
+                        baseline_genome=baseline_genome,
+                        baseline_result=baseline_result,
+                        best_result=best_result,
+                        patience_left=patience_left,
+                        scenario_hash=scenario_hash,
+                        stop_reason=stop_reason,
+                        lineage=lineage,
+                    )
+                    if control_result:
+                        return control_result
+                    continue
                 mutated_result = self._run_and_evaluate(
                     mutated_genome,
                     bundle,
@@ -503,12 +632,29 @@ class EvolutionLoop:
                     mutation_dir / "eval_result.json",
                     mutated_result.model_dump(mode="json"),
                 )
+                candidate_genome_id = archive.add(
+                    mutated_genome.model_dump(mode="json"),
+                    mutated_result.promotion_score,
+                    generation,
+                    parent_id=current_parent_id,
+                )
 
                 if self.guardian.should_promote(
                     candidate_result.promotion_score,
                     mutated_result.promotion_score,
                     bundle.scenario.evolution.min_delta,
                 ):
+                    hidden_score = self._run_hidden_evaluation(
+                        mutated_genome,
+                        bundle,
+                        mutation_dir / "hidden_workspace",
+                        candidate_genome_id,
+                        generation=generation,
+                    )
+                    baseline_hidden = self.guardian.hidden_baseline_score
+                    hidden_regression = (
+                        baseline_hidden is not None and baseline_hidden - hidden_score > 0.1
+                    )
                     lineage.record_promoted_mutation(
                         generation,
                         mutation.mutation_type,
@@ -516,6 +662,8 @@ class EvolutionLoop:
                         candidate_result.promotion_score,
                         mutated_result.promotion_score,
                         mutation.rationale,
+                        operator_type=operator.name,
+                        hidden_eval_regression=hidden_regression,
                     )
                     self._emit_event(
                         event_sink,
@@ -528,6 +676,8 @@ class EvolutionLoop:
                             "old_score": candidate_result.promotion_score,
                             "new_score": mutated_result.promotion_score,
                             "rationale": mutation.rationale,
+                            "operator_type": operator.name,
+                            "hidden_eval_regression": hidden_regression,
                         },
                     )
                     genome = mutated_genome
@@ -584,6 +734,7 @@ class EvolutionLoop:
                         candidate_result.promotion_score,
                         mutated_result.promotion_score,
                         "fitness did not improve enough for promotion",
+                        operator_type=operator.name,
                     )
                     self._emit_event(
                         event_sink,
@@ -596,6 +747,7 @@ class EvolutionLoop:
                             "old_score": candidate_result.promotion_score,
                             "new_score": mutated_result.promotion_score,
                             "reason": "fitness did not improve enough for promotion",
+                            "operator_type": operator.name,
                         },
                     )
                     self._save_checkpoint(
@@ -633,8 +785,39 @@ class EvolutionLoop:
                     if control_result:
                         return control_result
 
+                sampled_parent_id, sampled_genome = archive.sample_parent(strategy="weighted")
+                sampled_score = archive.score_for(sampled_parent_id)
+                selected_parent_id = sampled_parent_id
+                selected_genome = sampled_genome
+                selected_score = sampled_score
+                if best_result is not None and sampled_score < best_result.promotion_score:
+                    selected_parent_id, selected_genome, selected_score = archive.best()
+                genome = Genome.model_validate(selected_genome)
+                current_parent_id = selected_parent_id
+                self._active_parent_id = current_parent_id
+                candidate_result = candidate_result.model_copy(
+                    update={"score": selected_score, "promotion_score": selected_score}
+                )
+                lineage.record(
+                    "archive_parent_sampled",
+                    generation=generation,
+                    sampled_parent_id=sampled_parent_id,
+                    selected_parent_id=selected_parent_id,
+                    candidate_genome_id=candidate_genome_id,
+                    sampled_score=round(sampled_score, 4),
+                    selected_score=round(selected_score, 4),
+                )
+
             if not promoted_this_generation:
                 patience_left -= 1
+            if len(archive):
+                archive_best_score = archive.best()[2]
+                if last_archive_best_score is not None and archive_best_score - last_archive_best_score <= 0.01:
+                    stagnation_count += 1
+                else:
+                    stagnation_count = 0
+                last_archive_best_score = archive_best_score
+                self._active_stagnation_count = stagnation_count
             self._save_checkpoint(
                 control,
                 scenario_hash,
@@ -766,7 +949,15 @@ class EvolutionLoop:
         best_result: EvaluationResult | None,
         patience_left: int,
         stop_reason: str,
+        archive: GenomeArchive | None = None,
+        current_parent_id: str | None = None,
+        stagnation_count: int | None = None,
     ) -> None:
+        archive = archive or getattr(self, "_active_archive", None)
+        if current_parent_id is None:
+            current_parent_id = getattr(self, "_active_parent_id", None)
+        if stagnation_count is None:
+            stagnation_count = getattr(self, "_active_stagnation_count", 0)
         control.save_checkpoint(
             scenario_hash=scenario_hash,
             generation=generation,
@@ -776,8 +967,11 @@ class EvolutionLoop:
             best_genome=best_genome,
             baseline_eval=baseline_result,
             best_eval=best_result,
+            archive=archive.snapshot() if archive else None,
+            stagnation_count=stagnation_count,
             patience_left=patience_left,
             stop_reason=stop_reason,
+            current_parent_id=current_parent_id,
         )
 
     def _handle_control_safe_point(
@@ -949,6 +1143,27 @@ class EvolutionLoop:
             bundle.scenario,
             train_runs,
             validation_runs,
+            run_dir=generation_dir.parent if generation_dir.name != "final_evaluation" else generation_dir.parent,
+        )
+
+    def _run_hidden_evaluation(
+        self,
+        genome: Genome,
+        bundle: ScenarioBundle,
+        workspace_dir: Path,
+        genome_id: str,
+        *,
+        generation: int,
+    ) -> float:
+        harness = self.harness_builder.materialize(
+            genome,
+            bundle.scenario,
+            workspace_dir=workspace_dir,
+        )
+        return self.guardian._run_hidden_evaluation(
+            harness,
+            genome_id,
+            generation=generation,
         )
 
     def _case_trace_sink(
@@ -1049,3 +1264,43 @@ class EvolutionLoop:
             "structured_output_repairs": self.model_client.structured_output_repairs,
             "total_estimated_cost": final_result.cost_estimate,
         }
+
+    def _gsm8k_baseline_genome(self, scenario_name: str) -> Genome:
+        return Genome.model_validate(
+            {
+                "genome_version": 0,
+                "name": "gsm8k_zero_shot_cot_seed",
+                "scenario_name": scenario_name,
+                "task_diagnosis": {},
+                "roles": [
+                    {
+                        "name": "solver",
+                        "description": "Zero-shot chain-of-thought math solver.",
+                        "instructions": "Solve the math problem. Show your work.",
+                        "allowed_tools": ["call_model"],
+                    }
+                ],
+                "workflow": [
+                    {
+                        "id": "solve",
+                        "role": "solver",
+                        "action": "Solve the math problem. Show your work.",
+                        "input_from": [],
+                        "output_key": "final_output",
+                    }
+                ],
+                "tools": {"builtin": [], "generated": []},
+                "memory": {},
+                "quality_gates": [],
+                "self_evaluation": {"rubric": ""},
+                "retry_policy": {"max_attempts": 1, "revise_on_failure": False},
+                "stop_rule": {},
+                "environment": {
+                    "workspace_layout": [],
+                    "required_artifacts": [],
+                    "artifact_purpose": {},
+                    "file_templates": {},
+                    "cleanup_policy": "keep_run_artifacts",
+                },
+            }
+        )

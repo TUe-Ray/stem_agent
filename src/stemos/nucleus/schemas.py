@@ -20,6 +20,7 @@ MutationType = Literal[
     "modify_self_evaluation",
     "modify_stop_rule",
     "modify_environment",
+    "replace_genome",
 ]
 
 

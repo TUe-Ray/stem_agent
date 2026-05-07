@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from stemos.genome.models import Genome
+from stemos.nucleus.operators import CrossoverMutation, FirstOrderMutation, MutationOperator
 from stemos.nucleus.model_client import ModelClient
 from stemos.nucleus.prompts import NUCLEUS_SYSTEM_PROMPT
 from stemos.nucleus.schemas import MutationPlan, MutationProposal
@@ -22,14 +23,30 @@ class MutationPlanner:
         failure_patterns: list[str],
         budget_remaining: float,
         lineage_summary: str,
+        operator: MutationOperator | None = None,
+        archive: object | None = None,
     ) -> MutationPlan:
+        operator = operator or FirstOrderMutation()
+        operator_plan = self._operator_plan(
+            operator=operator,
+            archive=archive,
+            scenario=scenario,
+            genome=genome,
+            failure_patterns=failure_patterns,
+        )
+        if operator_plan is not None:
+            self._audit_offline_plan(scenario, genome, operator, operator_plan)
+            return operator_plan
+
         if self.model_client.offline:
-            return self._deterministic_plan(
+            plan = self._deterministic_plan(
                 scenario=scenario,
                 genome=genome,
                 failure_patterns=failure_patterns,
                 lineage_summary=lineage_summary,
             )
+            self._audit_offline_plan(scenario, genome, operator, plan)
+            return plan
 
         payload = {
             "scenario": scenario.model_dump(mode="json"),
@@ -40,10 +57,14 @@ class MutationPlanner:
             "failure_patterns": failure_patterns,
             "budget_remaining": budget_remaining,
             "lineage_summary": lineage_summary,
+            "operator_type": operator.name,
         }
         result = self.model_client.call(
-            NUCLEUS_SYSTEM_PROMPT + "\n" + str(payload),
+            str(payload),
             response_schema=MutationPlan.model_json_schema(),
+            system_prompt=NUCLEUS_SYSTEM_PROMPT,
+            temperature=0.8,
+            role="nucleus",
         )
         if isinstance(result, dict) and "mutation_plan" in result:
             self.model_client.record_structured_output_repair()
@@ -58,6 +79,62 @@ class MutationPlanner:
                 failure_patterns=failure_patterns,
                 lineage_summary=lineage_summary,
             )
+
+    def _operator_plan(
+        self,
+        *,
+        operator: MutationOperator,
+        archive: object | None,
+        scenario: Scenario,
+        genome: Genome,
+        failure_patterns: list[str],
+    ) -> MutationPlan | None:
+        if isinstance(operator, FirstOrderMutation):
+            return None
+        genome_data = genome.model_dump(mode="json")
+        history = [{"scenario": scenario.model_dump(mode="json"), "failure_patterns": failure_patterns}]
+        if isinstance(operator, CrossoverMutation) and archive is not None and len(archive) >= 2:
+            _, best_genome, _ = archive.best()
+            _, random_genome = archive.sample_parent(strategy="random")
+            replacement = operator.propose(best_genome, random_genome, self.model_client)
+        else:
+            replacement = operator.propose(genome_data, history, self.model_client)
+        replacement["genome_version"] = int(genome_data.get("genome_version", 0)) + 1
+        return MutationPlan(
+            summary=f"{operator.name} operator proposed a whole-genome candidate.",
+            failure_patterns=failure_patterns,
+            proposed_mutations=[
+                MutationProposal(
+                    mutation_type="replace_genome",
+                    target="genome",
+                    rationale=f"{operator.name} selected because search stagnated or archive diversity was useful.",
+                    expected_improvement="Explore a non-greedy candidate outside the current local hill climb.",
+                    risk="Whole-genome replacement may remove useful organs and will be safety-checked before evaluation.",
+                    patch={"genome": replacement},
+                )
+            ],
+        )
+
+    def _audit_offline_plan(
+        self,
+        scenario: Scenario,
+        genome: Genome,
+        operator: MutationOperator,
+        plan: MutationPlan,
+    ) -> None:
+        prompt = str(
+            {
+                "scenario": scenario.model_dump(mode="json"),
+                "current_genome": genome.model_dump(mode="json"),
+                "operator_type": operator.name,
+            }
+        )
+        self.model_client.audit_call(
+            role="nucleus",
+            system_prompt=NUCLEUS_SYSTEM_PROMPT,
+            prompt=prompt,
+            response=plan.model_dump(mode="json"),
+        )
 
     def _deterministic_plan(
         self,

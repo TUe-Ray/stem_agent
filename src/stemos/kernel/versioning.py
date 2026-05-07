@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import json
+import math
 import os
+import random
 import re
 import shutil
 import subprocess
+import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from stemos.genome.models import Genome
 from stemos.genome.serializer import save_genome
@@ -30,6 +36,145 @@ class VersionStore:
             raise FileNotFoundError(f"Missing snapshot: {source}")
         target_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target_path)
+
+
+class GenomeArchive:
+    def __init__(
+        self,
+        max_size: int = 10,
+        *,
+        run_dir: str | Path | None = None,
+        entries: list[dict[str, Any]] | None = None,
+    ):
+        self.max_size = max(1, int(max_size))
+        self.run_dir = Path(run_dir) if run_dir else None
+        self.entries: list[dict[str, Any]] = []
+        if entries:
+            for entry in entries:
+                self._add_entry(dict(entry), persist=False)
+        elif self.archive_path and self.archive_path.exists():
+            self._load_from_jsonl(self.archive_path)
+
+    @property
+    def archive_path(self) -> Path | None:
+        if self.run_dir is None:
+            return None
+        return self.run_dir / "archive.jsonl"
+
+    @classmethod
+    def from_snapshot(
+        cls,
+        snapshot: dict[str, Any] | None,
+        *,
+        run_dir: str | Path,
+        max_size: int = 10,
+    ) -> "GenomeArchive":
+        if snapshot and snapshot.get("entries"):
+            return cls(max_size=int(snapshot.get("max_size", max_size)), run_dir=run_dir, entries=snapshot["entries"])
+        return cls(max_size=max_size, run_dir=run_dir)
+
+    def add(
+        self,
+        genome: dict,
+        score: float,
+        generation: int,
+        parent_id: str | None,
+    ) -> str:
+        genome_id = str(uuid.uuid4())
+        entry = {
+            "genome_id": genome_id,
+            "genome": genome,
+            "score": float(score),
+            "generation": int(generation),
+            "parent_id": parent_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        self._add_entry(entry, persist=True)
+        return genome_id
+
+    def sample_parent(self, strategy: str = "weighted") -> tuple[str, dict]:
+        if not self.entries:
+            raise RuntimeError("Cannot sample parent from an empty genome archive")
+        if strategy == "best":
+            entry = max(self.entries, key=lambda item: float(item["score"]))
+        elif strategy == "random":
+            entry = random.choice(self.entries)
+        elif strategy == "weighted":
+            weights = self._softmax_weights([float(item["score"]) for item in self.entries])
+            entry = random.choices(self.entries, weights=weights, k=1)[0]
+        else:
+            raise ValueError(f"Unsupported archive sampling strategy: {strategy}")
+        return str(entry["genome_id"]), dict(entry["genome"])
+
+    def best(self) -> tuple[str, dict, float]:
+        if not self.entries:
+            raise RuntimeError("Cannot select best genome from an empty archive")
+        entry = max(self.entries, key=lambda item: float(item["score"]))
+        return str(entry["genome_id"]), dict(entry["genome"]), float(entry["score"])
+
+    def score_for(self, genome_id: str) -> float:
+        for entry in self.entries:
+            if entry.get("genome_id") == genome_id:
+                return float(entry.get("score", 0.0))
+        raise KeyError(genome_id)
+
+    def to_markdown_table(self) -> str:
+        rows = [
+            "| Rank | Genome ID | Score | Generation | Parent ID |",
+            "|---:|---|---:|---:|---|",
+        ]
+        for rank, entry in enumerate(
+            sorted(self.entries, key=lambda item: float(item["score"]), reverse=True),
+            start=1,
+        ):
+            parent_id = entry.get("parent_id") or ""
+            rows.append(
+                "| {rank} | `{genome_id}` | {score:.4f} | {generation} | {parent} |".format(
+                    rank=rank,
+                    genome_id=entry.get("genome_id", ""),
+                    score=float(entry.get("score", 0.0)),
+                    generation=entry.get("generation", ""),
+                    parent=f"`{parent_id}`" if parent_id else "",
+                )
+            )
+        if len(rows) == 2:
+            rows.append("| | | | | Archive is empty. |")
+        return "\n".join(rows)
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "max_size": self.max_size,
+            "entries": [dict(entry) for entry in self.entries],
+        }
+
+    def __len__(self) -> int:
+        return len(self.entries)
+
+    def _add_entry(self, entry: dict[str, Any], *, persist: bool) -> None:
+        self.entries.append(entry)
+        self.entries.sort(key=lambda item: float(item["score"]), reverse=True)
+        if len(self.entries) > self.max_size:
+            self.entries = self.entries[: self.max_size]
+        if persist and self.archive_path:
+            self.archive_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.archive_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(entry, sort_keys=True) + "\n")
+
+    def _load_from_jsonl(self, path: Path) -> None:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            if "genome_id" in item and "genome" in item and "score" in item:
+                self._add_entry(item, persist=False)
+
+    def _softmax_weights(self, scores: list[float]) -> list[float]:
+        peak = max(scores)
+        raw = [math.exp(score - peak) for score in scores]
+        total = sum(raw)
+        if total <= 0:
+            return [1.0 for _ in scores]
+        return [value / total for value in raw]
 
 
 SECRET_PATTERNS = [

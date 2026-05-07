@@ -43,6 +43,7 @@ class LineageLog:
         rationale: str,
         expected_improvement: str,
         risk: str,
+        operator_type: str | None = None,
     ) -> None:
         self.record(
             "mutation_proposed",
@@ -52,15 +53,27 @@ class LineageLog:
             rationale=rationale,
             expected_improvement=expected_improvement,
             risk=risk,
+            **({"operator_type": operator_type} if operator_type else {}),
         )
 
-    def record_rejected_mutation(self, generation: int, mutation_type: str, target: str, reason: str) -> None:
+    def record_rejected_mutation(
+        self,
+        generation: int,
+        mutation_type: str,
+        target: str,
+        reason: str,
+        *,
+        operator_type: str | None = None,
+        mutation_rejected_by: str | None = None,
+    ) -> None:
         self.record(
             "mutation_rejected",
             generation=generation,
             mutation_type=mutation_type,
             target=target,
             reason=reason,
+            **({"operator_type": operator_type} if operator_type else {}),
+            **({"mutation_rejected_by": mutation_rejected_by} if mutation_rejected_by else {}),
         )
 
     def record_promoted_mutation(
@@ -71,6 +84,8 @@ class LineageLog:
         score_before: float,
         score_after: float,
         rationale: str,
+        operator_type: str | None = None,
+        hidden_eval_regression: bool | None = None,
     ) -> None:
         self.record(
             "mutation_promoted",
@@ -80,6 +95,8 @@ class LineageLog:
             score_before=round(score_before, 4),
             score_after=round(score_after, 4),
             rationale=rationale,
+            **({"operator_type": operator_type} if operator_type else {}),
+            **({"hidden_eval_regression": hidden_eval_regression} if hidden_eval_regression is not None else {}),
         )
 
     def record_rolled_back_mutation(
@@ -90,6 +107,7 @@ class LineageLog:
         score_before: float,
         score_after: float,
         reason: str,
+        operator_type: str | None = None,
     ) -> None:
         self.record(
             "mutation_rolled_back",
@@ -99,6 +117,7 @@ class LineageLog:
             score_before=round(score_before, 4),
             score_after=round(score_after, 4),
             reason=reason,
+            **({"operator_type": operator_type} if operator_type else {}),
         )
 
     def record_freeze(self, generation: int, best_score: float, reason: str) -> None:

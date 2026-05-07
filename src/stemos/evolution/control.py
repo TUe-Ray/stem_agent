@@ -31,8 +31,11 @@ class CheckpointState(BaseModel):
     phase: str
     current_genome_path: str
     best_genome_path: str
+    current_parent_id: str | None = None
     baseline_eval: dict[str, Any] | None = None
     best_eval: dict[str, Any] | None = None
+    archive: dict[str, Any] | None = None
+    stagnation_count: int = 0
     patience_left: int
     stop_reason: str = ""
 
@@ -109,10 +112,13 @@ class EvolutionControl:
         phase: str,
         current_genome: Genome,
         best_genome: Genome,
-        baseline_eval: EvaluationResult | None,
-        best_eval: EvaluationResult | None,
-        patience_left: int,
-        stop_reason: str,
+        baseline_eval: EvaluationResult | None = None,
+        best_eval: EvaluationResult | None = None,
+        archive: dict[str, Any] | None = None,
+        stagnation_count: int = 0,
+        patience_left: int = 0,
+        stop_reason: str = "",
+        current_parent_id: str | None = None,
     ) -> CheckpointState:
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         current_path = self.checkpoint_dir / "current_genome.yaml"
@@ -127,8 +133,11 @@ class EvolutionControl:
             phase=phase,
             current_genome_path=str(current_path),
             best_genome_path=str(best_path),
+            current_parent_id=current_parent_id,
             baseline_eval=baseline_eval.model_dump(mode="json") if baseline_eval else None,
             best_eval=best_eval.model_dump(mode="json") if best_eval else None,
+            archive=archive,
+            stagnation_count=stagnation_count,
             patience_left=patience_left,
             stop_reason=stop_reason,
         )
