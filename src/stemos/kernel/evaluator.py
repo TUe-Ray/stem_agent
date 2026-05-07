@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from stemos.genome.models import Genome
 from stemos.harness.runner import HarnessRunResult
+from stemos.llm.client import build_guardian_system_prompt
+from stemos.nucleus.model_client import ModelClient
 from stemos.scenarios.schema import Scenario
 
 
@@ -34,14 +38,25 @@ class EvaluationResult(BaseModel):
 class GuardianFitnessEvaluator:
     """Immutable promotion evaluator. Nucleus is not allowed to mutate this."""
 
+    def __init__(self, model_client: ModelClient | None = None):
+        self.model_client = model_client or ModelClient(offline=True)
+
+    def configure_run(self, run_dir: str | Path | None) -> None:
+        self.model_client.configure_run(run_dir)
+
     def evaluate(
         self,
         genome: Genome,
         scenario: Scenario,
         train_runs: list[HarnessRunResult],
         validation_runs: list[HarnessRunResult] | None = None,
+        *,
+        run_dir: str | Path | None = None,
     ) -> EvaluationResult:
+        if run_dir is not None:
+            self.configure_run(run_dir)
         validation_runs = validation_runs or []
+        self._audit_guardian_call(scenario, train_runs, validation_runs)
         complexity_penalty = self._complexity_penalty(genome)
         train_cases = [
             self._evaluate_case(genome, scenario, run, complexity_penalty)
@@ -90,6 +105,8 @@ class GuardianFitnessEvaluator:
         complexity_penalty: float,
     ) -> CaseEvaluation:
         output = run.final_output or ""
+        if scenario.evaluation_criteria:
+            return self._evaluate_case_with_criteria(scenario, run, output, complexity_penalty)
         requirement_coverage, failures = self._requirement_coverage(
             scenario.expected_output.requirements, output
         )
@@ -136,6 +153,100 @@ class GuardianFitnessEvaluator:
             metrics=metrics,
             failures=failures,
             final_output=output,
+        )
+
+    def _evaluate_case_with_criteria(
+        self,
+        scenario: Scenario,
+        run: HarnessRunResult,
+        output: str,
+        complexity_penalty: float,
+    ) -> CaseEvaluation:
+        metrics: dict[str, float] = {}
+        failures: list[str] = []
+        total_weight = sum(max(float(item.weight), 0.0) for item in scenario.evaluation_criteria) or 1.0
+        weighted_score = 0.0
+        for criterion in scenario.evaluation_criteria:
+            value = self._criterion_score(criterion.method, output, run, criterion.pattern)
+            metrics[criterion.name] = value
+            weighted_score += (max(float(criterion.weight), 0.0) / total_weight) * value
+            if value <= 0.0:
+                failures.append(f"Failed criterion: {criterion.name}")
+        score = self._clamp(weighted_score - 0.05 * complexity_penalty)
+        metrics["complexity_penalty"] = complexity_penalty
+        return CaseEvaluation(
+            case_id=run.case_id,
+            score=score,
+            metrics=metrics,
+            failures=failures,
+            final_output=output,
+        )
+
+    def _criterion_score(
+        self,
+        method: str,
+        output: str,
+        run: HarnessRunResult,
+        pattern: str | None,
+    ) -> float:
+        if method == "exact_match_after_extraction":
+            from stemos.benchmarks.gsm8k import exact_match_after_extraction
+
+            return exact_match_after_extraction(output, run.expected_output or "")
+        if method == "regex_check":
+            expression = pattern or r"\d+.*[\+\-\*\/].*\d+"
+            return 1.0 if re.search(expression, output, re.DOTALL) else 0.0
+        if method == "llm_judge":
+            return self._no_hallucinated_numbers_score(output, run)
+        return 0.0
+
+    def _no_hallucinated_numbers_score(self, output: str, run: HarnessRunResult) -> float:
+        problem_text = json.dumps(run.case_input or {}, sort_keys=True)
+        allowed = set(re.findall(r"-?\d+\.?\d*", problem_text))
+        if run.expected_output:
+            allowed.add(str(run.expected_output))
+        produced = re.findall(r"-?\d+\.?\d*", output)
+        if not produced:
+            return 0.0
+        extra = [number for number in produced if number not in allowed]
+        return 1.0 if len(extra) <= max(2, len(produced) // 2) else 0.0
+
+    def _audit_guardian_call(
+        self,
+        scenario: Scenario,
+        train_runs: list[HarnessRunResult],
+        validation_runs: list[HarnessRunResult],
+    ) -> None:
+        criteria = [item.model_dump(mode="json") for item in scenario.evaluation_criteria]
+        if not criteria:
+            criteria = [
+                {"name": item.name, "weight": item.weight, "description": item.description}
+                for item in scenario.success_criteria
+            ]
+        if not criteria:
+            criteria = [
+                {"name": "expected_output_requirement", "weight": 1.0, "description": item}
+                for item in scenario.expected_output.requirements
+            ]
+        payload = {
+            "evaluation_criteria": criteria,
+            "outputs": [
+                {
+                    "case_id": run.case_id,
+                    "split": "train" if run in train_runs else "validation",
+                    "final_output": run.final_output,
+                }
+                for run in train_runs + validation_runs
+            ],
+        }
+        prompt = json.dumps(payload, sort_keys=True)
+        system_prompt = build_guardian_system_prompt(criteria)
+        response = {"criterion_scores": {}, "overall": 0.0, "reasoning": "deterministic evaluator audit"}
+        self.model_client.audit_call(
+            role="guardian",
+            system_prompt=system_prompt,
+            prompt=prompt,
+            response=response,
         )
 
     def _requirement_coverage(

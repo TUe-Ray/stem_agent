@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ScenarioMeta(BaseModel):
@@ -32,6 +33,14 @@ class SuccessCriterion(BaseModel):
     description: str
 
 
+class EvaluationCriterion(BaseModel):
+    name: str
+    weight: float
+    method: str
+    description: str = ""
+    pattern: str | None = None
+
+
 class EvolutionConfig(BaseModel):
     max_generations: int = 5
     patience: int = 2
@@ -50,6 +59,7 @@ class Scenario(BaseModel):
     constraints: list[str] = Field(default_factory=list)
     available_builtin_tools: list[str] = Field(default_factory=list)
     success_criteria: list[SuccessCriterion] = Field(default_factory=list)
+    evaluation_criteria: list[EvaluationCriterion] = Field(default_factory=list)
     evolution: EvolutionConfig = Field(default_factory=EvolutionConfig)
 
     @property
@@ -69,6 +79,24 @@ class Scenario(BaseModel):
 
 
 class TaskCase(BaseModel):
-    id: str
+    id: str = ""
     input: dict[str, Any]
     reference_notes: str = ""
+    expected_output: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_case(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        raw_input = normalized.get("input", {})
+        if isinstance(raw_input, str):
+            normalized["input"] = {"user_request": raw_input, "problem": raw_input}
+        if not normalized.get("id"):
+            basis = str(normalized.get("input", ""))[:80]
+            digest = hashlib.sha256(basis.encode("utf-8")).hexdigest()[:8]
+            normalized["id"] = f"case_{digest}"
+        if normalized.get("expected_output") is not None:
+            normalized["expected_output"] = str(normalized["expected_output"])
+        return normalized

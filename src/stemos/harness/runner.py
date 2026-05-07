@@ -19,6 +19,8 @@ class HarnessRunResult(BaseModel):
     cost_estimate: float = 0.0
     blocked: bool = False
     block_reason: str | None = None
+    expected_output: str | None = None
+    case_input: dict[str, Any] = Field(default_factory=dict)
 
 
 class HarnessRunner:
@@ -77,6 +79,8 @@ class HarnessRunner:
                     cost_estimate=self._estimate_cost(traces),
                     blocked=True,
                     block_reason=gate_failure,
+                    expected_output=case.expected_output,
+                    case_input=dict(case.input),
                 )
 
         return HarnessRunResult(
@@ -85,6 +89,8 @@ class HarnessRunner:
             outputs=outputs,
             traces=traces,
             cost_estimate=self._estimate_cost(traces),
+            expected_output=case.expected_output,
+            case_input=dict(case.input),
         )
 
     def collect_inputs(

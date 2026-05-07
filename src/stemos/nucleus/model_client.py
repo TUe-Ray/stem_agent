@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Any
+
+from stemos.llm.client import LLMCallLogger
 
 try:
     from openai import OpenAI
@@ -25,6 +28,7 @@ class ModelClient:
         model: str = "gpt-4.1-mini",
         offline: bool = True,
         endpoint: str | None = None,
+        run_dir: str | Path | None = None,
     ):
         self.model = model
         self.offline = offline
@@ -33,6 +37,10 @@ class ModelClient:
         self.fallback_used = False
         self.responses_api_available: bool | None = None
         self.structured_output_repairs = 0
+        self.call_logger = LLMCallLogger(run_dir)
+
+    def configure_run(self, run_dir: str | Path | None) -> None:
+        self.call_logger.configure(run_dir)
 
     def call(
         self,
@@ -41,11 +49,36 @@ class ModelClient:
         response_schema: dict[str, Any] | None = None,
         context: dict[str, Any] | None = None,
         tools: list[Any] | None = None,
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+        role: str | None = None,
     ) -> str | dict[str, Any]:
+        full_prompt = self._full_prompt(system_prompt, prompt)
         if self.offline or not os.getenv("OPENAI_API_KEY"):
-            return self._offline_response(prompt, response_schema, context or {})
+            response = self._offline_response(prompt, response_schema, context or {})
+            self._record_call(role, full_prompt, response)
+            return response
         self.model_calls += 1
-        return self._openai_response(prompt, response_schema, context or {}, tools or [])
+        response, tokens_used = self._openai_response(
+            prompt,
+            response_schema,
+            context or {},
+            tools or [],
+            system_prompt=system_prompt,
+            temperature=temperature,
+        )
+        self._record_call(role, full_prompt, response, tokens_used=tokens_used)
+        return response
+
+    def audit_call(
+        self,
+        *,
+        role: str,
+        system_prompt: str,
+        prompt: str,
+        response: str | dict[str, Any],
+    ) -> None:
+        self._record_call(role, self._full_prompt(system_prompt, prompt), response)
 
     def record_structured_output_repair(self) -> None:
         self.structured_output_repairs += 1
@@ -66,7 +99,10 @@ class ModelClient:
         response_schema: dict[str, Any] | None,
         context: dict[str, Any],
         tools: list[Any],
-    ) -> str | dict[str, Any]:
+        *,
+        system_prompt: str | None,
+        temperature: float | None,
+    ) -> tuple[str | dict[str, Any], int | None]:
         if OpenAI is None:
             raise RuntimeError(
                 "OpenAI mode requires installing stemos[openai]."
@@ -74,20 +110,39 @@ class ModelClient:
 
         client = OpenAI()
         if self.endpoint == "chat_completions":
-            return self._chat_completions_response(client, prompt, response_schema)
+            return self._chat_completions_response(
+                client,
+                prompt,
+                response_schema,
+                system_prompt=system_prompt,
+                temperature=temperature,
+            )
         if self.endpoint not in {"auto", "responses"}:
             raise RuntimeError(
                 "STEMOS_OPENAI_ENDPOINT must be one of: auto, responses, chat_completions"
             )
 
         try:
-            return self._responses_response(client, prompt, response_schema, tools)
+            return self._responses_response(
+                client,
+                prompt,
+                response_schema,
+                tools,
+                system_prompt=system_prompt,
+                temperature=temperature,
+            )
         except Exception as exc:
             if self.endpoint == "responses" or not self._is_responses_scope_error(exc):
                 raise
             self.fallback_used = True
             self.responses_api_available = False
-            return self._chat_completions_response(client, prompt, response_schema)
+            return self._chat_completions_response(
+                client,
+                prompt,
+                response_schema,
+                system_prompt=system_prompt,
+                temperature=temperature,
+            )
 
     def _responses_response(
         self,
@@ -95,11 +150,24 @@ class ModelClient:
         prompt: str,
         response_schema: dict[str, Any] | None,
         tools: list[Any],
-    ) -> str | dict[str, Any]:
+        *,
+        system_prompt: str | None,
+        temperature: float | None,
+    ) -> tuple[str | dict[str, Any], int | None]:
+        input_payload: str | list[dict[str, str]]
+        if system_prompt:
+            input_payload = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ]
+        else:
+            input_payload = prompt
+        kwargs: dict[str, Any] = {"model": self.model, "input": input_payload}
+        if temperature is not None:
+            kwargs["temperature"] = temperature
         if response_schema:
             response = client.responses.create(
-                model=self.model,
-                input=prompt,
+                **kwargs,
                 text={
                     "format": {
                         "type": "json_schema",
@@ -110,25 +178,33 @@ class ModelClient:
                 },
             )
             self.responses_api_available = True
-            return json.loads(response.output_text)
+            return json.loads(response.output_text), self._tokens_from_response(response)
 
-        response = client.responses.create(model=self.model, input=prompt, tools=tools)
+        response = client.responses.create(**kwargs, tools=tools)
         self.responses_api_available = True
-        return response.output_text
+        return response.output_text, self._tokens_from_response(response)
 
     def _chat_completions_response(
         self,
         client: Any,
         prompt: str,
         response_schema: dict[str, Any] | None,
-    ) -> str | dict[str, Any]:
+        *,
+        system_prompt: str | None,
+        temperature: float | None,
+    ) -> tuple[str | dict[str, Any], int | None]:
+        messages = [{"role": "user", "content": prompt}]
+        if system_prompt:
+            messages.insert(0, {"role": "system", "content": system_prompt})
         kwargs: dict[str, Any] = {
             "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
         }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
         if response_schema:
             if self._has_freeform_object(response_schema):
-                kwargs["messages"] = [
+                kwargs["messages"] = ([{"role": "system", "content": system_prompt}] if system_prompt else []) + [
                     {
                         "role": "user",
                         "content": "Return only valid JSON matching the requested schema.\n"
@@ -149,8 +225,45 @@ class ModelClient:
         response = client.chat.completions.create(**kwargs)
         content = response.choices[0].message.content or ""
         if response_schema:
-            return json.loads(content)
-        return content
+            return json.loads(content), self._tokens_from_response(response)
+        return content, self._tokens_from_response(response)
+
+    def _full_prompt(self, system_prompt: str | None, prompt: str) -> str:
+        if not system_prompt:
+            return prompt
+        return f"{system_prompt}\n\n{prompt}"
+
+    def _record_call(
+        self,
+        role: str | None,
+        prompt: str,
+        response: str | dict[str, Any],
+        *,
+        tokens_used: int | None = None,
+    ) -> None:
+        if role not in {"nucleus", "guardian"}:
+            return
+        response_text = response if isinstance(response, str) else json.dumps(response, sort_keys=True)
+        self.call_logger.record(
+            role=role,
+            prompt=prompt,
+            response=response_text,
+            tokens_used=tokens_used,
+        )
+
+    def _tokens_from_response(self, response: Any) -> int | None:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return None
+        for name in ["total_tokens", "total_token_count"]:
+            value = getattr(usage, name, None)
+            if value is not None:
+                return int(value)
+        if isinstance(usage, dict):
+            for name in ["total_tokens", "total_token_count"]:
+                if usage.get(name) is not None:
+                    return int(usage[name])
+        return None
 
     def _is_responses_scope_error(self, exc: Exception) -> bool:
         text = str(exc).lower()

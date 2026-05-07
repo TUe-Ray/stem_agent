@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from stemos.genome.models import EnvironmentSpec, Genome, QualityGate, RoleSpec, WorkflowStep
+from stemos.harness.builder import MaterializedHarness
+from stemos.harness.runner import HarnessRunner
 from stemos.kernel.evaluator import EvaluationResult, GuardianFitnessEvaluator
 from stemos.kernel.sandbox import Sandbox
-from stemos.kernel.validators import ValidationResult
+from stemos.kernel.validators import MutationSafetyValidator, ValidationResult
 from stemos.nucleus.schemas import MutationProposal
+from stemos.scenarios.schema import TaskCase
 from stemos.scenarios.schema import Scenario
 
 
@@ -38,6 +43,20 @@ class Guardian:
     def __init__(self, evaluator: GuardianFitnessEvaluator | None = None):
         self.evaluator = evaluator or GuardianFitnessEvaluator()
         self.sandbox = Sandbox()
+        self.run_dir: Path | None = None
+        self.hidden_cases_path: Path | None = None
+        self.hidden_baseline_score: float | None = None
+
+    def configure_run(self, run_dir: str | Path | None) -> None:
+        self.run_dir = Path(run_dir) if run_dir else None
+        if hasattr(self.evaluator, "configure_run"):
+            self.evaluator.configure_run(run_dir)
+
+    def configure_hidden_evaluation(self, scenario_path: str | Path) -> None:
+        root = Path(scenario_path)
+        if root.is_file():
+            root = root.parent
+        self.hidden_cases_path = root / "hidden_cases.jsonl"
 
     def validate_mutation(
         self,
@@ -76,6 +95,36 @@ class Guardian:
                     )
 
         return ValidationResult.allow("mutation is inside mutable genome boundary")
+
+    def validate_candidate_safety(
+        self,
+        old_genome: Genome,
+        new_genome: Genome,
+        scenario: Scenario,
+        *,
+        train_cases: list[dict[str, Any]] | None = None,
+        run_dir: str | Path | None = None,
+    ) -> ValidationResult:
+        target_run_dir = Path(run_dir) if run_dir else self.run_dir
+        validator = MutationSafetyValidator(target_run_dir)
+        old_data = old_genome.model_dump(mode="json")
+        new_data = new_genome.model_dump(mode="json")
+        scenario_data = scenario.model_dump(mode="json")
+        if train_cases is not None:
+            scenario_data["train_cases"] = train_cases
+
+        rubric_validation = validator.validate_self_eval_rubric_change(
+            old_data,
+            new_data,
+            scenario_data,
+        )
+        if not rubric_validation.allowed:
+            return rubric_validation
+
+        stop_rule_validation = validator.validate_stop_rule_change(old_data, new_data)
+        if not stop_rule_validation.allowed:
+            return stop_rule_validation
+        return ValidationResult.allow("candidate passed mutation safety validation")
 
     def activate_generated_tool(
         self, mutation: MutationProposal, tool_dir: Path
@@ -144,6 +193,10 @@ class Guardian:
             mutated.stop_rule.update(patch)
         elif mutation.mutation_type == "modify_environment":
             mutated.environment = self._merge_environment(mutated.environment, patch)
+        elif mutation.mutation_type == "replace_genome":
+            replacement = Genome.model_validate(patch["genome"])
+            replacement.genome_version = mutated.genome_version
+            mutated = replacement
         elif mutation.mutation_type in {"create_tool", "edit_tool"}:
             generated = list(mutated.tools.get("generated", []) or [])
             generated.append(
@@ -160,6 +213,47 @@ class Guardian:
 
     def evaluate_candidate(self, *args: Any, **kwargs: Any) -> EvaluationResult:
         return self.evaluator.evaluate(*args, **kwargs)
+
+    def _run_hidden_evaluation(
+        self,
+        harness: MaterializedHarness,
+        genome_id: str,
+        *,
+        generation: int | None = None,
+    ) -> float:
+        """
+        Runs hidden_cases.jsonl through harness.
+        Results written to runs/<run_id>/hidden_eval_log.jsonl.
+        Never returned to Nucleus. Never used in fitness score.
+        """
+        if self.run_dir is None or self.hidden_cases_path is None or not self.hidden_cases_path.exists():
+            return 0.0
+        cases = self._read_hidden_cases(self.hidden_cases_path)
+        if not cases:
+            return 0.0
+        runner = HarnessRunner()
+        runs = [runner.run_case(harness, case) for case in cases]
+        result = self.evaluator.evaluate(
+            harness.genome,
+            harness.scenario,
+            runs,
+            [],
+            run_dir=self.run_dir,
+        )
+        score = float(result.train_score)
+        item = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "generation": generation,
+            "genome_id": genome_id,
+            "hidden_score": score,
+            "case_scores": [
+                {"case_id": case.case_id, "score": case.score, "metrics": case.metrics}
+                for case in result.case_results
+            ],
+        }
+        with (self.run_dir / "hidden_eval_log.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(item, sort_keys=True) + "\n")
+        return score
 
     def should_promote(self, old_score: float, new_score: float, min_delta: float) -> bool:
         return (new_score - old_score) >= min_delta
@@ -222,3 +316,10 @@ class Guardian:
         if "cleanup_policy" in patch:
             data["cleanup_policy"] = patch["cleanup_policy"]
         return EnvironmentSpec.model_validate(data)
+
+    def _read_hidden_cases(self, path: Path) -> list[TaskCase]:
+        cases: list[TaskCase] = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                cases.append(TaskCase.model_validate(json.loads(line)))
+        return cases
