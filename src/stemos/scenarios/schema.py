@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from stemos.kernel.signal_policy import SignalPolicy
+from stemos.kernel.convergence import ConvergencePolicy
 
 
 class ScenarioMeta(BaseModel):
@@ -64,10 +65,27 @@ class Scenario(BaseModel):
     evaluation_criteria: list[EvaluationCriterion] = Field(default_factory=list)
     signal_policy: SignalPolicy = Field(default_factory=SignalPolicy)
     evolution: EvolutionConfig = Field(default_factory=EvolutionConfig)
+    domain_tags: list[str] = Field(default_factory=list)
+    convergence_policy: ConvergencePolicy = Field(default_factory=ConvergencePolicy)
+    convergence_policy_explicit: bool = False
 
     @property
     def name(self) -> str:
         return self.scenario.name
+
+    @property
+    def effective_domain_tags(self) -> list[str]:
+        if self.domain_tags:
+            return list(dict.fromkeys(self.domain_tags))
+        tags = [
+            self.scenario.name,
+            self.scenario.task_class,
+        ]
+        tags.extend(item.name for item in self.success_criteria)
+        tags.extend(item.name for item in self.evaluation_criteria)
+        for requirement in self.expected_output.requirements:
+            tags.extend(word.strip(".,:;!?()[]{}").lower() for word in requirement.split() if len(word) >= 5)
+        return [tag for tag in dict.fromkeys(tags) if tag]
 
     @field_validator("success_criteria")
     @classmethod

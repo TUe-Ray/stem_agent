@@ -37,6 +37,14 @@ def load_scenario(path: str | Path) -> ScenarioBundle:
 
     data = yaml.safe_load(scenario_path.read_text(encoding="utf-8")) or {}
     scenario = Scenario.model_validate(data)
+    scenario.convergence_policy_explicit = "convergence_policy" in data
+    if not scenario.convergence_policy_explicit:
+        scenario.convergence_policy = scenario.convergence_policy.model_copy(
+            update={
+                "max_generations": scenario.evolution.max_generations,
+                "absolute_score_threshold": 1.01,
+            }
+        )
     return ScenarioBundle(
         path=root,
         scenario=scenario,
