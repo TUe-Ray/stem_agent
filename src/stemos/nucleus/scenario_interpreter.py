@@ -10,11 +10,11 @@ class ScenarioInterpreter:
     """Turns scenario signals into a structured task diagnosis."""
 
     def __init__(self, model_client: ModelClient | None = None):
-        self.model_client = model_client or ModelClient(offline=True)
+        self.model_client = model_client or ModelClient()
 
     def interpret(self, scenario: Scenario) -> TaskDiagnosis:
-        if self.model_client.offline:
-            return self._deterministic_interpretation(scenario)
+        if self.model_client.test_mode:
+            return self._test_interpretation(scenario)
 
         schema = TaskDiagnosis.model_json_schema()
         payload = {
@@ -40,7 +40,7 @@ class ScenarioInterpreter:
         )
         return TaskDiagnosis.model_validate(result)
 
-    def _deterministic_interpretation(self, scenario: Scenario) -> TaskDiagnosis:
+    def _test_interpretation(self, scenario: Scenario) -> TaskDiagnosis:
         requirements = " ".join(scenario.expected_output.requirements).lower()
         task_type = scenario.scenario.task_class or "general task operation"
         capabilities = ["structured drafting", "requirement checking"]

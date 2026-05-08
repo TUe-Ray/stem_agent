@@ -45,8 +45,10 @@ class Guardian:
         self,
         signal_policy: SignalPolicy | None = None,
         evaluator: GuardianFitnessEvaluator | None = None,
+        harness_runner: HarnessRunner | None = None,
     ):
         self.evaluator = evaluator or GuardianFitnessEvaluator()
+        self.harness_runner = harness_runner or HarnessRunner()
         self._signal_policy = signal_policy or SignalPolicy()
         self._score_history: list[float] = []
         self.sandbox = Sandbox()
@@ -98,7 +100,7 @@ class Guardian:
         self._validation_cases = list(validation_cases)
 
     def _run_evaluation(self, harness: MaterializedHarness, cases: list[TaskCase]) -> dict[str, Any]:
-        runs = [HarnessRunner().run_case(harness, case) for case in cases]
+        runs = [self.harness_runner.run_case(harness, case) for case in cases]
         result = self.evaluator.evaluate(
             harness.genome,
             harness.scenario,
@@ -299,8 +301,7 @@ class Guardian:
         cases = self._read_hidden_cases(self.hidden_cases_path)
         if not cases:
             return 0.0
-        runner = HarnessRunner()
-        runs = [runner.run_case(harness, case) for case in cases]
+        runs = [self.harness_runner.run_case(harness, case) for case in cases]
         result = self.evaluator.evaluate(
             harness.genome,
             harness.scenario,

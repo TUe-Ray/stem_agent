@@ -17,8 +17,9 @@ from stemos.genome.models import Genome
 from stemos.genome.serializer import save_genome
 from stemos.harness.builder import HarnessBuilder
 from stemos.harness.runner import HarnessRunResult, HarnessRunner
+from stemos.harness.role_runner import RoleRunner
 from stemos.kernel.budget import BudgetTracker
-from stemos.kernel.evaluator import EvaluationResult
+from stemos.kernel.evaluator import EvaluationResult, GuardianFitnessEvaluator
 from stemos.kernel.guardian import Guardian
 from stemos.kernel.signal_policy import NucleusSignal
 from stemos.kernel.versioning import GenomeArchive, GitProvenance, GitRunConfig
@@ -53,18 +54,22 @@ class EvolutionLoop:
         self.settings = settings or load_settings()
         model_client = ModelClient(
             model=self.settings.model,
-            offline=self.settings.offline_mode,
+            test_mode=self.settings.test_mode,
             endpoint=self.settings.openai_endpoint,
         )
         self.model_client = model_client
+        default_harness_runner = HarnessRunner(RoleRunner(model_client))
         self.nucleus = NucleusCommander(
             scenario_interpreter=ScenarioInterpreter(model_client),
             failure_analyzer=FailureAnalyzer(),
             mutation_planner=MutationPlanner(model_client),
         )
-        self.guardian = guardian or Guardian()
+        self.harness_runner = harness_runner or default_harness_runner
+        self.guardian = guardian or Guardian(
+            evaluator=GuardianFitnessEvaluator(model_client),
+            harness_runner=self.harness_runner,
+        )
         self.harness_builder = harness_builder or HarnessBuilder()
-        self.harness_runner = harness_runner or HarnessRunner()
         self.runs_root = Path(runs_root)
 
     def resume(
@@ -1316,23 +1321,23 @@ class EvolutionLoop:
         return "Candidate satisfied visible requirements with acceptable complexity."
 
     def _run_metadata(self, final_result: EvaluationResult) -> dict:
-        mode = "offline deterministic" if self.settings.offline_mode else "openai-backed"
+        mode = "test double" if self.settings.test_mode else "openai-api"
         endpoint = self.model_client.endpoint
         responses_api_available = self.model_client.responses_api_available
-        if self.settings.offline_mode:
+        if self.settings.test_mode:
             responses_api_available = None
         elif endpoint == "chat_completions":
             responses_api_available = False
         chat_completions_fallback = (
             False
-            if self.settings.offline_mode
+            if self.settings.test_mode
             else bool(self.model_client.fallback_used or endpoint == "chat_completions")
         )
         return {
             "run_mode": mode,
             "model": self.settings.model,
             "endpoint": endpoint,
-            "offline_mode": self.settings.offline_mode,
+            "test_mode": self.settings.test_mode,
             "fallback_used": self.model_client.fallback_used,
             "responses_api_available": responses_api_available,
             "chat_completions_fallback": chat_completions_fallback,

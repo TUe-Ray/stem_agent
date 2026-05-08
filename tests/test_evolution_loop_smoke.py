@@ -5,14 +5,16 @@ from stemos.evolution.loop import EvolutionLoop
 from stemos.genome.loader import load_genome
 from stemos.harness.builder import HarnessBuilder
 from stemos.harness.runner import HarnessRunner
+from stemos.harness.role_runner import RoleRunner
 from stemos.kernel.evaluator import GuardianFitnessEvaluator
+from stemos.nucleus.model_client import ModelClient
 from stemos.scenarios.loader import load_scenario
 from stemos.scenarios.schema import TaskCase
 
 
 def test_evolution_loop_smoke_creates_frozen_genome_and_report(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
 
@@ -29,7 +31,7 @@ def test_evolution_loop_smoke_creates_frozen_genome_and_report(tmp_path):
 
 def test_demo_final_genome_has_more_than_two_workflow_steps(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
 
@@ -43,7 +45,7 @@ def test_demo_final_genome_has_more_than_two_workflow_steps(tmp_path):
 
 def test_demo_report_contains_organism_shape(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
 
@@ -58,7 +60,7 @@ def test_demo_report_contains_organism_shape(tmp_path):
 
 def test_lineage_contains_promoted_workflow_mutation(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
 
@@ -77,7 +79,7 @@ def test_lineage_contains_promoted_workflow_mutation(tmp_path):
 
 def test_lineage_contains_rejected_or_rolled_back_mutation(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
 
@@ -89,7 +91,7 @@ def test_lineage_contains_rejected_or_rolled_back_mutation(tmp_path):
 
 def test_evolution_loop_can_stream_training_events(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
     events = []
@@ -117,7 +119,7 @@ def test_evolution_loop_can_stream_training_events(tmp_path):
 
 def test_tiny_task_operator_demo_has_lineage_narrative_and_environment(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
 
@@ -140,7 +142,7 @@ def test_tiny_task_operator_demo_has_lineage_narrative_and_environment(tmp_path)
 
 def test_frozen_harness_can_execute_new_input(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
     result = loop.evolve("scenarios/tiny_task_operator", "execute_001")
@@ -153,7 +155,7 @@ def test_frozen_harness_can_execute_new_input(tmp_path):
     )
 
     streamed_traces = []
-    run = HarnessRunner().run_case(
+    run = HarnessRunner(RoleRunner(ModelClient(test_mode=True))).run_case(
         harness,
         TaskCase(
             id="new_input",
@@ -176,7 +178,7 @@ def test_frozen_harness_can_execute_new_input(tmp_path):
 
 def test_frozen_harness_execute_uses_final_output_step(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
     result = loop.evolve("scenarios/toy_structured_answer", "final_step_001")
@@ -188,7 +190,7 @@ def test_frozen_harness_execute_uses_final_output_step(tmp_path):
         workspace_dir=tmp_path / "execute_final_step_workspace",
     )
 
-    run = HarnessRunner().run_case(
+    run = HarnessRunner(RoleRunner(ModelClient(test_mode=True))).run_case(
         harness,
         TaskCase(
             id="new_input",
@@ -216,8 +218,9 @@ def test_validation_aware_promotion_and_complexity_pressure():
         bundle.scenario,
         workspace_dir="workspace/test_validation_aware",
     )
-    train_runs = [HarnessRunner().run_case(harness, case) for case in bundle.train_cases]
-    validation_runs = [HarnessRunner().run_case(harness, case) for case in bundle.validation_cases]
+    runner = HarnessRunner(RoleRunner(ModelClient(test_mode=True)))
+    train_runs = [runner.run_case(harness, case) for case in bundle.train_cases]
+    validation_runs = [runner.run_case(harness, case) for case in bundle.validation_cases]
     result = evaluator.evaluate(base_genome, bundle.scenario, train_runs, validation_runs)
 
     assert result.validation_score is not None

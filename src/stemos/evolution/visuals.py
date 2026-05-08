@@ -12,7 +12,9 @@ from stemos.genome.loader import load_genome
 from stemos.genome.models import Genome
 from stemos.harness.builder import HarnessBuilder
 from stemos.harness.runner import HarnessRunner
+from stemos.harness.role_runner import RoleRunner
 from stemos.kernel.evaluator import GuardianFitnessEvaluator
+from stemos.nucleus.model_client import ModelClient
 from stemos.scenarios.loader import load_scenario
 from stemos.scenarios.schema import Scenario, TaskCase
 
@@ -370,17 +372,21 @@ class VisualizationBuilder:
 
     def output_comparison(self, artifacts: RunArtifacts) -> str:
         sample_input = self._sample_input(artifacts)
+        metadata = self._normalize_metadata(artifacts.metadata or self._infer_metadata(artifacts))
+        test_mode = bool(metadata.get("test_mode", False))
         baseline_output = self._run_output(
             artifacts.baseline_genome,
             artifacts.scenario,
             artifacts.run_dir / "visuals" / "baseline_workspace",
             sample_input,
+            test_mode=test_mode,
         )
         evolved_output = self._run_output(
             artifacts.frozen_genome,
             artifacts.scenario,
             artifacts.run_dir / "visuals" / "frozen_workspace",
             sample_input,
+            test_mode=test_mode,
         )
         evaluator = GuardianFitnessEvaluator()
         checklist = ["| Requirement | Baseline | Evolved |", "|---|---:|---:|"]
@@ -429,7 +435,7 @@ class VisualizationBuilder:
             ("run mode", metadata.get("run_mode", "not recorded")),
             ("model", metadata.get("model", "not recorded")),
             ("endpoint", metadata.get("endpoint", "not recorded")),
-            ("offline_mode", metadata.get("offline_mode", "not recorded")),
+            ("test_mode", metadata.get("test_mode", "not recorded")),
             ("fallback_used", metadata.get("fallback_used", "not recorded")),
             (
                 "responses_api_available",
@@ -729,10 +735,17 @@ class VisualizationBuilder:
         return lines
 
     def _run_output(
-        self, genome: Genome, scenario: Scenario, workspace: Path, sample_input: str
+        self,
+        genome: Genome,
+        scenario: Scenario,
+        workspace: Path,
+        sample_input: str,
+        *,
+        test_mode: bool,
     ) -> str:
         harness = HarnessBuilder().materialize(genome, scenario, workspace_dir=workspace)
-        result = HarnessRunner().run_case(
+        runner = HarnessRunner(RoleRunner(ModelClient(test_mode=test_mode)))
+        result = runner.run_case(
             harness,
             TaskCase(id="visual_sample", input={"user_request": sample_input}),
         )
@@ -747,47 +760,47 @@ class VisualizationBuilder:
 
     def _infer_metadata(self, artifacts: RunArtifacts) -> dict[str, Any]:
         settings = artifacts.config.get("settings", {}) or {}
-        offline_mode = settings.get("offline_mode", "not recorded")
+        test_mode = settings.get("test_mode", False)
         model_calls = sum(1 for event in artifacts.lineage if event.get("event") == "mutation_plan")
-        if offline_mode is False:
+        if not test_mode:
             model_calls += 1
         repairs = 0
-        if offline_mode is False:
+        if not test_mode:
             repairs = sum(
                 1
                 for event in artifacts.lineage
                 if event.get("event") == "mutation_plan"
-                and "Offline deterministic" in str(event.get("summary", ""))
+                and "Test Nucleus plan" in str(event.get("summary", ""))
             )
         endpoint = settings.get("openai_endpoint")
-        if not endpoint and offline_mode is False:
+        if not endpoint and not test_mode:
             endpoint = "chat_completions"
         fallback_used = False if endpoint == "chat_completions" else "not recorded"
         responses_api_available = self._responses_api_available(
             endpoint,
-            metadata={"offline_mode": offline_mode, "fallback_used": fallback_used},
+            metadata={"test_mode": test_mode, "fallback_used": fallback_used},
         )
         chat_completions_fallback = self._chat_completions_fallback(
-            endpoint, fallback_used=fallback_used, offline_mode=offline_mode
+            endpoint, fallback_used=fallback_used, test_mode=test_mode
         )
         return {
-            "run_mode": "offline deterministic" if offline_mode else "openai-backed",
+            "run_mode": "test double" if test_mode else "openai-api",
             "model": settings.get("model", "not recorded"),
             "endpoint": endpoint or "not recorded",
-            "offline_mode": offline_mode,
+            "test_mode": test_mode,
             "fallback_used": fallback_used,
             "responses_api_available": responses_api_available,
             "chat_completions_fallback": chat_completions_fallback,
-            "model_calls": model_calls if offline_mode is False else 0,
+            "model_calls": model_calls if not test_mode else 0,
             "structured_output_repairs": repairs,
             "total_estimated_cost": artifacts.final_eval.get("cost_estimate", "not recorded"),
         }
 
     def _normalize_metadata(self, metadata: dict[str, Any]) -> dict[str, Any]:
         normalized = dict(metadata)
-        offline_mode = normalized.get("offline_mode", "not recorded")
+        test_mode = normalized.get("test_mode", False)
         endpoint = normalized.get("endpoint")
-        if not endpoint and offline_mode is False:
+        if not endpoint and not test_mode:
             endpoint = "chat_completions"
             normalized["endpoint"] = endpoint
         normalized.setdefault(
@@ -799,7 +812,7 @@ class VisualizationBuilder:
             self._chat_completions_fallback(
                 endpoint,
                 fallback_used=normalized.get("fallback_used", "not recorded"),
-                offline_mode=offline_mode,
+                test_mode=test_mode,
             ),
         )
         return normalized
@@ -807,7 +820,7 @@ class VisualizationBuilder:
     def _responses_api_available(
         self, endpoint: Any, metadata: dict[str, Any]
     ) -> bool | str:
-        if metadata.get("offline_mode") is True:
+        if metadata.get("test_mode") is True:
             return "not applicable"
         if metadata.get("fallback_used") is True:
             return False
@@ -818,9 +831,9 @@ class VisualizationBuilder:
         return "not recorded"
 
     def _chat_completions_fallback(
-        self, endpoint: Any, *, fallback_used: Any, offline_mode: Any
+        self, endpoint: Any, *, fallback_used: Any, test_mode: Any
     ) -> bool | str:
-        if offline_mode is True:
+        if test_mode is True:
             return "not applicable"
         if fallback_used is True:
             return True

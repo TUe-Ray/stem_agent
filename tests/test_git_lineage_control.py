@@ -104,7 +104,7 @@ def test_pause_command_writes_control_file(tmp_path):
 
 
 def test_freeze_now_uses_best_verified_genome(tmp_path):
-    loop = EvolutionLoop(settings=Settings(offline_mode=True), runs_root=tmp_path / "runs")
+    loop = EvolutionLoop(settings=Settings(test_mode=True), runs_root=tmp_path / "runs")
     result = loop.evolve("scenarios/toy_structured_answer", "freeze_best")
     control = EvolutionControl(result.run_dir, "freeze_best")
     state = control.load_checkpoint()
@@ -123,7 +123,7 @@ def test_abort_does_not_promote_candidate(tmp_path):
     run_id = "abort_001"
     run_dir = tmp_path / "runs" / run_id
     EvolutionControl(run_dir, run_id).write_command("abort")
-    loop = EvolutionLoop(settings=Settings(offline_mode=True), runs_root=tmp_path / "runs")
+    loop = EvolutionLoop(settings=Settings(test_mode=True), runs_root=tmp_path / "runs")
 
     result = loop.evolve("scenarios/toy_structured_answer", run_id)
     lineage = (run_dir / "lineage.jsonl").read_text(encoding="utf-8")

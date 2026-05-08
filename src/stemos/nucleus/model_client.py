@@ -25,17 +25,17 @@ def _env(key: str, default: str) -> str:
 
 
 class ModelClient:
-    """Small model abstraction used by both offline and OpenAI-backed paths."""
+    """Small model abstraction for OpenAI API calls, with an internal test double."""
 
     def __init__(
         self,
         model: str = "gpt-4.1-mini",
-        offline: bool = True,
+        test_mode: bool = False,
         endpoint: str | None = None,
         run_dir: str | Path | None = None,
     ):
         self.model = model
-        self.offline = offline
+        self.test_mode = test_mode
         self.endpoint = endpoint or _env("STEM_AGENT_OPENAI_ENDPOINT", "auto")
         self.model_calls = 0
         self.fallback_used = False
@@ -58,10 +58,15 @@ class ModelClient:
         role: str | None = None,
     ) -> str | dict[str, Any]:
         full_prompt = self._full_prompt(system_prompt, prompt)
-        if self.offline or not os.getenv("OPENAI_API_KEY"):
-            response = self._offline_response(prompt, response_schema, context or {})
+        if self.test_mode:
+            response = self._test_response(prompt, response_schema, context or {})
             self._record_call(role, full_prompt, response)
             return response
+        if not os.getenv("OPENAI_API_KEY"):
+            raise RuntimeError(
+                "OPENAI_API_KEY is required. Copy .env.example to .env, set your key, "
+                "then run: set -a; source .env; set +a"
+            )
         self.model_calls += 1
         response, tokens_used = self._openai_response(
             prompt,
@@ -87,7 +92,7 @@ class ModelClient:
     def record_structured_output_repair(self) -> None:
         self.structured_output_repairs += 1
 
-    def _offline_response(
+    def _test_response(
         self,
         prompt: str,
         response_schema: dict[str, Any] | None,

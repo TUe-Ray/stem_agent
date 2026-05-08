@@ -39,7 +39,7 @@ class GuardianFitnessEvaluator:
     """Immutable promotion evaluator. Nucleus is not allowed to mutate this."""
 
     def __init__(self, model_client: ModelClient | None = None):
-        self.model_client = model_client or ModelClient(offline=True)
+        self.model_client = model_client or ModelClient()
 
     def configure_run(self, run_dir: str | Path | None) -> None:
         self.model_client.configure_run(run_dir)
@@ -241,7 +241,7 @@ class GuardianFitnessEvaluator:
         }
         prompt = json.dumps(payload, sort_keys=True)
         system_prompt = build_guardian_system_prompt(criteria)
-        response = {"criterion_scores": {}, "overall": 0.0, "reasoning": "deterministic evaluator audit"}
+        response = {"criterion_scores": {}, "overall": 0.0, "reasoning": "guardian evaluator audit"}
         self.model_client.audit_call(
             role="guardian",
             system_prompt=system_prompt,

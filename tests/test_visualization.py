@@ -7,7 +7,7 @@ from stemos.evolution.visuals import VisualizationBuilder
 
 def test_visualize_generates_reviewer_visuals(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
     result = loop.evolve("scenarios/toy_structured_answer", "visual_001")
@@ -38,7 +38,7 @@ def test_visualize_generates_reviewer_visuals(tmp_path):
 
 def test_aggregate_compares_runs(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
     first = loop.evolve("scenarios/toy_structured_answer", "aggregate_001")
@@ -76,7 +76,7 @@ def test_progress_visualization_handles_partial_run(tmp_path):
 
 def test_output_comparison_uses_specific_manager_deadline_sample(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
     result = loop.evolve("scenarios/toy_structured_answer", "output_compare_001")

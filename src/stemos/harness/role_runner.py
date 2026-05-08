@@ -10,7 +10,7 @@ from stemos.nucleus.model_client import ModelClient
 
 class RoleRunner:
     def __init__(self, model_client: ModelClient | None = None):
-        self.model_client = model_client or ModelClient(offline=True)
+        self.model_client = model_client or ModelClient()
 
     def run(
         self,
@@ -20,8 +20,8 @@ class RoleRunner:
         memory: MemoryStore,
         harness: MaterializedHarness,
     ) -> str:
-        if self.model_client.offline:
-            return self._offline_role_response(role, step, input_payload, harness)
+        if self.model_client.test_mode:
+            return self._test_role_response(role, step, input_payload, harness)
 
         prompt = self._build_role_prompt(role, step, input_payload, harness)
         tools = harness.tool_registry.get(role.allowed_tools)
@@ -41,7 +41,7 @@ class RoleRunner:
             f"Step: {step.action}\nInput: {input_payload}\n"
         )
 
-    def _offline_role_response(
+    def _test_role_response(
         self,
         role: RoleSpec,
         step: WorkflowStep,

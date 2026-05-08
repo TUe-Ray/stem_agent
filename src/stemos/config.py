@@ -21,10 +21,7 @@ class Settings(BaseModel):
     workspace_dir: Path = Field(
         default_factory=lambda: Path(_env("STEM_AGENT_WORKSPACE_DIR", "workspace"))
     )
-    offline_mode: bool = Field(
-        default_factory=lambda: _env("STEM_AGENT_OFFLINE_MODE", "true").lower()
-        in {"1", "true", "yes", "on"}
-    )
+    test_mode: bool = False
 
 
 def load_settings() -> Settings:

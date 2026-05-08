@@ -1,4 +1,5 @@
 from stemos.nucleus.scenario_interpreter import ScenarioInterpreter
+from stemos.nucleus.model_client import ModelClient
 from stemos.scenarios.loader import load_scenario
 
 
@@ -13,7 +14,7 @@ def test_scenario_loader_reads_yaml_and_jsonl_cases():
 
 def test_scenario_interpreter_produces_task_diagnosis():
     bundle = load_scenario("scenarios/tiny_task_operator")
-    diagnosis = ScenarioInterpreter().interpret(bundle.scenario)
+    diagnosis = ScenarioInterpreter(ModelClient(test_mode=True)).interpret(bundle.scenario)
 
     assert diagnosis.task_type == "tiny task operation harness"
     assert diagnosis.expected_task_solving_pattern

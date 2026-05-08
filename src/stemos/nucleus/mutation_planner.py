@@ -12,7 +12,7 @@ from stemos.scenarios.schema import Scenario
 
 class MutationPlanner:
     def __init__(self, model_client: ModelClient | None = None):
-        self.model_client = model_client or ModelClient(offline=True)
+        self.model_client = model_client or ModelClient()
 
     def propose_mutations(
         self,
@@ -41,17 +41,17 @@ class MutationPlanner:
             failure_patterns=failure_patterns,
         )
         if operator_plan is not None:
-            self._audit_offline_plan(scenario, genome, operator, operator_plan, mutation_history, signal_policy)
+            self._audit_test_plan(scenario, genome, operator, operator_plan, mutation_history, signal_policy)
             return operator_plan
 
-        if self.model_client.offline:
-            plan = self._deterministic_plan(
+        if self.model_client.test_mode:
+            plan = self._test_plan(
                 scenario=scenario,
                 genome=genome,
                 failure_patterns=failure_patterns,
                 lineage_summary=lineage_summary,
             )
-            self._audit_offline_plan(scenario, genome, operator, plan, mutation_history, signal_policy)
+            self._audit_test_plan(scenario, genome, operator, plan, mutation_history, signal_policy)
             return plan
 
         _ = (last_score, best_score, budget_remaining, lineage_summary)
@@ -73,14 +73,9 @@ class MutationPlanner:
             result = result["mutation_plan"]
         try:
             return MutationPlan.model_validate(result)
-        except Exception:
+        except Exception as exc:
             self.model_client.record_structured_output_repair()
-            return self._deterministic_plan(
-                scenario=scenario,
-                genome=genome,
-                failure_patterns=failure_patterns,
-                lineage_summary=lineage_summary,
-            )
+            raise RuntimeError("Nucleus returned an invalid mutation plan.") from exc
 
     def _operator_plan(
         self,
@@ -117,7 +112,7 @@ class MutationPlanner:
             ],
         )
 
-    def _audit_offline_plan(
+    def _audit_test_plan(
         self,
         scenario: Scenario,
         genome: Genome,
@@ -143,7 +138,7 @@ class MutationPlanner:
     def _scenario_description(self, scenario: Scenario) -> str:
         return f"{scenario.scenario.task_class}: {scenario.scenario.description}"
 
-    def _deterministic_plan(
+    def _test_plan(
         self,
         *,
         scenario: Scenario,
@@ -305,7 +300,7 @@ class MutationPlanner:
 
         return MutationPlan(
             summary=(
-                "Offline deterministic Nucleus plan based on repeated failure patterns."
+                "Test Nucleus plan based on repeated failure patterns."
                 if mutations
                 else "Current genome is good enough; freeze."
             ),

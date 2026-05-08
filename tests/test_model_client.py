@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from stemos.config import Settings
 from stemos.nucleus import model_client as model_client_module
 from stemos.nucleus.model_client import ModelClient
@@ -52,7 +54,7 @@ def test_model_client_auto_falls_back_to_chat_completions(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(model_client_module, "OpenAI", _FakeOpenAI, raising=False)
 
-    client = ModelClient(model="gpt-4.1-mini", offline=False, endpoint="auto")
+    client = ModelClient(model="gpt-4.1-mini", test_mode=False, endpoint="auto")
 
     assert client.call("Say OK") == "OK"
 
@@ -61,7 +63,7 @@ def test_model_client_chat_completions_structured_output(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(model_client_module, "OpenAI", _FakeOpenAI, raising=False)
 
-    client = ModelClient(model="gpt-4.1-mini", offline=False, endpoint="chat_completions")
+    client = ModelClient(model="gpt-4.1-mini", test_mode=False, endpoint="chat_completions")
     result = client.call(
         "Return JSON",
         response_schema={
@@ -79,6 +81,15 @@ def test_settings_default_model_is_chat_completions_friendly(monkeypatch):
     monkeypatch.delenv("STEM_AGENT_MODEL", raising=False)
 
     assert Settings().model == "gpt-4.1-mini"
+
+
+def test_model_client_requires_openai_api_key(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    client = ModelClient(model="gpt-4.1-mini", test_mode=False, endpoint="chat_completions")
+
+    with pytest.raises(RuntimeError, match="OPENAI_API_KEY is required"):
+        client.call("Say OK")
 
 
 def test_strict_chat_schema_disallows_extra_properties_recursively():
@@ -116,7 +127,7 @@ def test_chat_completions_uses_json_object_for_freeform_patch(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(model_client_module, "OpenAI", _FakeOpenAI, raising=False)
 
-    client = ModelClient(model="gpt-4.1-mini", offline=False, endpoint="chat_completions")
+    client = ModelClient(model="gpt-4.1-mini", test_mode=False, endpoint="chat_completions")
     client.call(
         "Return JSON",
         response_schema={

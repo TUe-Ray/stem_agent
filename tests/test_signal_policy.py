@@ -63,7 +63,7 @@ def test_build_nucleus_prompt_uses_signal_history_without_layer2_content():
 
 def test_signal_policy_override_removes_aggregate_scores_from_lineage(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
 
@@ -90,7 +90,7 @@ def test_signal_policy_override_removes_aggregate_scores_from_lineage(tmp_path):
 
 def test_default_signal_policy_exposes_aggregate_scores_for_promotions(tmp_path):
     loop = EvolutionLoop(
-        settings=Settings(offline_mode=True),
+        settings=Settings(test_mode=True),
         runs_root=tmp_path / "runs",
     )
 
