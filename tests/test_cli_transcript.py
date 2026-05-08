@@ -1,4 +1,4 @@
-from stemos.cli import _format_execution_transcript, _format_training_transcript_event
+from stem_agent.cli import _format_execution_transcript, _format_training_transcript_event
 
 
 def test_format_execution_transcript_reads_like_agent_dialogue():

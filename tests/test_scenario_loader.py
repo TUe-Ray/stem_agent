@@ -1,6 +1,6 @@
-from stemos.nucleus.scenario_interpreter import ScenarioInterpreter
-from stemos.nucleus.model_client import ModelClient
-from stemos.scenarios.loader import load_scenario
+from stem_agent.nucleus.scenario_interpreter import ScenarioInterpreter
+from stem_agent.nucleus.model_client import ModelClient
+from stem_agent.scenarios.loader import load_scenario
 
 
 def test_scenario_loader_reads_yaml_and_jsonl_cases():

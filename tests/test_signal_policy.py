@@ -2,10 +2,10 @@ import json
 
 import pytest
 
-from stemos.config import Settings
-from stemos.evolution.loop import EvolutionLoop
-from stemos.kernel.signal_policy import NucleusSignal, SignalPolicy
-from stemos.nucleus.nucleus import build_nucleus_prompt
+from stem_agent.config import Settings
+from stem_agent.evolution.loop import EvolutionLoop
+from stem_agent.kernel.signal_policy import NucleusSignal, SignalPolicy
+from stem_agent.nucleus.nucleus import build_nucleus_prompt
 
 
 def test_signal_policy_blocks_layer2_prompt_content():

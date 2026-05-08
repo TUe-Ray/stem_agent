@@ -1,15 +1,15 @@
 import json
 
-from stemos.config import Settings
-from stemos.evolution.loop import EvolutionLoop
-from stemos.genome.loader import load_genome
-from stemos.harness.builder import HarnessBuilder
-from stemos.harness.runner import HarnessRunner
-from stemos.harness.role_runner import RoleRunner
-from stemos.kernel.evaluator import GuardianFitnessEvaluator
-from stemos.nucleus.model_client import ModelClient
-from stemos.scenarios.loader import load_scenario
-from stemos.scenarios.schema import TaskCase
+from stem_agent.config import Settings
+from stem_agent.evolution.loop import EvolutionLoop
+from stem_agent.genome.loader import load_genome
+from stem_agent.harness.builder import HarnessBuilder
+from stem_agent.harness.runner import HarnessRunner
+from stem_agent.harness.role_runner import RoleRunner
+from stem_agent.kernel.evaluator import GuardianFitnessEvaluator
+from stem_agent.nucleus.model_client import ModelClient
+from stem_agent.scenarios.loader import load_scenario
+from stem_agent.scenarios.schema import TaskCase
 
 
 def test_evolution_loop_smoke_creates_frozen_genome_and_report(tmp_path):
@@ -204,7 +204,7 @@ def test_frozen_harness_execute_uses_final_output_step(tmp_path):
 
 def test_validation_aware_promotion_and_complexity_pressure():
     bundle = load_scenario("scenarios/tiny_task_operator")
-    base_genome = load_genome("src/stemos/genome/default_genome.yaml")
+    base_genome = load_genome("src/stem_agent/genome/default_genome.yaml")
     bloated_genome = base_genome.model_copy(deep=True)
     for index in range(5):
         bloated_genome.environment.required_artifacts.append(f"artifact_{index}.md")

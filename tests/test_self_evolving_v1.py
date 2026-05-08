@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import json
 
-from stemos.genome.models import QualityGate, WorkflowStep
-from stemos.genome.loader import load_default_genome
-from stemos.kernel.convergence import ConvergenceEngine, ConvergencePolicy
-from stemos.kernel.guardian import Guardian
-from stemos.nucleus.nucleus import build_nucleus_prompt
-from stemos.nucleus.schemas import MutationProposal
-from stemos.scenarios.loader import load_scenario
-from stemos.skills.awm_bridge import AWMBridge
-from stemos.skills.extractor import SkillExtractor
-from stemos.skills.library import SkillLibrary
-from stemos.skills.schema import AtomicSkill
+from stem_agent.genome.models import QualityGate, WorkflowStep
+from stem_agent.genome.loader import load_default_genome
+from stem_agent.kernel.convergence import ConvergenceEngine, ConvergencePolicy
+from stem_agent.kernel.guardian import Guardian
+from stem_agent.nucleus.nucleus import build_nucleus_prompt
+from stem_agent.nucleus.schemas import MutationProposal
+from stem_agent.scenarios.loader import load_scenario
+from stem_agent.skills.awm_bridge import AWMBridge
+from stem_agent.skills.extractor import SkillExtractor
+from stem_agent.skills.library import SkillLibrary
+from stem_agent.skills.schema import AtomicSkill
 
 
 def _atom(

@@ -2,9 +2,9 @@ import json
 
 import pytest
 
-from stemos.config import Settings
-from stemos.nucleus import model_client as model_client_module
-from stemos.nucleus.model_client import ModelClient
+from stem_agent.config import Settings
+from stem_agent.nucleus import model_client as model_client_module
+from stem_agent.nucleus.model_client import ModelClient
 
 
 class _FakeMessage:

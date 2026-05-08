@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from stemos.config import Settings
-from stemos.evolution.loop import EvolutionLoop
-from stemos.evolution.visuals import VisualizationBuilder
+from stem_agent.config import Settings
+from stem_agent.evolution.loop import EvolutionLoop
+from stem_agent.evolution.visuals import VisualizationBuilder
 
 
 def test_visualize_generates_reviewer_visuals(tmp_path):

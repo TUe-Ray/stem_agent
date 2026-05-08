@@ -1,6 +1,6 @@
-# StemOS Evolution Report
+# stem_agent Evolution Report
 
-StemOS is a universal differentiation mechanism. This run grew a specialized operating harness from scenario signals.
+stem_agent is a universal differentiation mechanism. This run grew a specialized operating harness from scenario signals.
 
 ## Before / After
 - Baseline genome score: 0.1049
@@ -27,7 +27,7 @@ StemOS is a universal differentiation mechanism. This run grew a specialized ope
 - Environment artifacts: 5
 
 ## Why This Is Evolution, Not Subagent Orchestration
-StemOS does not start with a hand-written set of PM/Engineer/QA agents. It starts with a minimal Founder genome. Every new role, workflow step, quality gate, tool, or workspace artifact must appear as a mutation. Guardian evaluates the mutated harness and only promotes changes that improve fitness.
+stem_agent does not start with a hand-written set of PM/Engineer/QA agents. It starts with a minimal Founder genome. Every new role, workflow step, quality gate, tool, or workspace artifact must appear as a mutation. Guardian evaluates the mutated harness and only promotes changes that improve fitness.
 
 ## Promoted Mutations
 - modify_self_evaluation on self_evaluation: Previous runs missed required output sections.
@@ -48,7 +48,7 @@ StemOS does not start with a hand-written set of PM/Engineer/QA agents. It start
 - Self-evaluation enabled: True
 
 ## Differentiation Story
-StemOS differentiation story
+stem_agent differentiation story
 
 Scenario signals were interpreted by Nucleus, then converted into structured genome mutations.
 - Generation 0 evaluated at 0.1049: Missing requirement: Must include a short summary; Missing requirement: Must include concrete steps; Missing requirement: Must include final answer

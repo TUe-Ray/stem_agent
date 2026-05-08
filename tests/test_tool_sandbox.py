@@ -1,4 +1,4 @@
-from stemos.kernel.sandbox import Sandbox
+from stem_agent.kernel.sandbox import Sandbox
 
 
 def test_sandbox_rejects_forbidden_imports():

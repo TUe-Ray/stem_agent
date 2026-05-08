@@ -1,7 +1,7 @@
-from stemos.genome.loader import load_default_genome
-from stemos.genome.models import EnvironmentSpec, Genome
-from stemos.harness.builder import HarnessBuilder
-from stemos.scenarios.loader import load_scenario
+from stem_agent.genome.loader import load_default_genome
+from stem_agent.genome.models import EnvironmentSpec, Genome
+from stem_agent.harness.builder import HarnessBuilder
+from stem_agent.scenarios.loader import load_scenario
 
 
 def test_default_genome_schema_includes_environment():

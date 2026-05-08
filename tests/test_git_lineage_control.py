@@ -2,12 +2,12 @@ import json
 import subprocess
 from pathlib import Path
 
-from stemos.config import Settings
-from stemos.evolution.control import EvolutionControl
-from stemos.evolution.loop import EvolutionLoop
-from stemos.genome.loader import load_genome
-from stemos.genome.serializer import save_genome
-from stemos.kernel.versioning import GitProvenance, GitRunConfig
+from stem_agent.config import Settings
+from stem_agent.evolution.control import EvolutionControl
+from stem_agent.evolution.loop import EvolutionLoop
+from stem_agent.genome.loader import load_genome
+from stem_agent.genome.serializer import save_genome
+from stem_agent.kernel.versioning import GitProvenance, GitRunConfig
 
 
 def _run(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -22,7 +22,7 @@ def _run(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
 
 def _init_git_repo(path: Path) -> None:
     _run(["git", "init"], path)
-    _run(["git", "config", "user.email", "stemos@example.test"], path)
+    _run(["git", "config", "user.email", "stem_agent@example.test"], path)
     _run(["git", "config", "user.name", "stem_agent Test"], path)
     (path / "README.md").write_text("test repo\n", encoding="utf-8")
     _run(["git", "add", "README.md"], path)

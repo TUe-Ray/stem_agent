@@ -305,7 +305,7 @@ Nucleus cannot see the answer key.
 The policy lives here:
 
 ```text
-src/stemos/kernel/signal_policy.py
+src/stem_agent/kernel/signal_policy.py
 ```
 
 Scenario-level configuration:

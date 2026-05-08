@@ -1,17 +1,17 @@
-from stemos.genome.loader import load_default_genome
-from stemos.kernel.guardian import Guardian
-from stemos.nucleus.schemas import MutationProposal
-from stemos.scenarios.loader import load_scenario
+from stem_agent.genome.loader import load_default_genome
+from stem_agent.kernel.guardian import Guardian
+from stem_agent.nucleus.schemas import MutationProposal
+from stem_agent.scenarios.loader import load_scenario
 
 
 def test_guardian_rejects_kernel_mutation():
     mutation = MutationProposal(
         mutation_type="edit_tool",
-        target="src/stemos/kernel/evaluator.py",
+        target="src/stem_agent/kernel/evaluator.py",
         rationale="Try to change immutable Guardian fitness.",
         expected_improvement="Reward hacking.",
         risk="Unsafe.",
-        patch={"path": "src/stemos/kernel/evaluator.py"},
+        patch={"path": "src/stem_agent/kernel/evaluator.py"},
     )
 
     result = Guardian().validate_mutation(mutation)
