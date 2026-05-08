@@ -48,6 +48,9 @@ stop_rule:
   patience: 2
   min_delta: 0.03
 
+intra_test_reflection_enabled: false
+max_intra_reflection_retries: 1
+
 environment:
   workspace_layout: []
   required_artifacts: []

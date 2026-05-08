@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Callable
 
 from pydantic import BaseModel, Field
 
 from stemos.genome.models import RoleSpec, WorkflowStep
 from stemos.harness.builder import MaterializedHarness
+from stemos.harness.intra_adapter import IntraTestAdapter
 from stemos.harness.memory import MemoryStore
 from stemos.harness.role_runner import RoleRunner
 from stemos.scenarios.schema import TaskCase
@@ -32,12 +34,14 @@ class HarnessRunner:
         harness: MaterializedHarness,
         case: TaskCase,
         trace_sink: Callable[[dict[str, Any]], None] | None = None,
+        run_dir: str | Path | None = None,
     ) -> HarnessRunResult:
         memory = MemoryStore(harness.memory_layout)
         outputs: dict[str, str] = {}
         traces: list[dict[str, Any]] = []
         attempts = int(harness.retry_policy.get("max_attempts", 1))
         attempts = max(attempts, 1)
+        intra = IntraTestAdapter(run_dir) if run_dir is not None else None
         if harness.environment.required_artifacts:
             self._record_trace(
                 traces,
@@ -70,7 +74,30 @@ class HarnessRunner:
             gate_traces, gate_failure = self._run_quality_gates(harness, outputs)
             for trace in gate_traces:
                 self._record_trace(traces, trace, trace_sink)
+            if (
+                gate_failure
+                and intra is not None
+                and intra.active(harness.genome)
+                and gate_traces
+            ):
+                gate_failure = self._retry_with_reflection(
+                    harness=harness,
+                    case=case,
+                    memory=memory,
+                    outputs=outputs,
+                    traces=traces,
+                    trace_sink=trace_sink,
+                    intra=intra,
+                    step=step,
+                    role=role,
+                    step_input=step_input,
+                    output_key=output_key,
+                    original_output=result,
+                    first_gate_trace=gate_traces[-1],
+                )
             if gate_failure:
+                if intra is not None:
+                    intra.flush()
                 return HarnessRunResult(
                     case_id=case.id,
                     final_output=self.extract_final(outputs),
@@ -83,6 +110,8 @@ class HarnessRunner:
                     case_input=dict(case.input),
                 )
 
+        if intra is not None:
+            intra.flush()
         return HarnessRunResult(
             case_id=case.id,
             final_output=self.extract_final(outputs),
@@ -220,6 +249,68 @@ class HarnessRunner:
             if not passed:
                 return traces, f"Required quality gate failed: {gate.name}"
         return traces, None
+
+    def _retry_with_reflection(
+        self,
+        *,
+        harness: MaterializedHarness,
+        case: TaskCase,
+        memory: MemoryStore,
+        outputs: dict[str, str],
+        traces: list[dict[str, Any]],
+        trace_sink: Callable[[dict[str, Any]], None] | None,
+        intra: IntraTestAdapter,
+        step: WorkflowStep,
+        role: RoleSpec,
+        step_input: dict[str, Any],
+        output_key: str,
+        original_output: str,
+        first_gate_trace: dict[str, Any],
+    ) -> str | None:
+        gate_trace = first_gate_trace
+        gate_failure = f"Required quality gate failed: {gate_trace.get('gate', 'quality_gate')}"
+        baseline_missing = len(gate_trace.get("missing") or [])
+        previous_output = original_output
+        for attempt_number in range(1, intra.max_retries(harness.genome) + 1):
+            reflection_text = intra.reflection_for_failure(step=step, gate_trace=gate_trace)
+            retry_input = dict(step_input)
+            retry_input["temporary_reflection"] = reflection_text
+            result = self.role_runner.run(role, step, retry_input, memory, harness)
+            outputs[output_key] = result
+            outputs[step.id] = result
+            self._record_trace(
+                traces,
+                self._workflow_step_trace(
+                    role=role,
+                    step=step,
+                    step_input=retry_input,
+                    output_key=output_key,
+                    output=result,
+                    attempts=attempt_number + 1,
+                )
+                | {"intra_reflection_retry": True},
+                trace_sink,
+            )
+            retry_gate_traces, retry_failure = self._run_quality_gates(harness, outputs)
+            for trace in retry_gate_traces:
+                self._record_trace(traces, trace | {"intra_reflection_retry": True}, trace_sink)
+            latest_trace = retry_gate_traces[-1] if retry_gate_traces else gate_trace
+            latest_missing = len(latest_trace.get("missing") or [])
+            improved = retry_failure is None or latest_missing < baseline_missing or result != previous_output
+            intra.record(
+                task_id=case.id,
+                step_name=step.id,
+                quality_gate_name=str(gate_trace.get("gate") or "quality_gate"),
+                attempt_number=attempt_number,
+                reflection_text=reflection_text,
+                retry_improved_output=improved,
+            )
+            if retry_failure is None:
+                return None
+            gate_trace = latest_trace
+            gate_failure = retry_failure
+            previous_output = result
+        return gate_failure
 
     def _estimate_cost(self, traces: list[dict[str, Any]]) -> float:
         workflow_cost = sum(1 for trace in traces if trace.get("event") == "workflow_step") * 0.01

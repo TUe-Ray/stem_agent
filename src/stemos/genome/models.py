@@ -57,6 +57,8 @@ class Genome(BaseModel):
     retry_policy: dict[str, Any] = Field(default_factory=dict)
     stop_rule: dict[str, Any] = Field(default_factory=dict)
     environment: EnvironmentSpec = Field(default_factory=EnvironmentSpec)
+    intra_test_reflection_enabled: bool = False
+    max_intra_reflection_retries: int = 1
 
     @field_validator("roles")
     @classmethod

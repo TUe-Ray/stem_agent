@@ -49,6 +49,8 @@ class RoleRunner:
         harness: MaterializedHarness,
     ) -> str:
         request = self._extract_request(input_payload)
+        if input_payload.get("temporary_reflection"):
+            return self._reflected_output(request, input_payload["temporary_reflection"])
         if "understand" in step.id:
             return f"Intent: {request}"
         if step.id == "review_against_requirements":
@@ -61,6 +63,22 @@ class RoleRunner:
         if any(token in role.name.lower() for token in ["checker", "reviewer", "qa"]):
             return "Quality review: check summary, concrete steps, final answer, and scenario requirements."
         return self._draft_output(request, harness)
+
+    def _reflected_output(self, request: str, reflection: str) -> str:
+        return "\n".join(
+            [
+                "## Summary",
+                f"Revised response for: {request}.",
+                "",
+                "## Steps",
+                "1. Re-check the requested output requirements.",
+                "2. Add any missing required sections.",
+                "3. Keep the final answer concise and actionable.",
+                "",
+                "## Final Answer",
+                f"Applied reflection: {reflection}",
+            ]
+        )
 
     def _draft_output(self, request: str, harness: MaterializedHarness) -> str:
         genome = harness.genome

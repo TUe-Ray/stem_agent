@@ -21,6 +21,7 @@ MutationType = Literal[
     "modify_stop_rule",
     "modify_environment",
     "replace_genome",
+    "awm_promoted",
 ]
 
 
@@ -31,6 +32,7 @@ class MutationProposal(BaseModel):
     expected_improvement: str
     risk: str
     patch: dict[str, Any] = Field(default_factory=dict)
+    origin: str | None = None
 
 
 class MutationPlan(BaseModel):
