@@ -8,6 +8,7 @@ from stemos.nucleus.nucleus import build_nucleus_prompt
 from stemos.nucleus.prompts import NUCLEUS_SYSTEM_PROMPT
 from stemos.nucleus.schemas import MutationPlan, MutationProposal
 from stemos.scenarios.schema import Scenario
+from stemos.skills.schema import AtomicSkill
 
 
 class MutationPlanner:
@@ -29,6 +30,7 @@ class MutationPlanner:
         archive: object | None = None,
         mutation_history: list[NucleusSignal] | None = None,
         signal_policy: SignalPolicy | None = None,
+        reusable_skills: list[AtomicSkill] | None = None,
     ) -> MutationPlan:
         operator = operator or FirstOrderMutation()
         signal_policy = signal_policy or scenario.signal_policy
@@ -41,7 +43,15 @@ class MutationPlanner:
             failure_patterns=failure_patterns,
         )
         if operator_plan is not None:
-            self._audit_test_plan(scenario, genome, operator, operator_plan, mutation_history, signal_policy)
+            self._audit_test_plan(
+                scenario,
+                genome,
+                operator,
+                operator_plan,
+                mutation_history,
+                signal_policy,
+                reusable_skills,
+            )
             return operator_plan
 
         if self.model_client.test_mode:
@@ -51,7 +61,15 @@ class MutationPlanner:
                 failure_patterns=failure_patterns,
                 lineage_summary=lineage_summary,
             )
-            self._audit_test_plan(scenario, genome, operator, plan, mutation_history, signal_policy)
+            self._audit_test_plan(
+                scenario,
+                genome,
+                operator,
+                plan,
+                mutation_history,
+                signal_policy,
+                reusable_skills,
+            )
             return plan
 
         _ = (last_score, best_score, budget_remaining, lineage_summary)
@@ -60,6 +78,7 @@ class MutationPlanner:
             current_genome=genome.model_dump(mode="json"),
             mutation_history=mutation_history,
             signal_policy=signal_policy,
+            reusable_skills=reusable_skills,
         )
         result = self.model_client.call(
             prompt,
@@ -120,6 +139,7 @@ class MutationPlanner:
         plan: MutationPlan,
         mutation_history: list[NucleusSignal],
         signal_policy: SignalPolicy,
+        reusable_skills: list[AtomicSkill] | None,
     ) -> None:
         _ = operator
         prompt = build_nucleus_prompt(
@@ -127,6 +147,7 @@ class MutationPlanner:
             current_genome=genome.model_dump(mode="json"),
             mutation_history=mutation_history,
             signal_policy=signal_policy,
+            reusable_skills=reusable_skills,
         )
         self.model_client.audit_call(
             role="nucleus",

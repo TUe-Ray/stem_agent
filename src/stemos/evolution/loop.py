@@ -19,6 +19,7 @@ from stemos.harness.builder import HarnessBuilder
 from stemos.harness.runner import HarnessRunResult, HarnessRunner
 from stemos.harness.role_runner import RoleRunner
 from stemos.kernel.budget import BudgetTracker
+from stemos.kernel.convergence import ConvergenceEngine
 from stemos.kernel.evaluator import EvaluationResult, GuardianFitnessEvaluator
 from stemos.kernel.guardian import Guardian
 from stemos.kernel.signal_policy import NucleusSignal
@@ -28,8 +29,13 @@ from stemos.nucleus.failure_analyzer import FailureAnalyzer
 from stemos.nucleus.model_client import ModelClient
 from stemos.nucleus.mutation_planner import MutationPlanner
 from stemos.nucleus.nucleus import nucleus_signal_to_dict, select_operator
+from stemos.nucleus.operators import ZeroOrderMutation
+from stemos.nucleus.schemas import MutationProposal
 from stemos.nucleus.scenario_interpreter import ScenarioInterpreter
 from stemos.scenarios.loader import ScenarioBundle, load_scenario
+from stemos.skills.awm_bridge import AWMBridge
+from stemos.skills.extractor import SkillExtractor
+from stemos.skills.library import SkillLibrary
 
 
 class EvolutionRunResult(BaseModel):
@@ -50,6 +56,7 @@ class EvolutionLoop:
         harness_builder: HarnessBuilder | None = None,
         harness_runner: HarnessRunner | None = None,
         runs_root: str | Path = "runs",
+        skill_library_path: str | Path | None = None,
     ):
         self.settings = settings or load_settings()
         model_client = ModelClient(
@@ -71,6 +78,10 @@ class EvolutionLoop:
         )
         self.harness_builder = harness_builder or HarnessBuilder()
         self.runs_root = Path(runs_root)
+        default_skill_path = self.runs_root.parent / "skills" / "atoms.jsonl"
+        self.skill_library = SkillLibrary(skill_library_path or default_skill_path)
+        self.skill_extractor = SkillExtractor()
+        self.awm_bridge = AWMBridge()
 
     def resume(
         self,
@@ -247,11 +258,19 @@ class EvolutionLoop:
 
         history: list[EvaluationResult] = []
         signal_history: list[NucleusSignal] = self._load_signal_history(lineage)
+        convergence = ConvergenceEngine(
+            bundle.scenario.convergence_policy,
+            run_dir=run_dir,
+            hidden_baseline_score=self.guardian.hidden_baseline_score,
+        )
+        force_zero_order_next = False
+        pending_awm_candidates: list[MutationProposal] = []
 
-        for generation in range(start_generation, bundle.scenario.evolution.max_generations):
+        for generation in range(start_generation, bundle.scenario.convergence_policy.max_generations):
             generation_dir = run_dir / f"generation_{generation:03d}"
             generation_dir.mkdir(parents=True, exist_ok=True)
             save_genome(genome, generation_dir / "genome.yaml")
+            tokens_before_generation = self._total_tokens_used(run_dir)
             self._emit_event(
                 event_sink,
                 {
@@ -321,6 +340,7 @@ class EvolutionLoop:
                         current_parent_id,
                         generation=generation,
                     )
+                    convergence.hidden_baseline_score = self.guardian.hidden_baseline_score
 
             summary = self._evaluation_summary(current_result)
             previous_eval_score = history[-2].promotion_score if len(history) >= 2 else 0.0
@@ -387,12 +407,14 @@ class EvolutionLoop:
             if control_result:
                 return control_result
 
-            if patience_left <= 0:
-                stop_reason = f"validation score plateaued for {bundle.scenario.evolution.patience} generations"
-                break
-
             failure_patterns = self.nucleus.failure_analyzer.analyze(current_result)
-            operator = select_operator(archive, stagnation_count)
+            operator = ZeroOrderMutation() if force_zero_order_next else select_operator(archive, stagnation_count)
+            force_zero_order_next = False
+            reusable_skills = self._retrieve_reusable_skills(
+                bundle=bundle,
+                run_id=run_id,
+            )
+            injected_skill_ids = [skill.id for skill in reusable_skills]
             plan = self.nucleus.plan(
                 scenario=bundle.scenario,
                 genome=genome,
@@ -406,7 +428,16 @@ class EvolutionLoop:
                 archive=archive,
                 mutation_history=signal_history,
                 signal_policy=bundle.scenario.signal_policy,
+                reusable_skills=reusable_skills,
             )
+            if pending_awm_candidates:
+                plan = plan.model_copy(
+                    update={
+                        "summary": "AWM candidates queued before Nucleus plan. " + plan.summary,
+                        "proposed_mutations": pending_awm_candidates + plan.proposed_mutations,
+                    }
+                )
+                pending_awm_candidates = []
             self._write_json(generation_dir / "mutation_plan.json", plan.model_dump(mode="json"))
             lineage.record_mutation_plan(
                 generation,
@@ -440,6 +471,7 @@ class EvolutionLoop:
 
             promoted_this_generation = False
             candidate_result = current_result
+            generation_terminal_result = current_result
             for index, mutation in enumerate(plan.proposed_mutations):
                 lineage.record_proposed_mutation(
                     generation,
@@ -449,6 +481,7 @@ class EvolutionLoop:
                     mutation.expected_improvement,
                     mutation.risk,
                     operator_type=operator.name,
+                    origin=mutation.origin,
                 )
                 self._emit_event(
                     event_sink,
@@ -721,6 +754,17 @@ class EvolutionLoop:
                     hidden_regression = (
                         baseline_hidden is not None and baseline_hidden - hidden_score > 0.1
                     )
+                    extracted_skill_ids = self._extract_and_store_skills(
+                        old_genome=genome,
+                        new_genome=mutated_genome,
+                        mutation_type=mutation.mutation_type,
+                        score_before=candidate_result.promotion_score,
+                        score_after=mutated_result.promotion_score,
+                        run_id=run_id,
+                        scenario_name=bundle.scenario.name,
+                        generation=generation,
+                        domain_tags=bundle.scenario.effective_domain_tags,
+                    )
                     lineage.record_promoted_mutation(
                         generation,
                         mutation.mutation_type,
@@ -730,6 +774,8 @@ class EvolutionLoop:
                         mutation.rationale,
                         operator_type=operator.name,
                         hidden_eval_regression=hidden_regression,
+                        extracted_skill_ids=extracted_skill_ids,
+                        origin=mutation.origin,
                         nucleus_signal=nucleus_signal_to_dict(mutation_signal),
                     )
                     self._emit_event(
@@ -749,6 +795,7 @@ class EvolutionLoop:
                     )
                     genome = mutated_genome
                     candidate_result = mutated_result
+                    generation_terminal_result = mutated_result
                     promoted_this_generation = True
                     if best_result is None or self.guardian.should_promote(
                         best_result.promotion_score,
@@ -899,6 +946,73 @@ class EvolutionLoop:
                         generation=generation,
                         stagnation_count=stagnation_count,
                     )
+            observed_lift = generation_terminal_result.promotion_score - current_result.promotion_score
+            for skill_id in injected_skill_ids:
+                self.skill_library.record_observed_lift(
+                    skill_id=skill_id,
+                    run_id=run_id,
+                    observed_score_lift=observed_lift,
+                )
+            evicted_skill_ids = self.skill_library.tick_probation(run_id=run_id)
+            if evicted_skill_ids:
+                lineage.record(
+                    "skill_probation_evicted",
+                    generation=generation,
+                    skill_ids=evicted_skill_ids,
+                )
+            pending_awm_candidates = self.awm_bridge.analyze(
+                run_id,
+                {"run_dir": run_dir, "min_occurrences": 3},
+            )
+            if pending_awm_candidates:
+                lineage.record(
+                    "awm_candidates_queued",
+                    generation=generation,
+                    candidate_count=len(pending_awm_candidates),
+                    candidate_ids=[
+                        str(candidate.patch.get("candidate_id"))
+                        for candidate in pending_awm_candidates
+                    ],
+                )
+            saturation_atoms = self.skill_library.query_atoms(
+                bundle.scenario.effective_domain_tags,
+                current_run_id=run_id,
+                current_scenario_name=bundle.scenario.name,
+                top_k=5,
+            )
+            skill_saturation_available = bool(saturation_atoms)
+            skill_saturation = (
+                self.skill_library.saturation_score(bundle.scenario.effective_domain_tags)
+                if skill_saturation_available
+                else 0.0
+            )
+            tokens_used_this_generation = max(
+                self._total_tokens_used(run_dir) - tokens_before_generation,
+                0,
+            )
+            convergence.update(
+                generation_number=generation,
+                validation_score=self._validation_score(generation_terminal_result),
+                hidden_eval_score=self._latest_hidden_score(run_dir, generation),
+                tokens_used_this_generation=tokens_used_this_generation,
+                skill_saturation_score=skill_saturation,
+                skill_saturation_available=skill_saturation_available,
+                zero_order_was_attempted=isinstance(operator, ZeroOrderMutation),
+            )
+            convergence_decision = convergence.evaluate()
+            lineage.record(
+                "convergence_decision",
+                generation=generation,
+                action=convergence_decision.action,
+                stop=convergence_decision.stop,
+                reason=convergence_decision.reason,
+                plateau_detected=convergence_decision.plateau_detected,
+            )
+            if convergence_decision.action == "force_zero_order":
+                force_zero_order_next = True
+            if convergence_decision.stop:
+                stop_reason = convergence_decision.reason
+                break
             self._save_checkpoint(
                 control,
                 scenario_hash,
@@ -1183,6 +1297,7 @@ class EvolutionLoop:
             },
         )
         workspace_dir = generation_dir / f"{label}_workspace"
+        run_root = self._run_root_for_artifact_dir(generation_dir)
         harness = self.harness_builder.materialize(
             genome,
             bundle.scenario,
@@ -1200,6 +1315,7 @@ class EvolutionLoop:
                     case_id=case.id,
                     mutation_index=mutation_index,
                 ),
+                run_dir=run_root,
             )
             for case in bundle.train_cases
         ]
@@ -1215,6 +1331,7 @@ class EvolutionLoop:
                     case_id=case.id,
                     mutation_index=mutation_index,
                 ),
+                run_dir=run_root,
             )
             for case in bundle.validation_cases
         ]
@@ -1224,8 +1341,13 @@ class EvolutionLoop:
             bundle.scenario,
             train_runs,
             validation_runs,
-            run_dir=generation_dir.parent if generation_dir.name != "final_evaluation" else generation_dir.parent,
+            run_dir=run_root,
         )
+
+    def _run_root_for_artifact_dir(self, artifact_dir: Path) -> Path:
+        if artifact_dir.name.startswith("mutation_"):
+            return artifact_dir.parent.parent
+        return artifact_dir.parent
 
     def _run_hidden_evaluation(
         self,
@@ -1314,6 +1436,85 @@ class EvolutionLoop:
 
     def _write_json(self, path: Path, data: dict) -> None:
         path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
+
+    def _retrieve_reusable_skills(
+        self,
+        *,
+        bundle: ScenarioBundle,
+        run_id: str,
+    ):
+        skills = self.skill_library.query_atoms(
+            bundle.scenario.effective_domain_tags,
+            current_run_id=run_id,
+            current_scenario_name=bundle.scenario.name,
+            top_k=5,
+        )
+        for skill in skills:
+            if skill.origin_scenario_name != bundle.scenario.name:
+                self.skill_library.open_probation(
+                    skill.id,
+                    run_id=run_id,
+                    scenario_name=bundle.scenario.name,
+                )
+        return skills
+
+    def _extract_and_store_skills(
+        self,
+        *,
+        old_genome: Genome,
+        new_genome: Genome,
+        mutation_type: str,
+        score_before: float,
+        score_after: float,
+        run_id: str,
+        scenario_name: str,
+        generation: int,
+        domain_tags: list[str],
+    ) -> list[str]:
+        atoms = self.skill_extractor.extract(
+            old_genome=old_genome,
+            new_genome=new_genome,
+            mutation_type=mutation_type,
+            score_before=score_before,
+            score_after=score_after,
+            run_id=run_id,
+            scenario_name=scenario_name,
+            generation_number=generation,
+            scenario_domain_tags=domain_tags,
+        )
+        stored_ids: list[str] = []
+        for atom in atoms:
+            if self.skill_library.add_atom(atom):
+                stored_ids.append(atom.id)
+        return stored_ids
+
+    def _validation_score(self, result: EvaluationResult) -> float:
+        return float(result.validation_score if result.validation_score is not None else result.promotion_score)
+
+    def _latest_hidden_score(self, run_dir: Path, generation: int) -> float | None:
+        path = run_dir / "hidden_eval_log.jsonl"
+        if not path.exists():
+            return None
+        latest: float | None = None
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            if item.get("generation") == generation:
+                latest = float(item.get("hidden_score", 0.0))
+        return latest
+
+    def _total_tokens_used(self, run_dir: Path) -> int:
+        total = 0
+        for path in [run_dir / "llm_calls.jsonl", *run_dir.glob("generation_*/llm_calls.jsonl")]:
+            if not path.exists():
+                continue
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                item = json.loads(line)
+                total += int(item.get("tokens_used", 0))
+        return total
 
     def _evaluation_summary(self, result: EvaluationResult) -> str:
         if result.failures:

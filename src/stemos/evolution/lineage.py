@@ -65,6 +65,7 @@ class LineageLog:
         expected_improvement: str,
         risk: str,
         operator_type: str | None = None,
+        origin: str | None = None,
         nucleus_signal: dict[str, Any] | None = None,
     ) -> None:
         self.record(
@@ -76,6 +77,7 @@ class LineageLog:
             expected_improvement=expected_improvement,
             risk=risk,
             **({"operator_type": operator_type} if operator_type else {}),
+            **({"origin": origin} if origin else {}),
             **({"nucleus_signal": nucleus_signal} if nucleus_signal else {}),
         )
 
@@ -111,6 +113,8 @@ class LineageLog:
         rationale: str,
         operator_type: str | None = None,
         hidden_eval_regression: bool | None = None,
+        extracted_skill_ids: list[str] | None = None,
+        origin: str | None = None,
         nucleus_signal: dict[str, Any] | None = None,
     ) -> None:
         self.record(
@@ -123,6 +127,8 @@ class LineageLog:
             rationale=rationale,
             **({"operator_type": operator_type} if operator_type else {}),
             **({"hidden_eval_regression": hidden_eval_regression} if hidden_eval_regression is not None else {}),
+            **({"extracted_skill_ids": extracted_skill_ids} if extracted_skill_ids is not None else {}),
+            **({"origin": origin} if origin else {}),
             **({"nucleus_signal": nucleus_signal} if nucleus_signal else {}),
         )
 

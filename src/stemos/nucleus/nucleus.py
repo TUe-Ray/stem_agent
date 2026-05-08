@@ -30,6 +30,7 @@ def build_nucleus_prompt(
     current_genome: dict,
     mutation_history: list[NucleusSignal],
     signal_policy: SignalPolicy,
+    reusable_skills: list[Any] | None = None,
 ) -> str:
     history_lines = []
     for sig in mutation_history[-5:]:
@@ -57,6 +58,9 @@ CURRENT GENOME STRUCTURE:
 
 RECENT MUTATION HISTORY:
 {chr(10).join(history_lines) if history_lines else "No history yet."}
+
+Reusable Skills Retrieved From Skill Library:
+{_format_reusable_skills(reusable_skills or [])}
 
 Your job: propose ONE mutation to the genome that may improve harness performance.
 You do NOT know the specific validation cases. You do NOT know per-case scores.
@@ -114,6 +118,29 @@ def format_genome_for_nucleus(current_genome: dict[str, Any]) -> str:
 
 def nucleus_signal_to_dict(signal: NucleusSignal) -> dict[str, Any]:
     return asdict(signal)
+
+
+def _format_reusable_skills(skills: list[Any]) -> str:
+    if not skills:
+        return "No reusable skills retrieved."
+    lines: list[str] = []
+    for skill in skills[:5]:
+        if hasattr(skill, "model_dump"):
+            data = skill.model_dump(mode="json")
+        elif isinstance(skill, dict):
+            data = skill
+        else:
+            continue
+        tags = ", ".join(str(tag) for tag in data.get("domain_tags", [])[:5])
+        lines.append(
+            "- "
+            f"{data.get('name')} | {data.get('skill_type')} | "
+            f"lift={float(data.get('score_lift', 0.0)):.3f} | "
+            f"origin={data.get('origin_scenario_name')} | "
+            f"tags={tags or 'none'} | "
+            f"{data.get('description', '')}"
+        )
+    return "\n".join(lines) if lines else "No reusable skills retrieved."
 
 
 def _tool_names(tools: Any) -> list[str]:
