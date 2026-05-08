@@ -189,7 +189,8 @@ class ModelClient:
             self.responses_api_available = True
             return json.loads(response.output_text), self._tokens_from_response(response)
 
-        response = client.responses.create(**kwargs, tools=tools)
+        api_tools = [t.to_api_dict() if hasattr(t, "to_api_dict") else t for t in tools]
+        response = client.responses.create(**kwargs, tools=api_tools)
         self.responses_api_available = True
         return response.output_text, self._tokens_from_response(response)
 
