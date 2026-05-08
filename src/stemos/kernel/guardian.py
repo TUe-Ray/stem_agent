@@ -12,6 +12,7 @@ from stemos.harness.builder import MaterializedHarness
 from stemos.harness.runner import HarnessRunner
 from stemos.kernel.evaluator import EvaluationResult, GuardianFitnessEvaluator
 from stemos.kernel.sandbox import Sandbox
+from stemos.kernel.signal_policy import NucleusSignal, SignalPolicy
 from stemos.kernel.validators import MutationSafetyValidator, ValidationResult
 from stemos.nucleus.schemas import MutationProposal
 from stemos.scenarios.schema import TaskCase
@@ -40,23 +41,90 @@ PROTECTED_TARGET_MARKERS = {
 class Guardian:
     """Immutable safety kernel for mutation validation and promotion decisions."""
 
-    def __init__(self, evaluator: GuardianFitnessEvaluator | None = None):
+    def __init__(
+        self,
+        signal_policy: SignalPolicy | None = None,
+        evaluator: GuardianFitnessEvaluator | None = None,
+    ):
         self.evaluator = evaluator or GuardianFitnessEvaluator()
+        self._signal_policy = signal_policy or SignalPolicy()
+        self._score_history: list[float] = []
         self.sandbox = Sandbox()
         self.run_dir: Path | None = None
         self.hidden_cases_path: Path | None = None
         self.hidden_baseline_score: float | None = None
+        self._validation_cases: list[TaskCase] = []
 
     def configure_run(self, run_dir: str | Path | None) -> None:
         self.run_dir = Path(run_dir) if run_dir else None
         if hasattr(self.evaluator, "configure_run"):
             self.evaluator.configure_run(run_dir)
 
+    def configure_signal_policy(self, signal_policy: SignalPolicy) -> None:
+        self._signal_policy = signal_policy
+
+    def produce_nucleus_signal(
+        self,
+        harness: MaterializedHarness,
+        generation: int,
+        mutation_type: str,
+    ) -> tuple[bool, NucleusSignal]:
+        """
+        Evaluates internally and returns only the policy-filtered NucleusSignal.
+        This compatibility boundary is intentionally aggregate-only.
+        """
+        eval_result = self._run_evaluation(harness, self._validation_cases)
+        current_score = float(eval_result["aggregate_score"])
+        hidden_score = self._run_hidden_evaluation(harness, f"generation_{generation:03d}", generation=generation)
+        _ = hidden_score
+        previous_score = self._score_history[-1] if self._score_history else 0.0
+        promoted = self._promotion_decision(current_score, previous_score, eval_result)
+        self._score_history.append(current_score)
+        signal = self._signal_policy.build_nucleus_signal(
+            generation=generation,
+            mutation_type=mutation_type,
+            current_score=current_score,
+            previous_score=previous_score,
+        )
+        return promoted, signal
+
     def configure_hidden_evaluation(self, scenario_path: str | Path) -> None:
         root = Path(scenario_path)
         if root.is_file():
             root = root.parent
         self.hidden_cases_path = root / "hidden_cases.jsonl"
+
+    def configure_validation_cases(self, validation_cases: list[TaskCase]) -> None:
+        self._validation_cases = list(validation_cases)
+
+    def _run_evaluation(self, harness: MaterializedHarness, cases: list[TaskCase]) -> dict[str, Any]:
+        runs = [HarnessRunner().run_case(harness, case) for case in cases]
+        result = self.evaluator.evaluate(
+            harness.genome,
+            harness.scenario,
+            [],
+            runs,
+            run_dir=self.run_dir,
+        )
+        item = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "aggregate_score": result.promotion_score,
+            "validation_score": result.validation_score,
+            "case_count": len(cases),
+        }
+        if self.run_dir is not None:
+            with (self.run_dir / "eval_log.jsonl").open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(item, sort_keys=True) + "\n")
+        return item
+
+    def _promotion_decision(
+        self,
+        current_score: float,
+        previous_score: float,
+        eval_result: dict[str, Any],
+    ) -> bool:
+        _ = eval_result
+        return self.should_promote(previous_score, current_score, 0.01)
 
     def validate_mutation(
         self,

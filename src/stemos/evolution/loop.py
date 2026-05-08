@@ -20,12 +20,13 @@ from stemos.harness.runner import HarnessRunResult, HarnessRunner
 from stemos.kernel.budget import BudgetTracker
 from stemos.kernel.evaluator import EvaluationResult
 from stemos.kernel.guardian import Guardian
+from stemos.kernel.signal_policy import NucleusSignal
 from stemos.kernel.versioning import GenomeArchive, GitProvenance, GitRunConfig
 from stemos.nucleus.commander import NucleusCommander
 from stemos.nucleus.failure_analyzer import FailureAnalyzer
 from stemos.nucleus.model_client import ModelClient
 from stemos.nucleus.mutation_planner import MutationPlanner
-from stemos.nucleus.nucleus import select_operator
+from stemos.nucleus.nucleus import nucleus_signal_to_dict, select_operator
 from stemos.nucleus.scenario_interpreter import ScenarioInterpreter
 from stemos.scenarios.loader import ScenarioBundle, load_scenario
 
@@ -141,14 +142,24 @@ class EvolutionLoop:
         git_commit: bool = False,
         git_push: bool = False,
         resume: bool = False,
+        signal_policy_override: dict[str, bool] | None = None,
         event_sink: Callable[[dict[str, Any]], None] | None = None,
     ) -> EvolutionRunResult:
         bundle = load_scenario(scenario_path)
+        if signal_policy_override:
+            bundle.scenario.signal_policy = bundle.scenario.signal_policy.__class__(
+                **{
+                    **bundle.scenario.signal_policy.__dict__,
+                    **signal_policy_override,
+                }
+            )
         run_dir = self.runs_root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         self.model_client.configure_run(run_dir)
         self.guardian.configure_run(run_dir)
+        self.guardian.configure_signal_policy(bundle.scenario.signal_policy)
         self.guardian.configure_hidden_evaluation(bundle.path)
+        self.guardian.configure_validation_cases(bundle.validation_cases)
         self._emit_event(
             event_sink,
             {
@@ -230,6 +241,7 @@ class EvolutionLoop:
         last_archive_best_score = archive.best()[2] if len(archive) else None
 
         history: list[EvaluationResult] = []
+        signal_history: list[NucleusSignal] = self._load_signal_history(lineage)
 
         for generation in range(start_generation, bundle.scenario.evolution.max_generations):
             generation_dir = run_dir / f"generation_{generation:03d}"
@@ -306,7 +318,20 @@ class EvolutionLoop:
                     )
 
             summary = self._evaluation_summary(current_result)
-            lineage.record_evaluation(generation, current_result.promotion_score, summary)
+            previous_eval_score = history[-2].promotion_score if len(history) >= 2 else 0.0
+            evaluation_signal = bundle.scenario.signal_policy.build_nucleus_signal(
+                generation=generation,
+                mutation_type="evaluation",
+                current_score=current_result.promotion_score,
+                previous_score=previous_eval_score,
+            )
+            signal_history.append(evaluation_signal)
+            lineage.record_evaluation(
+                generation,
+                current_result.promotion_score,
+                summary,
+                nucleus_signal=nucleus_signal_to_dict(evaluation_signal),
+            )
 
             if best_result is None or self.guardian.should_promote(
                 best_result.promotion_score,
@@ -374,10 +399,15 @@ class EvolutionLoop:
                 lineage_summary=lineage.summary(),
                 operator=operator,
                 archive=archive,
+                mutation_history=signal_history,
+                signal_policy=bundle.scenario.signal_policy,
             )
             self._write_json(generation_dir / "mutation_plan.json", plan.model_dump(mode="json"))
             lineage.record_mutation_plan(
-                generation, plan.summary, len(plan.proposed_mutations)
+                generation,
+                plan.summary,
+                len(plan.proposed_mutations),
+                nucleus_signal=nucleus_signal_to_dict(signal_history[-1]) if signal_history else None,
             )
             self._emit_event(
                 event_sink,
@@ -433,12 +463,20 @@ class EvolutionLoop:
                     mutation, genome=genome, scenario=bundle.scenario
                 )
                 if not validation.allowed:
+                    rejection_signal = bundle.scenario.signal_policy.build_nucleus_signal(
+                        generation=generation,
+                        mutation_type=mutation.mutation_type,
+                        current_score=candidate_result.promotion_score,
+                        previous_score=candidate_result.promotion_score,
+                    )
+                    signal_history.append(rejection_signal)
                     lineage.record_rejected_mutation(
                         generation,
                         mutation.mutation_type,
                         mutation.target,
                         validation.reason,
                         operator_type=operator.name,
+                        nucleus_signal=nucleus_signal_to_dict(rejection_signal),
                     )
                     self._emit_event(
                         event_sink,
@@ -495,12 +533,20 @@ class EvolutionLoop:
                         mutation, mutation_dir / "generated_tools"
                     )
                     if not activation.allowed:
+                        rejection_signal = bundle.scenario.signal_policy.build_nucleus_signal(
+                            generation=generation,
+                            mutation_type=mutation.mutation_type,
+                            current_score=candidate_result.promotion_score,
+                            previous_score=candidate_result.promotion_score,
+                        )
+                        signal_history.append(rejection_signal)
                         lineage.record_rejected_mutation(
                             generation,
                             mutation.mutation_type,
                             mutation.target,
                             activation.reason,
                             operator_type=operator.name,
+                            nucleus_signal=nucleus_signal_to_dict(rejection_signal),
                         )
                         self._emit_event(
                             event_sink,
@@ -562,6 +608,13 @@ class EvolutionLoop:
                 )
                 if not safety_validation.allowed:
                     self.guardian.rollback(f"generation_{generation:03d}_mutation_{index:02d}")
+                    rejection_signal = bundle.scenario.signal_policy.build_nucleus_signal(
+                        generation=generation,
+                        mutation_type=mutation.mutation_type,
+                        current_score=candidate_result.promotion_score,
+                        previous_score=candidate_result.promotion_score,
+                    )
+                    signal_history.append(rejection_signal)
                     lineage.record_rejected_mutation(
                         generation,
                         mutation.mutation_type,
@@ -569,6 +622,7 @@ class EvolutionLoop:
                         safety_validation.reason,
                         operator_type=operator.name,
                         mutation_rejected_by="safety_validator",
+                        nucleus_signal=nucleus_signal_to_dict(rejection_signal),
                     )
                     self._emit_event(
                         event_sink,
@@ -644,6 +698,13 @@ class EvolutionLoop:
                     mutated_result.promotion_score,
                     bundle.scenario.evolution.min_delta,
                 ):
+                    mutation_signal = bundle.scenario.signal_policy.build_nucleus_signal(
+                        generation=generation,
+                        mutation_type=mutation.mutation_type,
+                        current_score=mutated_result.promotion_score,
+                        previous_score=candidate_result.promotion_score,
+                    )
+                    signal_history.append(mutation_signal)
                     hidden_score = self._run_hidden_evaluation(
                         mutated_genome,
                         bundle,
@@ -664,6 +725,7 @@ class EvolutionLoop:
                         mutation.rationale,
                         operator_type=operator.name,
                         hidden_eval_regression=hidden_regression,
+                        nucleus_signal=nucleus_signal_to_dict(mutation_signal),
                     )
                     self._emit_event(
                         event_sink,
@@ -727,6 +789,13 @@ class EvolutionLoop:
                         return control_result
                 else:
                     self.guardian.rollback(f"generation_{generation:03d}_mutation_{index:02d}")
+                    mutation_signal = bundle.scenario.signal_policy.build_nucleus_signal(
+                        generation=generation,
+                        mutation_type=mutation.mutation_type,
+                        current_score=mutated_result.promotion_score,
+                        previous_score=candidate_result.promotion_score,
+                    )
+                    signal_history.append(mutation_signal)
                     lineage.record_rolled_back_mutation(
                         generation,
                         mutation.mutation_type,
@@ -735,6 +804,7 @@ class EvolutionLoop:
                         mutated_result.promotion_score,
                         "fitness did not improve enough for promotion",
                         operator_type=operator.name,
+                        nucleus_signal=nucleus_signal_to_dict(mutation_signal),
                     )
                     self._emit_event(
                         event_sink,
@@ -818,6 +888,12 @@ class EvolutionLoop:
                     stagnation_count = 0
                 last_archive_best_score = archive_best_score
                 self._active_stagnation_count = stagnation_count
+                if stagnation_count >= 3:
+                    lineage.record(
+                        "stagnation",
+                        generation=generation,
+                        stagnation_count=stagnation_count,
+                    )
             self._save_checkpoint(
                 control,
                 scenario_hash,
@@ -1264,6 +1340,17 @@ class EvolutionLoop:
             "structured_output_repairs": self.model_client.structured_output_repairs,
             "total_estimated_cost": final_result.cost_estimate,
         }
+
+    def _load_signal_history(self, lineage: LineageLog) -> list[NucleusSignal]:
+        signals: list[NucleusSignal] = []
+        for event in lineage.events:
+            signal = event.get("nucleus_signal")
+            if isinstance(signal, dict):
+                try:
+                    signals.append(NucleusSignal(**signal))
+                except TypeError:
+                    continue
+        return signals
 
     def _gsm8k_baseline_genome(self, scenario_name: str) -> Genome:
         return Genome.model_validate(

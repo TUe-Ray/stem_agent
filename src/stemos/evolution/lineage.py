@@ -24,15 +24,36 @@ class LineageLog:
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(item, sort_keys=True) + "\n")
 
-    def record_evaluation(self, generation: int, score: float, summary: str) -> None:
-        self.record("evaluation", generation=generation, score=round(score, 4), summary=summary)
+    def record_evaluation(
+        self,
+        generation: int,
+        score: float,
+        summary: str,
+        *,
+        nucleus_signal: dict[str, Any] | None = None,
+    ) -> None:
+        self.record(
+            "evaluation",
+            generation=generation,
+            score=round(score, 4),
+            summary=summary,
+            **({"nucleus_signal": nucleus_signal} if nucleus_signal else {}),
+        )
 
-    def record_mutation_plan(self, generation: int, summary: str, mutation_count: int) -> None:
+    def record_mutation_plan(
+        self,
+        generation: int,
+        summary: str,
+        mutation_count: int,
+        *,
+        nucleus_signal: dict[str, Any] | None = None,
+    ) -> None:
         self.record(
             "mutation_plan",
             generation=generation,
             summary=summary,
             mutation_count=mutation_count,
+            **({"nucleus_signal": nucleus_signal} if nucleus_signal else {}),
         )
 
     def record_proposed_mutation(
@@ -44,6 +65,7 @@ class LineageLog:
         expected_improvement: str,
         risk: str,
         operator_type: str | None = None,
+        nucleus_signal: dict[str, Any] | None = None,
     ) -> None:
         self.record(
             "mutation_proposed",
@@ -54,6 +76,7 @@ class LineageLog:
             expected_improvement=expected_improvement,
             risk=risk,
             **({"operator_type": operator_type} if operator_type else {}),
+            **({"nucleus_signal": nucleus_signal} if nucleus_signal else {}),
         )
 
     def record_rejected_mutation(
@@ -65,6 +88,7 @@ class LineageLog:
         *,
         operator_type: str | None = None,
         mutation_rejected_by: str | None = None,
+        nucleus_signal: dict[str, Any] | None = None,
     ) -> None:
         self.record(
             "mutation_rejected",
@@ -74,6 +98,7 @@ class LineageLog:
             reason=reason,
             **({"operator_type": operator_type} if operator_type else {}),
             **({"mutation_rejected_by": mutation_rejected_by} if mutation_rejected_by else {}),
+            **({"nucleus_signal": nucleus_signal} if nucleus_signal else {}),
         )
 
     def record_promoted_mutation(
@@ -86,6 +111,7 @@ class LineageLog:
         rationale: str,
         operator_type: str | None = None,
         hidden_eval_regression: bool | None = None,
+        nucleus_signal: dict[str, Any] | None = None,
     ) -> None:
         self.record(
             "mutation_promoted",
@@ -97,6 +123,7 @@ class LineageLog:
             rationale=rationale,
             **({"operator_type": operator_type} if operator_type else {}),
             **({"hidden_eval_regression": hidden_eval_regression} if hidden_eval_regression is not None else {}),
+            **({"nucleus_signal": nucleus_signal} if nucleus_signal else {}),
         )
 
     def record_rolled_back_mutation(
@@ -108,6 +135,7 @@ class LineageLog:
         score_after: float,
         reason: str,
         operator_type: str | None = None,
+        nucleus_signal: dict[str, Any] | None = None,
     ) -> None:
         self.record(
             "mutation_rolled_back",
@@ -118,6 +146,7 @@ class LineageLog:
             score_after=round(score_after, 4),
             reason=reason,
             **({"operator_type": operator_type} if operator_type else {}),
+            **({"nucleus_signal": nucleus_signal} if nucleus_signal else {}),
         )
 
     def record_freeze(self, generation: int, best_score: float, reason: str) -> None:

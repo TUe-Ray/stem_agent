@@ -23,6 +23,11 @@ evaluation_criteria:
   - name: no_hallucinated_numbers
     weight: 0.1
     method: llm_judge
+signal_policy:
+  layer_1_enabled: true
+  expose_aggregate_score: true
+  expose_score_delta: true
+  expose_direction: true
 constraints:
   - Show concise work before the final answer.
 available_builtin_tools:

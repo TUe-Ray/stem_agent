@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from stemos.genome.models import Genome
+from stemos.kernel.signal_policy import NucleusSignal, SignalPolicy
 from stemos.nucleus.operators import CrossoverMutation, FirstOrderMutation, MutationOperator
 from stemos.nucleus.model_client import ModelClient
+from stemos.nucleus.nucleus import build_nucleus_prompt
 from stemos.nucleus.prompts import NUCLEUS_SYSTEM_PROMPT
 from stemos.nucleus.schemas import MutationPlan, MutationProposal
 from stemos.scenarios.schema import Scenario
@@ -25,8 +27,12 @@ class MutationPlanner:
         lineage_summary: str,
         operator: MutationOperator | None = None,
         archive: object | None = None,
+        mutation_history: list[NucleusSignal] | None = None,
+        signal_policy: SignalPolicy | None = None,
     ) -> MutationPlan:
         operator = operator or FirstOrderMutation()
+        signal_policy = signal_policy or scenario.signal_policy
+        mutation_history = mutation_history or []
         operator_plan = self._operator_plan(
             operator=operator,
             archive=archive,
@@ -35,7 +41,7 @@ class MutationPlanner:
             failure_patterns=failure_patterns,
         )
         if operator_plan is not None:
-            self._audit_offline_plan(scenario, genome, operator, operator_plan)
+            self._audit_offline_plan(scenario, genome, operator, operator_plan, mutation_history, signal_policy)
             return operator_plan
 
         if self.model_client.offline:
@@ -45,22 +51,18 @@ class MutationPlanner:
                 failure_patterns=failure_patterns,
                 lineage_summary=lineage_summary,
             )
-            self._audit_offline_plan(scenario, genome, operator, plan)
+            self._audit_offline_plan(scenario, genome, operator, plan, mutation_history, signal_policy)
             return plan
 
-        payload = {
-            "scenario": scenario.model_dump(mode="json"),
-            "current_genome": genome.model_dump(mode="json"),
-            "generation": generation,
-            "last_score": last_score,
-            "best_score": best_score,
-            "failure_patterns": failure_patterns,
-            "budget_remaining": budget_remaining,
-            "lineage_summary": lineage_summary,
-            "operator_type": operator.name,
-        }
+        _ = (last_score, best_score, budget_remaining, lineage_summary)
+        prompt = build_nucleus_prompt(
+            scenario_description=self._scenario_description(scenario),
+            current_genome=genome.model_dump(mode="json"),
+            mutation_history=mutation_history,
+            signal_policy=signal_policy,
+        )
         result = self.model_client.call(
-            str(payload),
+            prompt,
             response_schema=MutationPlan.model_json_schema(),
             system_prompt=NUCLEUS_SYSTEM_PROMPT,
             temperature=0.8,
@@ -121,13 +123,15 @@ class MutationPlanner:
         genome: Genome,
         operator: MutationOperator,
         plan: MutationPlan,
+        mutation_history: list[NucleusSignal],
+        signal_policy: SignalPolicy,
     ) -> None:
-        prompt = str(
-            {
-                "scenario": scenario.model_dump(mode="json"),
-                "current_genome": genome.model_dump(mode="json"),
-                "operator_type": operator.name,
-            }
+        _ = operator
+        prompt = build_nucleus_prompt(
+            scenario_description=self._scenario_description(scenario),
+            current_genome=genome.model_dump(mode="json"),
+            mutation_history=mutation_history,
+            signal_policy=signal_policy,
         )
         self.model_client.audit_call(
             role="nucleus",
@@ -135,6 +139,9 @@ class MutationPlanner:
             prompt=prompt,
             response=plan.model_dump(mode="json"),
         )
+
+    def _scenario_description(self, scenario: Scenario) -> str:
+        return f"{scenario.scenario.task_class}: {scenario.scenario.description}"
 
     def _deterministic_plan(
         self,

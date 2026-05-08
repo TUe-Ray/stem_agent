@@ -12,6 +12,7 @@ from stemos.evolution.control import EvolutionControl
 from stemos.evolution.loop import EvolutionLoop
 from stemos.evolution.visuals import VisualizationBuilder
 from stemos.benchmarks.gsm8k import download_gsm8k_sample
+from stemos.cli_compare_ablations import compare_ablations as compare_ablations_report
 from stemos.genome.loader import load_genome
 from stemos.harness.builder import HarnessBuilder
 from stemos.harness.runner import HarnessRunner
@@ -58,6 +59,12 @@ def init_scenario(path: Path) -> None:
                 "description": "Output is useful and actionable.",
             },
         ],
+        "signal_policy": {
+            "layer_1_enabled": True,
+            "expose_aggregate_score": True,
+            "expose_score_delta": True,
+            "expose_direction": True,
+        },
         "evolution": {
             "max_generations": 5,
             "patience": 2,
@@ -144,6 +151,11 @@ def evolve(
         "--stream-training-transcript",
         help="Print agent outputs and Nucleus/Guardian decisions during evolution.",
     ),
+    signal_policy_override: Optional[list[str]] = typer.Option(
+        None,
+        "--signal-policy-override",
+        help="Override signal_policy fields, e.g. layer_1_enabled=false.",
+    ),
 ) -> None:
     scenario = load_scenario(scenario_path).scenario
     sinks: list[Callable[[dict[str, Any]], None]] = []
@@ -164,6 +176,7 @@ def evolve(
             git_branch=git_branch,
             git_commit=git_commit,
             git_push=git_push,
+            signal_policy_override=_parse_signal_policy_overrides(signal_policy_override or []),
             event_sink=event_sink,
         )
     finally:
@@ -240,6 +253,12 @@ def progress(run_path: Path) -> None:
 def aggregate(run_paths: list[Path]) -> None:
     path = VisualizationBuilder().aggregate(run_paths)
     typer.echo(f"Aggregate report: {path}")
+
+
+@app.command("compare-ablations")
+def compare_ablations(run_paths: list[Path]) -> None:
+    report = compare_ablations_report([str(path) for path in run_paths])
+    typer.echo(f"Ablation comparison written to {report}")
 
 
 @app.command()
@@ -387,6 +406,29 @@ def _read_eval(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _parse_signal_policy_overrides(items: list[str]) -> dict[str, bool]:
+    overrides: dict[str, bool] = {}
+    for item in items:
+        if "=" not in item:
+            raise typer.BadParameter(
+                "--signal-policy-override must use key=value, e.g. layer_1_enabled=false"
+            )
+        key, raw_value = item.split("=", 1)
+        key = key.strip()
+        value = raw_value.strip().lower()
+        if key not in {
+            "layer_1_enabled",
+            "expose_aggregate_score",
+            "expose_score_delta",
+            "expose_direction",
+        }:
+            raise typer.BadParameter(f"Unsupported signal_policy override: {key}")
+        if value not in {"true", "false"}:
+            raise typer.BadParameter(f"Signal policy override must be true/false: {item}")
+        overrides[key] = value == "true"
+    return overrides
+
+
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.write_text(
         "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows),
@@ -430,6 +472,12 @@ def _gsm8k_scenario_yaml() -> dict[str, Any]:
                 "method": "llm_judge",
             },
         ],
+        "signal_policy": {
+            "layer_1_enabled": True,
+            "expose_aggregate_score": True,
+            "expose_score_delta": True,
+            "expose_direction": True,
+        },
         "constraints": ["Show concise work before the final answer."],
         "available_builtin_tools": ["call_model"],
         "success_criteria": [

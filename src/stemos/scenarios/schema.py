@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from stemos.kernel.signal_policy import SignalPolicy
+
 
 class ScenarioMeta(BaseModel):
     name: str
@@ -60,6 +62,7 @@ class Scenario(BaseModel):
     available_builtin_tools: list[str] = Field(default_factory=list)
     success_criteria: list[SuccessCriterion] = Field(default_factory=list)
     evaluation_criteria: list[EvaluationCriterion] = Field(default_factory=list)
+    signal_policy: SignalPolicy = Field(default_factory=SignalPolicy)
     evolution: EvolutionConfig = Field(default_factory=EvolutionConfig)
 
     @property

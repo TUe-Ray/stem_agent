@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from stemos.nucleus.model_client import ModelClient
+from stemos.nucleus.prompts import NUCLEUS_SYSTEM_PROMPT
 from stemos.nucleus.schemas import TaskDiagnosis
 from stemos.scenarios.schema import Scenario
 
@@ -17,13 +18,26 @@ class ScenarioInterpreter:
 
         schema = TaskDiagnosis.model_json_schema()
         payload = {
-            "scenario": scenario.model_dump(mode="json"),
+            "scenario": {
+                "name": scenario.name,
+                "description": scenario.scenario.description,
+                "task_class": scenario.scenario.task_class,
+                "constraints": scenario.constraints,
+                "available_builtin_tools": scenario.available_builtin_tools,
+            },
             "instruction": (
                 "Read the scenario as environmental signals and produce a "
                 "TaskDiagnosis JSON object."
             ),
         }
-        result = self.model_client.call(str(payload), response_schema=schema)
+        scenario.signal_policy.assert_no_layer2_leak(str(payload))
+        result = self.model_client.call(
+            str(payload),
+            response_schema=schema,
+            system_prompt=NUCLEUS_SYSTEM_PROMPT,
+            temperature=0.8,
+            role="nucleus",
+        )
         return TaskDiagnosis.model_validate(result)
 
     def _deterministic_interpretation(self, scenario: Scenario) -> TaskDiagnosis:

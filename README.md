@@ -54,6 +54,86 @@ Mutable genome:
 
 Nucleus may evolve mutable self-evaluation. It must never modify immutable Guardian fitness.
 
+## Nucleus/Guardian Information Flow
+
+StemOS uses a layered information policy between Guardian and Nucleus. The design is intentionally not simply "visible" or "hidden": Nucleus receives enough aggregate signal to improve search, but never receives validation answers, per-case outcomes, or Guardian's internal scoring details.
+
+The policy lives in `src/stemos/kernel/signal_policy.py` and is enforced before Nucleus prompts are sent to an LLM.
+
+### Signal Layers
+
+`Layer 0` is always-visible context that does not require Guardian evaluation:
+
+- scenario task description and task class
+- current genome structure
+- mutation type
+- generation number
+- directional result such as `improved`, `degraded`, or `neutral`
+
+`Layer 1` is aggregate evaluation signal. It is configurable per scenario and is enabled by default:
+
+- `aggregate_score`
+- `previous_aggregate_score`
+- `score_delta`
+
+`Layer 2` is hard-blocked at the kernel boundary and must never reach Nucleus:
+
+- validation case inputs
+- validation expected outputs or answer keys
+- Guardian criterion scores
+- per-case scores
+- hidden evaluation scores
+- hidden evaluation case details
+
+The practical rule is: Nucleus may see the dashboard, never the answer key.
+
+### NucleusSignal
+
+Guardian exposes evaluation feedback to Nucleus through `NucleusSignal`, not raw evaluation results. A signal contains only:
+
+- `generation`
+- `mutation_type`
+- `direction`
+- optional Layer 1 aggregate score fields when enabled
+
+It cannot carry validation cases, expected outputs, hidden eval scores, or per-case score breakdowns. Tests in `tests/test_signal_policy.py` assert that these fields do not exist and that prompt construction rejects Layer 2 strings.
+
+### Prompt Boundary
+
+Nucleus prompts are constructed from:
+
+- scenario task description
+- current genome structure summary
+- recent mutation history as `NucleusSignal` objects
+- configured signal policy
+
+Nucleus prompts are checked with `SignalPolicy.assert_no_layer2_leak()` before LLM invocation. If prompt text contains Layer 2 markers such as `validation_case`, `expected_output`, `ground_truth`, `criterion_score`, `per_case`, or `hidden_eval`, StemOS raises a `ValueError`.
+
+Guardian and Nucleus also use separate system prompts and separate LLM calls. Guardian receives harness outputs and fixed evaluation criteria. Nucleus receives structure and policy-filtered signals. They do not share message history.
+
+### Signal Policy In Scenario YAML
+
+Scenarios can configure Layer 1 exposure:
+
+```yaml
+signal_policy:
+  layer_1_enabled: true
+  expose_aggregate_score: true
+  expose_score_delta: true
+  expose_direction: true
+```
+
+For ablation experiments, you can disable aggregate score exposure without editing the scenario file:
+
+```bash
+stemos evolve scenarios/gsm8k_mini --run-id gsm8k_blind \
+  --signal-policy-override layer_1_enabled=false
+
+stemos evolve scenarios/gsm8k_mini --run-id gsm8k_signal
+```
+
+In the blind run, lineage `nucleus_signal.aggregate_score` is `null`. In the signal-guided run, promoted mutation signals include aggregate scores.
+
 ## Setup
 
 StemOS requires Python 3.10 or newer. The default setup runs in offline deterministic
@@ -146,8 +226,35 @@ A scenario contains:
 - `scenario.yaml`
 - `train_cases.jsonl`
 - `validation_cases.jsonl`
+- optional `hidden_cases.jsonl`
 
 Validation cases are used for promotion when present, so evolution cannot promote a genome only because it overfits training cases.
+
+Hidden cases are run silently on promoted mutations when present. Hidden scores are written to audit logs and visualizations, but they are never passed back to Nucleus and never used for promotion.
+
+### GSM8K Mini Benchmark
+
+StemOS includes a `gsm8k_mini` benchmark scenario for grade-school math reasoning. Initialize or refresh its cases with:
+
+```bash
+stemos init-benchmark gsm8k_mini --n-train 30 --n-val 20
+```
+
+Then run evolution:
+
+```bash
+stemos evolve scenarios/gsm8k_mini --run-id gsm8k_001
+stemos compare runs/gsm8k_001
+stemos visualize runs/gsm8k_001
+```
+
+The GSM8K evaluator uses structured criteria:
+
+- exact match after extracting the final number
+- visible arithmetic reasoning steps
+- a conservative check for hallucinated numbers
+
+The baseline genome is a minimal zero-shot chain-of-thought math solver: one `solver` role, one `solve` workflow step, no tools, no quality gates, and an empty self-evaluation rubric.
 
 ## Run Evolution
 
@@ -197,10 +304,19 @@ The run writes:
 
 - `runs/<run_id>/config_snapshot.yaml`
 - `runs/<run_id>/baseline_genome.yaml`
+- `runs/<run_id>/baseline_genome_score.json`
 - `runs/<run_id>/frozen_genome.yaml`
 - `runs/<run_id>/lineage.jsonl`
+- `runs/<run_id>/archive.jsonl`
+- `runs/<run_id>/llm_calls.jsonl`
+- `runs/<run_id>/rubric_audit.jsonl` when self-evaluation rubric changes
+- `runs/<run_id>/hidden_eval_log.jsonl` when hidden cases exist
 - `runs/<run_id>/report.md`
 - per-generation genomes, mutation plans, traces, outputs, and evaluation results
+
+`archive.jsonl` is an append-only Top-K genome archive. Each entry contains a `genome_id`, genome payload, score, generation, parent id, and timestamp. Resume checkpoints include an archive snapshot so pause/resume preserves search state.
+
+`llm_calls.jsonl` records auditable Nucleus and Guardian calls with role, prompt hash, response hash, token estimate, and prompt text. This is used to verify that Guardian and Nucleus calls are separate and that Nucleus prompts do not contain Layer 2 content.
 
 ## Inspect Before And After
 
@@ -210,6 +326,7 @@ stemos compare runs/demo_001
 stemos visualize runs/demo_001
 stemos progress runs/demo_001
 stemos aggregate runs/openai_001 runs/openai_002 runs/openai_003
+stemos compare-ablations runs/gsm8k_blind runs/gsm8k_signal
 ```
 
 `report.md` includes:
@@ -221,8 +338,10 @@ stemos aggregate runs/openai_001 runs/openai_002 runs/openai_003
 - frozen genome path
 - before/after comparison
 - lineage narrative explaining how the harness differentiated
+- genome archive table
 - Mermaid evolution timeline and before/after harness graph
 - Guardian selection board
+- hidden eval vs train eval panel when hidden scores exist
 - OpenAI run metadata without API keys
 
 `stemos progress` writes or refreshes `runs/<run_id>/visuals/training_progress.md`, which includes a promotion-score chart, generation score table, and mutation decision timeline. It can be used while a run is still in progress:
@@ -232,6 +351,17 @@ watch -n 2 'stemos progress runs/smoke_001'
 ```
 
 `stemos visualize` writes reviewer-facing files under `runs/<run_id>/visuals/`, including `training_progress.md`, `evolution_timeline.md`, `organism_shape.md`, `harness_before_after.md`, `guardian_selection_board.md`, `output_comparison.md`, and `visual_report.md`.
+
+`stemos compare-ablations` writes `runs/ablation_comparison.md`. It compares runs on:
+
+- generations to reach score greater than 0.7
+- final validation score
+- final hidden eval score
+- validation-hidden overfitting gap
+- mutation type entropy
+- stagnation events
+
+The command works with completed or in-progress runs. Missing metrics are shown as `N/A`.
 
 ## Safe Stop Controls
 
