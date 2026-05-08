@@ -17,8 +17,8 @@ from stemos.scenarios.loader import load_scenario
 from stemos.scenarios.schema import Scenario, TaskCase
 
 
-VISUALS_START = "<!-- STEMOS_VISUALS_START -->"
-VISUALS_END = "<!-- STEMOS_VISUALS_END -->"
+VISUALS_START = "<!-- STEM_AGENT_VISUALS_START -->"
+VISUALS_END = "<!-- STEM_AGENT_VISUALS_END -->"
 
 
 @dataclass
@@ -108,7 +108,7 @@ class VisualizationBuilder:
 
         return "\n".join(
             [
-                "# StemOS Training Progress",
+                "# stem_agent Training Progress",
                 "",
                 f"- Run: `{run_path}`",
                 f"- Status: {status}",
@@ -131,7 +131,7 @@ class VisualizationBuilder:
         if report_path.exists():
             report = report_path.read_text(encoding="utf-8")
         else:
-            report = "# StemOS Evolution Report\n"
+            report = "# stem_agent Evolution Report\n"
 
         pattern = re.compile(
             rf"\n?{re.escape(VISUALS_START)}.*?{re.escape(VISUALS_END)}\n?",
@@ -459,7 +459,7 @@ class VisualizationBuilder:
     def visual_report_markdown(self, artifacts: RunArtifacts) -> str:
         return "\n\n".join(
             [
-                "# StemOS Visual Report",
+                "# stem_agent Visual Report",
                 "",
                 self.evolution_timeline(artifacts),
                 self.organism_shape(artifacts),
@@ -498,7 +498,7 @@ class VisualizationBuilder:
             rows.append(
                 f"| {self._escape_table(str(artifacts.run_dir))} | {baseline:.4f} | {final:.4f} | {final - baseline:.4f} | {promoted} | {rejected} | {shape} |"
             )
-        content = "\n".join(["# StemOS Aggregate Run Report", "", *rows, ""])
+        content = "\n".join(["# stem_agent Aggregate Run Report", "", *rows, ""])
         path = output_path or Path("runs") / "aggregate_report.md"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")

@@ -314,13 +314,15 @@ The app does not auto-load `.env`; source it in each new shell before running `s
 
 ## Git Provenance
 
-Git provenance is optional:
+Git provenance is optional and should be used sparingly. Do not commit every experiment run. Keep raw runs local, and only preserve one curated run that shows the strongest result for the paper/demo.
 
 ```bash
 stem_agent evolve scenarios/toy_structured_answer --run-id demo_001 --git-branch --git-commit
 ```
 
 This creates a local branch named `stem_agent/run/<run_id>` and commits only at safe points such as baseline evaluation, promoted mutations, rollback, pause/resume, and final freeze.
+
+By default, `.gitignore` ignores ad-hoc `runs/*` outputs and only allows the curated `runs/demo_001/` showcase folder. If another run becomes the best result, replace that curated run intentionally instead of uploading every run.
 
 Push is never automatic unless requested:
 

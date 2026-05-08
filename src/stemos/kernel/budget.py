@@ -16,5 +16,5 @@ class BudgetTracker(BaseModel):
 
     def record(self, amount: float) -> None:
         if not self.can_spend(amount):
-            raise RuntimeError("StemOS budget exceeded")
+            raise RuntimeError("stem_agent budget exceeded")
         self.spent_usd += amount

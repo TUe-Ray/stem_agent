@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "stemos"
+name = "stem_agent"
 version = "0.1.0"
 description = "A stem agent framework that differentiates into task-specific operating harnesses."
 readme = "README.md"
@@ -23,7 +23,7 @@ openai = [
 ]
 
 [project.scripts]
-stemos = "stemos.cli:app"
+stem_agent = "stemos.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,6 +1,6 @@
 scenario:
   name: "blank_template"
-  description: "A blank template for a future StemOS scenario."
+  description: "A blank template for a future stem_agent scenario."
   task_class: "general task class"
 
 input_format:

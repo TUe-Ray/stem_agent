@@ -130,7 +130,7 @@ class EvolutionLoop:
             )
         )
         git.start()
-        git.commit_safe("StemOS freeze-now", [run_dir])
+        git.commit_safe("stem_agent freeze-now", [run_dir])
         return result
 
     def evolve(
@@ -214,7 +214,7 @@ class EvolutionLoop:
             start_generation = state.next_generation
             stop_reason = state.stop_reason or "maximum generations reached"
             lineage.record("resume", generation=start_generation, summary="Resumed from checkpoint")
-            git.commit_safe("StemOS resume event", [run_dir])
+            git.commit_safe("stem_agent resume event", [run_dir])
         else:
             self._write_config_snapshot(run_dir, bundle)
             diagnosis = self.nucleus.diagnose(bundle.scenario)
@@ -358,9 +358,9 @@ class EvolutionLoop:
                 stop_reason,
             )
             git.commit_safe(
-                "StemOS baseline evaluation complete"
+                "stem_agent baseline evaluation complete"
                 if generation == 0 and baseline_result is current_result
-                else f"StemOS generation {generation} evaluation",
+                else f"stem_agent generation {generation} evaluation",
                 [run_dir],
             )
             control_result = self._handle_control_safe_point(
@@ -504,7 +504,7 @@ class EvolutionLoop:
                         stop_reason,
                     )
                     git.commit_safe(
-                        f"StemOS rejected {mutation.mutation_type}", [run_dir]
+                        f"stem_agent rejected {mutation.mutation_type}", [run_dir]
                     )
                     control_result = self._handle_control_safe_point(
                         control=control,
@@ -574,7 +574,7 @@ class EvolutionLoop:
                             stop_reason,
                         )
                         git.commit_safe(
-                            f"StemOS rejected {mutation.mutation_type}", [run_dir]
+                            f"stem_agent rejected {mutation.mutation_type}", [run_dir]
                         )
                         control_result = self._handle_control_safe_point(
                             control=control,
@@ -651,7 +651,7 @@ class EvolutionLoop:
                         stop_reason,
                     )
                     git.commit_safe(
-                        f"StemOS safety-rejected {mutation.mutation_type}", [run_dir]
+                        f"stem_agent safety-rejected {mutation.mutation_type}", [run_dir]
                     )
                     control_result = self._handle_control_safe_point(
                         control=control,
@@ -767,7 +767,7 @@ class EvolutionLoop:
                         stop_reason,
                     )
                     git.commit_safe(
-                        f"StemOS promoted {mutation.mutation_type}", [run_dir]
+                        f"stem_agent promoted {mutation.mutation_type}", [run_dir]
                     )
                     control_result = self._handle_control_safe_point(
                         control=control,
@@ -834,7 +834,7 @@ class EvolutionLoop:
                         stop_reason,
                     )
                     git.commit_safe(
-                        f"StemOS rolled back {mutation.mutation_type}", [run_dir]
+                        f"stem_agent rolled back {mutation.mutation_type}", [run_dir]
                     )
                     control_result = self._handle_control_safe_point(
                         control=control,
@@ -907,7 +907,7 @@ class EvolutionLoop:
                 patience_left,
                 stop_reason,
             )
-            git.commit_safe(f"StemOS generation {generation} complete", [run_dir])
+            git.commit_safe(f"stem_agent generation {generation} complete", [run_dir])
             control_result = self._handle_control_safe_point(
                 control=control,
                 git=git,
@@ -944,7 +944,7 @@ class EvolutionLoop:
             event_sink=event_sink,
         )
         control.set_status("FROZEN", message=stop_reason)
-        git.commit_safe("StemOS final freeze", [run_dir])
+        git.commit_safe("stem_agent final freeze", [run_dir])
         if git_push:
             push_result = git.push()
             if not push_result.allowed:
@@ -1072,7 +1072,7 @@ class EvolutionLoop:
         if state.command == "resume":
             control.clear_command("RUNNING")
             lineage.record("resume", generation=generation, summary="Resume control event observed")
-            git.commit_safe("StemOS resume event", [run_dir])
+            git.commit_safe("stem_agent resume event", [run_dir])
             return None
         if state.command == "pause":
             self._save_checkpoint(
@@ -1090,7 +1090,7 @@ class EvolutionLoop:
             )
             lineage.record("pause", generation=generation, summary="Paused at safe checkpoint")
             control.set_status("PAUSED", command="pause", message="paused at safe checkpoint")
-            git.commit_safe("StemOS safe pause checkpoint", [run_dir])
+            git.commit_safe("stem_agent safe pause checkpoint", [run_dir])
             return self._non_frozen_result(run_dir, baseline_result, best_result, "PAUSED")
         if state.command == "freeze_now":
             if baseline_result is None or best_result is None:
@@ -1109,7 +1109,7 @@ class EvolutionLoop:
                 status="FROZEN",
             )
             control.set_status("FROZEN", command="freeze_now", message="freeze-now requested")
-            git.commit_safe("StemOS freeze-now", [run_dir])
+            git.commit_safe("stem_agent freeze-now", [run_dir])
             return result
         if state.command == "abort":
             self._save_checkpoint(
@@ -1127,7 +1127,7 @@ class EvolutionLoop:
             )
             lineage.record("abort", generation=generation, summary="Abort requested; candidate not promoted")
             control.set_status("ABORTED", command="abort", message="abort requested")
-            git.commit_safe("StemOS abort checkpoint", [run_dir])
+            git.commit_safe("stem_agent abort checkpoint", [run_dir])
             return self._non_frozen_result(run_dir, baseline_result, best_result, "ABORTED")
         return None
 

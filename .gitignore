@@ -26,7 +26,7 @@ dist/
 .idea/
 .vscode/
 
-# StemOS runtime scratch space
+# stem_agent runtime scratch space
 workspace/*
 !workspace/.gitkeep
 

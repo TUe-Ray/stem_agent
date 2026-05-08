@@ -21,7 +21,7 @@ from stemos.kernel.versioning import GenomeArchive
 from stemos.scenarios.loader import load_scenario
 from stemos.scenarios.schema import TaskCase
 
-app = typer.Typer(help="StemOS command line interface.")
+app = typer.Typer(help="stem_agent command line interface.")
 
 
 @app.command("init-scenario")

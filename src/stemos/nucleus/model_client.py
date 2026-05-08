@@ -20,6 +20,10 @@ RESPONSES_SCOPE_HINTS = (
 )
 
 
+def _env(key: str, default: str) -> str:
+    return os.getenv(key, default)
+
+
 class ModelClient:
     """Small model abstraction used by both offline and OpenAI-backed paths."""
 
@@ -32,7 +36,7 @@ class ModelClient:
     ):
         self.model = model
         self.offline = offline
-        self.endpoint = endpoint or os.getenv("STEMOS_OPENAI_ENDPOINT", "auto")
+        self.endpoint = endpoint or _env("STEM_AGENT_OPENAI_ENDPOINT", "auto")
         self.model_calls = 0
         self.fallback_used = False
         self.responses_api_available: bool | None = None
@@ -105,7 +109,7 @@ class ModelClient:
     ) -> tuple[str | dict[str, Any], int | None]:
         if OpenAI is None:
             raise RuntimeError(
-                "OpenAI mode requires installing stemos[openai]."
+                "OpenAI mode requires installing stem_agent[openai]."
             )
 
         client = OpenAI()
@@ -119,7 +123,7 @@ class ModelClient:
             )
         if self.endpoint not in {"auto", "responses"}:
             raise RuntimeError(
-                "STEMOS_OPENAI_ENDPOINT must be one of: auto, responses, chat_completions"
+                "STEM_AGENT_OPENAI_ENDPOINT must be one of: auto, responses, chat_completions"
             )
 
         try:
@@ -171,7 +175,7 @@ class ModelClient:
                 text={
                     "format": {
                         "type": "json_schema",
-                        "name": "stemos_structured_output",
+                        "name": "stem_agent_structured_output",
                         "schema": response_schema,
                         "strict": True,
                     }
@@ -217,7 +221,7 @@ class ModelClient:
                 kwargs["response_format"] = {
                     "type": "json_schema",
                     "json_schema": {
-                        "name": "stemos_structured_output",
+                        "name": "stem_agent_structured_output",
                         "schema": normalized_schema,
                         "strict": True,
                     },

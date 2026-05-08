@@ -27,7 +27,7 @@ def compare_ablations(run_ids: list[str]) -> str:
         for path in run_paths:
             row += f" {reports[path.name].get(metric, 'N/A')} |"
         rows.append(row)
-    content = "\n".join(["# StemOS Ablation Comparison", "", header[0], header[1], *rows, ""])
+    content = "\n".join(["# stem_agent Ablation Comparison", "", header[0], header[1], *rows, ""])
     output_path = Path("runs") / "ablation_comparison.md"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(content, encoding="utf-8")

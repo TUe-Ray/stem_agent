@@ -23,7 +23,7 @@ def _run(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
 def _init_git_repo(path: Path) -> None:
     _run(["git", "init"], path)
     _run(["git", "config", "user.email", "stemos@example.test"], path)
-    _run(["git", "config", "user.name", "StemOS Test"], path)
+    _run(["git", "config", "user.name", "stem_agent Test"], path)
     (path / "README.md").write_text("test repo\n", encoding="utf-8")
     _run(["git", "add", "README.md"], path)
     result = _run(["git", "commit", "-m", "initial"], path)
@@ -42,7 +42,7 @@ def test_git_branch_created_when_enabled(tmp_path, monkeypatch):
     branch = _run(["git", "branch", "--show-current"], tmp_path).stdout.strip()
 
     assert result.allowed is True
-    assert branch == "stemos/run/git_branch"
+    assert branch == "stem_agent/run/git_branch"
 
 
 def test_git_commit_created_on_promoted_mutation(tmp_path, monkeypatch):
@@ -71,11 +71,11 @@ def test_git_commit_created_on_promoted_mutation(tmp_path, monkeypatch):
         )
     )
     git.start()
-    result = git.commit_safe("StemOS promoted add_workflow_step", [run_dir])
+    result = git.commit_safe("stem_agent promoted add_workflow_step", [run_dir])
     log = _run(["git", "log", "--oneline", "--max-count=2"], tmp_path).stdout
 
     assert result.allowed is True
-    assert "StemOS promoted add_workflow_step" in log
+    assert "stem_agent promoted add_workflow_step" in log
 
 
 def test_git_push_disabled_by_default(tmp_path, monkeypatch):

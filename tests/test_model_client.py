@@ -76,7 +76,7 @@ def test_model_client_chat_completions_structured_output(monkeypatch):
 
 
 def test_settings_default_model_is_chat_completions_friendly(monkeypatch):
-    monkeypatch.delenv("STEMOS_MODEL", raising=False)
+    monkeypatch.delenv("STEM_AGENT_MODEL", raising=False)
 
     assert Settings().model == "gpt-4.1-mini"
 

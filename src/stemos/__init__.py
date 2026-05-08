@@ -1,4 +1,4 @@
-"""StemOS: a framework for differentiating task-specific operating harnesses."""
+"""stem_agent: a framework for differentiating task-specific operating harnesses."""
 
 __all__ = ["__version__"]
 

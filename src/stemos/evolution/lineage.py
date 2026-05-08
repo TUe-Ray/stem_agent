@@ -172,7 +172,7 @@ class LineageLog:
 
     def differentiation_story(self) -> str:
         lines = [
-            "StemOS differentiation story",
+            "stem_agent differentiation story",
             "",
             "Scenario signals were interpreted by Nucleus, then converted into structured genome mutations.",
         ]

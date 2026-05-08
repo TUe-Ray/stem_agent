@@ -197,7 +197,7 @@ class GitRunConfig:
 
     @property
     def branch_name(self) -> str:
-        return f"stemos/run/{self.run_id}"
+        return f"stem_agent/run/{self.run_id}"
 
 
 @dataclass

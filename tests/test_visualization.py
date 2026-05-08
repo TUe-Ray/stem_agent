@@ -47,7 +47,7 @@ def test_aggregate_compares_runs(tmp_path):
     path = VisualizationBuilder().aggregate([first.run_dir, second.run_dir])
     content = path.read_text(encoding="utf-8")
 
-    assert "StemOS Aggregate Run Report" in content
+    assert "stem_agent Aggregate Run Report" in content
     assert "aggregate_001" in content
     assert "aggregate_002" in content
     assert "Final organism shape" in content

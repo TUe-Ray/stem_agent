@@ -35,9 +35,9 @@ class ReportBuilder:
         ]
         accepted_generated_tools = frozen_genome.tools.get("generated", []) or []
         content = [
-            "# StemOS Evolution Report",
+            "# stem_agent Evolution Report",
             "",
-            "StemOS is a universal differentiation mechanism. This run grew a specialized operating harness from scenario signals.",
+            "stem_agent is a universal differentiation mechanism. This run grew a specialized operating harness from scenario signals.",
             "",
             "## Before / After",
             f"- Baseline genome score: {baseline.promotion_score:.4f}",
@@ -64,7 +64,7 @@ class ReportBuilder:
             f"- Environment artifacts: {len(frozen_genome.environment.required_artifacts)}",
             "",
             "## Why This Is Evolution, Not Subagent Orchestration",
-            "StemOS does not start with a hand-written set of PM/Engineer/QA agents. It starts with a minimal Founder genome. Every new role, workflow step, quality gate, tool, or workspace artifact must appear as a mutation. Guardian evaluates the mutated harness and only promotes changes that improve fitness.",
+            "stem_agent does not start with a hand-written set of PM/Engineer/QA agents. It starts with a minimal Founder genome. Every new role, workflow step, quality gate, tool, or workspace artifact must appear as a mutation. Guardian evaluates the mutated harness and only promotes changes that improve fitness.",
             "",
                 "## Promoted Mutations",
         ]
