@@ -27,16 +27,16 @@ MutationType = Literal[
 
 class MutationProposal(BaseModel):
     mutation_type: MutationType
-    target: str
-    rationale: str
-    expected_improvement: str
-    risk: str
+    target: str = ""
+    rationale: str = ""
+    expected_improvement: str = ""
+    risk: str = ""
     patch: dict[str, Any] = Field(default_factory=dict)
     origin: str | None = None
 
 
 class MutationPlan(BaseModel):
-    summary: str
+    summary: str = ""
     failure_patterns: list[str] = Field(default_factory=list)
     proposed_mutations: list[MutationProposal] = Field(default_factory=list)
 

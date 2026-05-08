@@ -94,6 +94,10 @@ class MutationPlanner:
         if isinstance(result, dict) and "mutation_plan" in result:
             self.model_client.record_structured_output_repair()
             result = result["mutation_plan"]
+        # If the LLM returned a single mutation proposal at the root, wrap it.
+        if isinstance(result, dict) and "mutation_type" in result and "proposed_mutations" not in result:
+            self.model_client.record_structured_output_repair()
+            result = {"summary": result.get("rationale", ""), "proposed_mutations": [result]}
         try:
             return MutationPlan.model_validate(result)
         except Exception as exc:
