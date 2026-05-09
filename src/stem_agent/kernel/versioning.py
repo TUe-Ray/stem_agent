@@ -79,6 +79,8 @@ class GenomeArchive:
         score: float,
         generation: int,
         parent_id: str | None,
+        *,
+        fitness_vector: dict[str, float] | None = None,
     ) -> str:
         genome_id = str(uuid.uuid4())
         entry = {
@@ -87,6 +89,7 @@ class GenomeArchive:
             "score": float(score),
             "generation": int(generation),
             "parent_id": parent_id,
+            "fitness_vector": fitness_vector or {},
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         self._add_entry(entry, persist=True)
@@ -120,25 +123,30 @@ class GenomeArchive:
 
     def to_markdown_table(self) -> str:
         rows = [
-            "| Rank | Genome ID | Score | Generation | Parent ID |",
-            "|---:|---|---:|---:|---|",
+            "| Rank | Genome ID | Score | Task | CostEff | Safety | Stability | Generation | Parent ID |",
+            "|---:|---|---:|---:|---:|---:|---:|---:|---|",
         ]
         for rank, entry in enumerate(
             sorted(self.entries, key=lambda item: float(item["score"]), reverse=True),
             start=1,
         ):
             parent_id = entry.get("parent_id") or ""
+            fitness = entry.get("fitness_vector", {}) or {}
             rows.append(
-                "| {rank} | `{genome_id}` | {score:.4f} | {generation} | {parent} |".format(
+                "| {rank} | `{genome_id}` | {score:.4f} | {task} | {cost_eff} | {safety} | {stability} | {generation} | {parent} |".format(
                     rank=rank,
                     genome_id=entry.get("genome_id", ""),
                     score=float(entry.get("score", 0.0)),
+                    task=f"{float(fitness.get('task_quality', 0.0)):.4f}" if fitness else "-",
+                    cost_eff=f"{float(fitness.get('cost_efficiency', 0.0)):.4f}" if fitness else "-",
+                    safety=f"{float(fitness.get('safety_score', 0.0)):.4f}" if fitness else "-",
+                    stability=f"{float(fitness.get('stability_score', 0.0)):.4f}" if fitness else "-",
                     generation=entry.get("generation", ""),
                     parent=f"`{parent_id}`" if parent_id else "",
                 )
             )
         if len(rows) == 2:
-            rows.append("| | | | | Archive is empty. |")
+            rows.append("| | | | | | | | | Archive is empty. |")
         return "\n".join(rows)
 
     def snapshot(self) -> dict[str, Any]:
@@ -166,6 +174,8 @@ class GenomeArchive:
                 continue
             item = json.loads(line)
             if "genome_id" in item and "genome" in item and "score" in item:
+                if "fitness_vector" not in item:
+                    item["fitness_vector"] = {}
                 self._add_entry(item, persist=False)
 
     def _softmax_weights(self, scores: list[float]) -> list[float]:

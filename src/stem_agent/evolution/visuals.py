@@ -530,6 +530,10 @@ class VisualizationBuilder:
                 "promotion_score": float(data.get("promotion_score", data.get("score", 0.0))),
                 "train_score": float(data.get("train_score", 0.0)),
                 "validation_score": data.get("validation_score"),
+                "task_quality": float(data.get("task_quality", 0.0)),
+                "cost_efficiency": float(data.get("cost_efficiency", 0.0)),
+                "safety_score": float(data.get("safety_score", 0.0)),
+                "stability_score": float(data.get("stability_score", 0.0)),
                 "summary": "",
             }
 
@@ -546,6 +550,10 @@ class VisualizationBuilder:
                     "promotion_score": float(event.get("score", 0.0)),
                     "train_score": 0.0,
                     "validation_score": None,
+                    "task_quality": 0.0,
+                    "cost_efficiency": 0.0,
+                    "safety_score": 0.0,
+                    "stability_score": 0.0,
                     "summary": "",
                 },
             )
@@ -625,21 +633,25 @@ class VisualizationBuilder:
         table = [
             "## Generation Scores",
             "",
-            "| Generation | Promotion | Train | Validation | Summary |",
-            "|---:|---:|---:|---:|---|",
+            "| Generation | Promotion | Train | Validation | Task | CostEff | Safety | Stability | Summary |",
+            "|---:|---:|---:|---:|---:|---:|---:|---:|---|",
         ]
         if not rows:
-            table.append("| | | | | No scores recorded yet. |")
+            table.append("| | | | | | | | | No scores recorded yet. |")
             return "\n".join(table)
         for row in rows:
             validation = row.get("validation_score")
             validation_text = "" if validation is None else f"{float(validation):.4f}"
             table.append(
-                "| {generation} | {promotion:.4f} | {train:.4f} | {validation} | {summary} |".format(
+                "| {generation} | {promotion:.4f} | {train:.4f} | {validation} | {task:.4f} | {cost_eff:.4f} | {safety:.4f} | {stability:.4f} | {summary} |".format(
                     generation=row["generation"],
                     promotion=row["promotion_score"],
                     train=row["train_score"],
                     validation=validation_text,
+                    task=float(row.get("task_quality", 0.0)),
+                    cost_eff=float(row.get("cost_efficiency", 0.0)),
+                    safety=float(row.get("safety_score", 0.0)),
+                    stability=float(row.get("stability_score", 0.0)),
                     summary=self._escape_table(str(row.get("summary", ""))),
                 )
             )

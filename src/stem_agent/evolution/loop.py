@@ -48,6 +48,19 @@ class EvolutionRunResult(BaseModel):
 
 
 class EvolutionLoop:
+    def _fitness_vector(self, result: EvaluationResult) -> dict[str, float]:
+        return {
+            "promotion_score": float(result.promotion_score),
+            "task_quality": float(result.task_quality),
+            "train_score": float(result.train_score),
+            "validation_score": float(result.validation_score or 0.0),
+            "cost_efficiency": float(result.cost_efficiency),
+            "safety_score": float(result.safety_score),
+            "complexity_penalty": float(result.complexity_penalty),
+            "stability_score": float(result.stability_score),
+            "cost_estimate": float(result.cost_estimate),
+        }
+
     def __init__(
         self,
         *,
@@ -316,11 +329,13 @@ class EvolutionLoop:
                 )
 
             if current_parent_id is None:
+                current_fitness_vector = self._fitness_vector(current_result)
                 current_parent_id = archive.add(
                     genome.model_dump(mode="json"),
                     current_result.promotion_score,
                     generation,
                     parent_id=None,
+                    fitness_vector=current_fitness_vector,
                 )
                 self._active_parent_id = current_parent_id
                 if baseline_result is current_result:
@@ -356,15 +371,7 @@ class EvolutionLoop:
                 current_result.promotion_score,
                 summary,
                 nucleus_signal=nucleus_signal_to_dict(evaluation_signal),
-                fitness_vector={
-                    "promotion_score": current_result.promotion_score,
-                    "task_quality": current_result.task_quality,
-                    "validation_score": float(current_result.validation_score or 0.0),
-                    "cost_efficiency": current_result.cost_efficiency,
-                    "safety_score": current_result.safety_score,
-                    "complexity_penalty": current_result.complexity_penalty,
-                    "stability_score": current_result.stability_score,
-                },
+                fitness_vector=self._fitness_vector(current_result),
             )
 
             if best_result is None or self.guardian.should_promote(
@@ -416,7 +423,8 @@ class EvolutionLoop:
             if control_result:
                 return control_result
 
-            failure_patterns = self.nucleus.failure_analyzer.analyze(current_result)
+            failure_pattern_objects = self.nucleus.failure_analyzer.analyze_patterns(current_result)
+            failure_patterns = [pattern.kind for pattern in failure_pattern_objects]
             operator = ZeroOrderMutation() if force_zero_order_next else select_operator(archive, stagnation_count)
             force_zero_order_next = False
             reusable_skills = self._retrieve_reusable_skills(
@@ -431,6 +439,7 @@ class EvolutionLoop:
                 last_score=current_result.promotion_score,
                 best_score=best_result.promotion_score if best_result else -1.0,
                 failure_patterns=failure_patterns,
+                structured_failure_patterns=failure_pattern_objects,
                 budget_remaining=budget.remaining_usd,
                 lineage_summary=lineage.summary(),
                 operator=operator,
@@ -453,6 +462,7 @@ class EvolutionLoop:
                 plan.summary,
                 len(plan.proposed_mutations),
                 nucleus_signal=nucleus_signal_to_dict(signal_history[-1]) if signal_history else None,
+                fitness_vector=self._fitness_vector(current_result),
             )
             self._emit_event(
                 event_sink,
@@ -738,6 +748,7 @@ class EvolutionLoop:
                     mutated_result.promotion_score,
                     generation,
                     parent_id=current_parent_id,
+                    fitness_vector=self._fitness_vector(mutated_result),
                 )
 
                 if self.guardian.should_promote(
