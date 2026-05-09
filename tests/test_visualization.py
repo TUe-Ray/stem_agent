@@ -71,7 +71,7 @@ def test_progress_visualization_handles_partial_run(tmp_path):
 
     assert path.name == "training_progress.md"
     assert "in progress or stopped before freeze" in content
-    assert "| 0 | 0.2500 | 0.2000 | 0.3000 | first pass |" in content
+    assert "| 0 | 0.2500 | 0.2000 | 0.3000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | first pass |" in content
 
 
 def test_output_comparison_uses_specific_manager_deadline_sample(tmp_path):

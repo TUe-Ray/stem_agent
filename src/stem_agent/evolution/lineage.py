@@ -56,6 +56,7 @@ class LineageLog:
             generation=generation,
             summary=summary,
             mutation_count=mutation_count,
+            **({"fitness_vector": fitness_vector} if fitness_vector else {}),
             **({"nucleus_signal": nucleus_signal} if nucleus_signal else {}),
         )
 

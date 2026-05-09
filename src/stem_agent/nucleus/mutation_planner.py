@@ -4,6 +4,7 @@ from stem_agent.genome.models import Genome
 from stem_agent.kernel.signal_policy import NucleusSignal, SignalPolicy
 from stem_agent.nucleus.operators import CrossoverMutation, FirstOrderMutation, MutationOperator
 from stem_agent.nucleus.model_client import ModelClient
+from stem_agent.nucleus.failure_analyzer import FailurePattern
 from stem_agent.nucleus.nucleus import build_nucleus_prompt
 from stem_agent.nucleus.prompts import NUCLEUS_SYSTEM_PROMPT
 from stem_agent.nucleus.schemas import MutationPlan, MutationProposal
@@ -24,6 +25,7 @@ class MutationPlanner:
         last_score: float,
         best_score: float,
         failure_patterns: list[str],
+        structured_failure_patterns: list[FailurePattern] | None = None,
         budget_remaining: float,
         lineage_summary: str,
         operator: MutationOperator | None = None,
@@ -59,6 +61,7 @@ class MutationPlanner:
                 scenario=scenario,
                 genome=genome,
                 failure_patterns=failure_patterns,
+                structured_failure_patterns=structured_failure_patterns,
                 lineage_summary=lineage_summary,
             )
             self._audit_test_plan(
@@ -79,6 +82,7 @@ class MutationPlanner:
             mutation_history=mutation_history,
             signal_policy=signal_policy,
             reusable_skills=reusable_skills,
+            failure_patterns=structured_failure_patterns,
         )
         result = self.model_client.call(
             prompt,
@@ -148,6 +152,7 @@ class MutationPlanner:
             mutation_history=mutation_history,
             signal_policy=signal_policy,
             reusable_skills=reusable_skills,
+            failure_patterns=plan.failure_patterns,
         )
         self.model_client.audit_call(
             role="nucleus",
@@ -165,9 +170,46 @@ class MutationPlanner:
         scenario: Scenario,
         genome: Genome,
         failure_patterns: list[str],
+        structured_failure_patterns: list[FailurePattern] | None,
         lineage_summary: str,
     ) -> MutationPlan:
         mutations: list[MutationProposal] = []
+        targeted_mutations: list[MutationProposal] = []
+        primary = structured_failure_patterns[0] if structured_failure_patterns else None
+        if primary and primary.category == "missing_required_section":
+            if not genome.quality_gates:
+                targeted_mutations.append(MutationProposal(
+                    mutation_type="add_quality_gate", target="quality_gates",
+                    rationale="Primary failure pattern indicates missing required sections.",
+                    expected_improvement="Enforce required sections before delivery.",
+                    risk="May introduce strict gating and extra retries.",
+                    patch={"name":"required_sections_gate","description":"Check required sections before final delivery.","check_type":"schema","required":True},
+                ))
+        elif primary and primary.category == "reasoning_or_calculation_error":
+            if not self._workflow_has(genome, "verification_step"):
+                targeted_mutations.append(MutationProposal(
+                    mutation_type="add_workflow_step", target="workflow",
+                    rationale="Primary failures indicate reasoning or calculation mistakes.",
+                    expected_improvement="Add a verification pass before final answer.",
+                    risk="Adds one workflow step and extra cost.",
+                    patch={"id":"verification_step","role":"Founder","action":"Verify calculations and critical claims before final output.","input_from":["solve_task"],"output_key":"verification_notes"},
+                ))
+        elif primary and primary.category == "cost_pressure":
+            targeted_mutations.append(MutationProposal(
+                mutation_type="modify_retry_policy", target="retry_policy",
+                rationale="Primary failures indicate budget pressure.",
+                expected_improvement="Reduce retry budget and improve cost efficiency.",
+                risk="May reduce recovery from transient errors.",
+                patch={"max_retries":1},
+            ))
+        elif primary and primary.category == "quality_gate_block":
+            targeted_mutations.append(MutationProposal(
+                mutation_type="edit_quality_gate", target="quality_gates[0]",
+                rationale="Primary failures indicate quality gate block behavior.",
+                expected_improvement="Tune quality gate to avoid blocking valid responses.",
+                risk="Could reduce strictness if tuned poorly.",
+                patch={"required": True},
+            ))
 
         if not genome.self_evaluation.get("enabled"):
             mutations.append(
@@ -319,6 +361,9 @@ class MutationPlanner:
                 )
             )
 
+
+        if not mutations and targeted_mutations:
+            mutations.extend(targeted_mutations)
         return MutationPlan(
             summary=(
                 "Test Nucleus plan based on repeated failure patterns."

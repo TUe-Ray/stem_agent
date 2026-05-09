@@ -31,6 +31,7 @@ def build_nucleus_prompt(
     mutation_history: list[NucleusSignal],
     signal_policy: SignalPolicy,
     reusable_skills: list[Any] | None = None,
+    failure_patterns: list[Any] | None = None,
 ) -> str:
     history_lines = []
     for sig in mutation_history[-5:]:
@@ -61,6 +62,9 @@ RECENT MUTATION HISTORY:
 
 Reusable Skills Retrieved From Skill Library:
 {_format_reusable_skills(reusable_skills or [])}
+
+STRUCTURED FAILURE PATTERNS:
+{_format_failure_patterns(failure_patterns or [])}
 
 Your job: propose ONE mutation to the genome that may improve harness performance.
 You do NOT know the specific validation cases. You do NOT know per-case scores.
@@ -153,3 +157,25 @@ def _tool_names(tools: Any) -> list[str]:
         if isinstance(item, dict) and item.get("name"):
             names.append(str(item["name"]))
     return names
+
+
+def _format_failure_patterns(failure_patterns: list[Any]) -> str:
+    if not failure_patterns:
+        return "No structured failure patterns provided."
+    lines: list[str] = []
+    for pattern in failure_patterns[:5]:
+        if hasattr(pattern, "model_dump"):
+            data = pattern.model_dump(mode="json")
+        elif isinstance(pattern, dict):
+            data = pattern
+        else:
+            continue
+        lines.append(
+            "- "
+            f"category={data.get('category', 'unknown')} | "
+            f"severity={float(data.get('severity', 0.0)):.4f} | "
+            f"count={int(data.get('count', 0))} | "
+            f"suggested_operator={data.get('suggested_operator') or 'none'} | "
+            f"kind={str(data.get('kind', ''))}"
+        )
+    return "\\n".join(lines) if lines else "No structured failure patterns provided."
