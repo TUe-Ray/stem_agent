@@ -27,6 +27,10 @@ class EvaluationResult(BaseModel):
     promotion_score: float
     train_score: float
     validation_score: float | None = None
+    task_quality: float = 0.0
+    cost_efficiency: float = 0.0
+    safety_score: float = 1.0
+    stability_score: float = 0.0
     metrics: dict[str, float] = Field(default_factory=dict)
     failures: list[str] = Field(default_factory=list)
     case_results: list[CaseEvaluation] = Field(default_factory=list)
@@ -79,6 +83,11 @@ class GuardianFitnessEvaluator:
             promotion_score = (0.40 * train_score) + (0.60 * validation_score)
             split_policy = "weighted_train_validation_40_60"
 
+        task_quality = promotion_score
+        safety_score = 0.0 if any(run.blocked for run in train_runs + validation_runs) else 1.0
+        cost_efficiency = self._clamp(1.0 - min(sum(run.cost_estimate for run in train_runs + validation_runs) / 5.0, 1.0))
+        stability_score = self._stability_score(train_cases, validation_cases)
+
         all_cases = train_cases + validation_cases
         metrics = self._mean_metrics([case.metrics for case in all_cases])
         failures = [failure for case in all_cases for failure in case.failures]
@@ -89,6 +98,10 @@ class GuardianFitnessEvaluator:
             promotion_score=promotion_score,
             train_score=train_score,
             validation_score=validation_score,
+            task_quality=task_quality,
+            cost_efficiency=cost_efficiency,
+            safety_score=safety_score,
+            stability_score=stability_score,
             metrics=metrics,
             failures=failures,
             case_results=all_cases,
@@ -96,6 +109,19 @@ class GuardianFitnessEvaluator:
             complexity_penalty=complexity_penalty,
             split_policy=split_policy,
         )
+
+
+    def _stability_score(
+        self,
+        train_cases: list[CaseEvaluation],
+        validation_cases: list[CaseEvaluation],
+    ) -> float:
+        case_scores = [case.score for case in train_cases + validation_cases]
+        if not case_scores:
+            return 1.0
+        mean_score = self._mean(case_scores)
+        variance = sum((score - mean_score) ** 2 for score in case_scores) / len(case_scores)
+        return self._clamp(1.0 - variance)
 
     def _evaluate_case(
         self,

@@ -356,6 +356,15 @@ class EvolutionLoop:
                 current_result.promotion_score,
                 summary,
                 nucleus_signal=nucleus_signal_to_dict(evaluation_signal),
+                fitness_vector={
+                    "promotion_score": current_result.promotion_score,
+                    "task_quality": current_result.task_quality,
+                    "validation_score": float(current_result.validation_score or 0.0),
+                    "cost_efficiency": current_result.cost_efficiency,
+                    "safety_score": current_result.safety_score,
+                    "complexity_penalty": current_result.complexity_penalty,
+                    "stability_score": current_result.stability_score,
+                },
             )
 
             if best_result is None or self.guardian.should_promote(

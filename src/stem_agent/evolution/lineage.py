@@ -31,12 +31,14 @@ class LineageLog:
         summary: str,
         *,
         nucleus_signal: dict[str, Any] | None = None,
+        fitness_vector: dict[str, float] | None = None,
     ) -> None:
         self.record(
             "evaluation",
             generation=generation,
             score=round(score, 4),
             summary=summary,
+            **({"fitness_vector": fitness_vector} if fitness_vector else {}),
             **({"nucleus_signal": nucleus_signal} if nucleus_signal else {}),
         )
 
@@ -47,6 +49,7 @@ class LineageLog:
         mutation_count: int,
         *,
         nucleus_signal: dict[str, Any] | None = None,
+        fitness_vector: dict[str, float] | None = None,
     ) -> None:
         self.record(
             "mutation_plan",
