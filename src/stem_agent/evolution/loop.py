@@ -208,8 +208,21 @@ class EvolutionLoop:
             {
                 "event": "evolution_start",
                 "run_id": run_id,
+                "run_dir": str(run_dir),
                 "scenario": bundle.scenario.name,
+                "scenario_path": str(bundle.path),
+                "task_class": bundle.scenario.scenario.task_class,
                 "resume": resume,
+                "model": self.settings.model,
+                "endpoint": self.settings.openai_endpoint,
+                "train_case_count": len(bundle.train_cases),
+                "validation_case_count": len(bundle.validation_cases),
+                "hidden_case_count": self._hidden_case_count(),
+                "max_generations": bundle.scenario.convergence_policy.max_generations,
+                "max_mutations_per_generation": bundle.scenario.evolution.max_mutations_per_generation,
+                "patience": bundle.scenario.evolution.patience,
+                "min_delta": bundle.scenario.evolution.min_delta,
+                "max_cost_usd": bundle.scenario.evolution.max_cost_usd,
             },
         )
         control = EvolutionControl(run_dir, run_id)
@@ -261,6 +274,15 @@ class EvolutionLoop:
         else:
             self._write_config_snapshot(run_dir, bundle)
             diagnosis = self.nucleus.diagnose(bundle.scenario)
+            self._emit_event(
+                event_sink,
+                {
+                    "event": "diagnosis_complete",
+                    "initial_evaluation_hypothesis": diagnosis.initial_evaluation_hypothesis,
+                    "requirement_count": len(bundle.scenario.expected_output.requirements),
+                    "constraint_count": len(bundle.scenario.constraints),
+                },
+            )
             seed_genome = (
                 self._gsm8k_baseline_genome(bundle.scenario.name)
                 if bundle.scenario.name == "gsm8k_mini"
@@ -368,6 +390,8 @@ class EvolutionLoop:
                         generation_dir / "hidden_baseline_workspace",
                         current_parent_id,
                         generation=generation,
+                        label="baseline",
+                        event_sink=event_sink,
                     )
                     convergence.hidden_baseline_score = self.guardian.hidden_baseline_score
 
@@ -783,6 +807,9 @@ class EvolutionLoop:
                         mutation_dir / "hidden_workspace",
                         candidate_genome_id,
                         generation=generation,
+                        label="candidate",
+                        mutation_index=index,
+                        event_sink=event_sink,
                     )
                     baseline_hidden = self.guardian.hidden_baseline_score
                     hidden_regression = (
@@ -1042,11 +1069,32 @@ class EvolutionLoop:
                 reason=convergence_decision.reason,
                 plateau_detected=convergence_decision.plateau_detected,
             )
+            self._emit_event(
+                event_sink,
+                {
+                    "event": "convergence_decision",
+                    "generation": generation,
+                    "action": convergence_decision.action,
+                    "stop": convergence_decision.stop,
+                    "reason": convergence_decision.reason,
+                    "plateau_detected": convergence_decision.plateau_detected,
+                },
+            )
             if convergence_decision.action == "force_zero_order":
                 force_zero_order_next = True
             if convergence_decision.stop:
                 stop_reason = convergence_decision.reason
                 break
+            self._emit_event(
+                event_sink,
+                {
+                    "event": "generation_complete",
+                    "generation": generation,
+                    "best_score": best_result.promotion_score if best_result else 0.0,
+                    "patience_left": patience_left,
+                    "tokens_used": tokens_used_this_generation,
+                },
+            )
             self._save_checkpoint(
                 control,
                 scenario_hash,
@@ -1320,6 +1368,7 @@ class EvolutionLoop:
         mutation_index: int | None = None,
         event_sink: Callable[[dict[str, Any]], None] | None = None,
     ) -> EvaluationResult:
+        workspace_dir = generation_dir / f"{label}_workspace"
         self._emit_event(
             event_sink,
             {
@@ -1328,17 +1377,31 @@ class EvolutionLoop:
                 "label": label,
                 "mutation_index": mutation_index,
                 "genome_version": genome.genome_version,
+                "workspace_dir": str(workspace_dir),
+                "train_case_count": len(bundle.train_cases),
+                "validation_case_count": len(bundle.validation_cases),
             },
         )
-        workspace_dir = generation_dir / f"{label}_workspace"
         run_root = self._run_root_for_artifact_dir(generation_dir)
         harness = self.harness_builder.materialize(
             genome,
             bundle.scenario,
             workspace_dir=workspace_dir,
         )
-        train_runs = [
-            self.harness_runner.run_case(
+        train_runs = []
+        for case in bundle.train_cases:
+            self._emit_event(
+                event_sink,
+                {
+                    "event": "case_start",
+                    "generation": generation,
+                    "label": label,
+                    "split": "train",
+                    "case_id": case.id,
+                    "mutation_index": mutation_index,
+                },
+            )
+            run = self.harness_runner.run_case(
                 harness,
                 case,
                 trace_sink=self._case_trace_sink(
@@ -1351,10 +1414,33 @@ class EvolutionLoop:
                 ),
                 run_dir=run_root,
             )
-            for case in bundle.train_cases
-        ]
-        validation_runs = [
-            self.harness_runner.run_case(
+            train_runs.append(run)
+            self._emit_event(
+                event_sink,
+                {
+                    "event": "case_complete",
+                    "generation": generation,
+                    "label": label,
+                    "split": "train",
+                    "case_id": case.id,
+                    "mutation_index": mutation_index,
+                    "output_summary": self._short_output_summary(run.final_output),
+                },
+            )
+        validation_runs = []
+        for case in bundle.validation_cases:
+            self._emit_event(
+                event_sink,
+                {
+                    "event": "case_start",
+                    "generation": generation,
+                    "label": label,
+                    "split": "validation",
+                    "case_id": case.id,
+                    "mutation_index": mutation_index,
+                },
+            )
+            run = self.harness_runner.run_case(
                 harness,
                 case,
                 trace_sink=self._case_trace_sink(
@@ -1367,9 +1453,31 @@ class EvolutionLoop:
                 ),
                 run_dir=run_root,
             )
-            for case in bundle.validation_cases
-        ]
+            validation_runs.append(run)
+            self._emit_event(
+                event_sink,
+                {
+                    "event": "case_complete",
+                    "generation": generation,
+                    "label": label,
+                    "split": "validation",
+                    "case_id": case.id,
+                    "mutation_index": mutation_index,
+                    "output_summary": self._short_output_summary(run.final_output),
+                },
+            )
         self._write_runs(generation_dir, label, train_runs + validation_runs)
+        self._emit_event(
+            event_sink,
+            {
+                "event": "evaluation_artifacts_written",
+                "generation": generation,
+                "label": label,
+                "mutation_index": mutation_index,
+                "outputs_dir": str(generation_dir / "outputs"),
+                "traces_path": str(generation_dir / f"{label}_traces.jsonl"),
+            },
+        )
         return self.guardian.evaluate_candidate(
             genome,
             bundle.scenario,
@@ -1383,6 +1491,12 @@ class EvolutionLoop:
             return artifact_dir.parent.parent
         return artifact_dir.parent
 
+    def _hidden_case_count(self) -> int:
+        path = self.guardian.hidden_cases_path
+        if path is None or not path.exists():
+            return 0
+        return sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
+
     def _run_hidden_evaluation(
         self,
         genome: Genome,
@@ -1391,17 +1505,44 @@ class EvolutionLoop:
         genome_id: str,
         *,
         generation: int,
+        label: str,
+        mutation_index: int | None = None,
+        event_sink: Callable[[dict[str, Any]], None] | None = None,
     ) -> float:
+        self._emit_event(
+            event_sink,
+            {
+                "event": "hidden_evaluation_start",
+                "generation": generation,
+                "label": label,
+                "genome_id": genome_id,
+                "workspace_dir": str(workspace_dir),
+                "mutation_index": mutation_index,
+            },
+        )
         harness = self.harness_builder.materialize(
             genome,
             bundle.scenario,
             workspace_dir=workspace_dir,
         )
-        return self.guardian._run_hidden_evaluation(
+        hidden_score = self.guardian._run_hidden_evaluation(
             harness,
             genome_id,
             generation=generation,
         )
+        self._emit_event(
+            event_sink,
+            {
+                "event": "hidden_evaluation_complete",
+                "generation": generation,
+                "label": label,
+                "genome_id": genome_id,
+                "workspace_dir": str(workspace_dir),
+                "hidden_score": hidden_score,
+                "mutation_index": mutation_index,
+            },
+        )
+        return hidden_score
 
     def _case_trace_sink(
         self,
@@ -1467,6 +1608,12 @@ class EvolutionLoop:
                     encoding="utf-8",
                 )
                 traces.write(json.dumps(run.model_dump(mode="json"), sort_keys=True) + "\n")
+
+    def _short_output_summary(self, output: str, *, limit: int = 140) -> str:
+        compact = " ".join(output.split())
+        if len(compact) <= limit:
+            return compact
+        return compact[: limit - 3] + "..."
 
     def _write_json(self, path: Path, data: dict) -> None:
         path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
