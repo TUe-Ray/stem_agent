@@ -160,6 +160,13 @@ class ReportBuilder:
         final: EvaluationResult,
     ) -> list[str]:
         preferred = [
+            "task_performance",
+            "stem_process_quality",
+            "generalization_score",
+            "diagnosis_quality",
+            "architecture_fit",
+            "safeguard_effectiveness",
+            "minimality_score",
             "requirement_coverage",
             "format_validity",
             "constraint_adherence",

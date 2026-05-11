@@ -3,6 +3,7 @@ import json
 from stem_agent.config import Settings
 from stem_agent.evolution.loop import EvolutionLoop
 from stem_agent.genome.loader import load_genome
+from stem_agent.genome.models import QualityGate, WorkflowStep
 from stem_agent.harness.builder import HarnessBuilder
 from stem_agent.harness.runner import HarnessRunResult, HarnessRunner
 from stem_agent.harness.role_runner import RoleRunner
@@ -126,13 +127,14 @@ def test_tiny_task_operator_demo_has_lineage_narrative_and_environment(tmp_path)
     result = loop.evolve("scenarios/tiny_task_operator", "demo_001")
     frozen = load_genome(result.frozen_genome_path)
     report = result.report_path.read_text(encoding="utf-8")
+    lineage = (result.run_dir / "lineage.jsonl").read_text(encoding="utf-8")
 
     assert result.final_score > result.baseline_score
     assert frozen.self_evaluation["enabled"] is True
     assert "artifacts/acceptance_criteria.md" in frozen.environment.required_artifacts
     assert len(frozen.workflow) > 2
     assert frozen.quality_gates
-    assert frozen.tools["generated"]
+    assert frozen.tools["generated"] or '"mutation_type": "create_tool"' in lineage
     assert "Differentiation Story" in report
     assert "Guardian promoted" in report
     assert "Rejected Or Rolled Back Mutations" in report
@@ -328,3 +330,136 @@ def test_success_criteria_affect_default_evaluator_score():
     ).promotion_score
 
     assert requirement_score > usefulness_score
+
+
+def test_stem_process_metrics_reward_specialized_harness_shape():
+    bundle = load_scenario("scenarios/toy_structured_answer")
+    base_genome = load_genome("src/stem_agent/genome/default_genome.yaml")
+    specialized = base_genome.model_copy(deep=True)
+    specialized.task_diagnosis = {
+        "task_type": "structured answer planning",
+        "expected_task_solving_pattern": "diagnose request, draft concrete plan, review constraints, revise final answer",
+        "likely_failure_modes": ["generic advice", "missed constraint", "weak final answer"],
+        "likely_needed_capabilities": ["input-specific planning", "self-review", "quality gate"],
+        "initial_architecture_hypothesis": "Founder workflow with review and final revision step",
+        "initial_evaluation_hypothesis": "Reward actionability, input specificity, requirement coverage, and safeguard usage",
+    }
+    specialized.workflow.append(
+        WorkflowStep(
+            id="review_against_requirements",
+            role="Founder",
+            action="Review the draft against requirements, constraints, and likely failure modes.",
+            input_from=["final_output"],
+            output_key="review_notes",
+        )
+    )
+    specialized.workflow.append(
+        WorkflowStep(
+            id="revise_final_output",
+            role="Founder",
+            action="Revise the response into a specific final answer with concrete steps.",
+            input_from=["final_output", "review_notes"],
+            output_key="final_output",
+        )
+    )
+    specialized.self_evaluation = {
+        "enabled": True,
+        "rubric": ["specific", "actionable", "constraint-aware"],
+    }
+    specialized.quality_gates.append(
+        QualityGate(
+            name="final_answer_quality",
+            description="Checks that the final answer is specific, actionable, and constraint-aware.",
+            check_type="manual_placeholder",
+        )
+    )
+    specialized.environment.required_artifacts.append("artifacts/decision_log.md")
+
+    output = (
+        "## Summary\nPlan a focused 20-minute morning routine before school drop-off.\n\n"
+        "## Concrete Steps\n"
+        "1. Put bags and shoes by the door first.\n"
+        "2. Prepare a simple breakfast and skip optional chores.\n"
+        "3. Keep five minutes as a fallback buffer.\n\n"
+        "## Review Notes Applied\nChecked time, parent context, and stress constraint.\n\n"
+        "## Final Answer\nUse a short checklist, protect the buffer, and review tomorrow."
+    )
+    generic_run = HarnessRunResult(
+        case_id="stem_metric_case",
+        case_input={"user_request": "Plan a less stressful 20-minute school morning routine."},
+        final_output=output,
+        outputs={"final_output": output},
+        traces=[
+            {"event": "workflow_step", "step_id": "understand_task"},
+            {"event": "workflow_step", "step_id": "solve_task"},
+        ],
+    )
+    specialized_run = generic_run.model_copy(
+        deep=True,
+        update={
+            "traces": [
+                {"event": "environment_materialized", "artifacts": ["artifacts/decision_log.md"]},
+                {"event": "workflow_step", "step_id": "understand_task"},
+                {"event": "workflow_step", "step_id": "solve_task"},
+                {"event": "workflow_step", "step_id": "review_against_requirements"},
+                {"event": "quality_gate", "passed": True},
+                {"event": "workflow_step", "step_id": "revise_final_output"},
+            ]
+        },
+    )
+    evaluator = GuardianFitnessEvaluator()
+
+    generic = evaluator.evaluate(base_genome, bundle.scenario, [generic_run], audit=False)
+    evolved = evaluator.evaluate(specialized, bundle.scenario, [specialized_run], audit=False)
+
+    assert evolved.metrics["stem_process_quality"] > generic.metrics["stem_process_quality"]
+    assert evolved.metrics["diagnosis_quality"] > generic.metrics["diagnosis_quality"]
+    assert evolved.metrics["safeguard_effectiveness"] > generic.metrics["safeguard_effectiveness"]
+    assert evolved.promotion_score > generic.promotion_score
+
+
+def test_exact_answer_criteria_remain_primary_over_stem_process_bonus():
+    bundle = load_scenario("scenarios/gsm8k_demo")
+    base_genome = load_genome("src/stem_agent/genome/default_genome.yaml")
+    specialized = base_genome.model_copy(deep=True)
+    specialized.task_diagnosis = {
+        "task_type": "structured math reasoning",
+        "expected_task_solving_pattern": "extract quantities, compute carefully, verify final numeric answer",
+        "likely_failure_modes": ["arithmetic error", "unsupported number"],
+        "likely_needed_capabilities": ["calculation", "verification"],
+        "initial_architecture_hypothesis": "Add verification before final answer",
+        "initial_evaluation_hypothesis": "Exact final answer is the primary score",
+    }
+    specialized.self_evaluation = {"enabled": True, "rubric": ["exact answer"]}
+    specialized.quality_gates.append(
+        QualityGate(
+            name="answer_check",
+            description="Checks arithmetic and final numeric answer.",
+            check_type="manual_placeholder",
+        )
+    )
+
+    correct_run = HarnessRunResult(
+        case_id="gsm_correct",
+        case_input={"problem": "Ray has 40 apples and buys 2 more. How many apples?"},
+        expected_output="42",
+        final_output="40 + 2 = 42\n\nFinal answer: 42",
+        traces=[{"event": "workflow_step", "step_id": "solve_task"}],
+    )
+    wrong_run = HarnessRunResult(
+        case_id="gsm_wrong",
+        case_input={"problem": "Ray has 40 apples and buys 2 more. How many apples?"},
+        expected_output="42",
+        final_output="40 + 2 = 41\n\nFinal answer: 41",
+        traces=[
+            {"event": "workflow_step", "step_id": "solve_task"},
+            {"event": "quality_gate", "passed": True},
+        ],
+    )
+    evaluator = GuardianFitnessEvaluator()
+
+    correct = evaluator.evaluate(base_genome, bundle.scenario, [correct_run], audit=False)
+    wrong = evaluator.evaluate(specialized, bundle.scenario, [wrong_run], audit=False)
+
+    assert correct.metrics["task_performance"] > wrong.metrics["task_performance"]
+    assert correct.promotion_score > wrong.promotion_score

@@ -14,6 +14,10 @@ class EvaluatorWeights(BaseModel):
     workflow_completion: float = 0.08
     quality_gate_usage: float = 0.10
     generated_tool_usage: float = 0.04
+    diagnosis_quality: float = 0.08
+    architecture_fit: float = 0.08
+    safeguard_effectiveness: float = 0.06
+    minimality_score: float = 0.04
     cost_penalty: float = 0.03
     complexity_penalty: float = 0.05
 
@@ -29,6 +33,10 @@ class EvaluatorWeights(BaseModel):
             "workflow_completion": self.workflow_completion,
             "quality_gate_usage": self.quality_gate_usage,
             "generated_tool_usage": self.generated_tool_usage,
+            "diagnosis_quality": self.diagnosis_quality,
+            "architecture_fit": self.architecture_fit,
+            "safeguard_effectiveness": self.safeguard_effectiveness,
+            "minimality_score": self.minimality_score,
         }
 
     def normalized(self) -> "EvaluatorWeights":

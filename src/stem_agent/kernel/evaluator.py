@@ -88,13 +88,19 @@ class GuardianFitnessEvaluator:
             promotion_score = (0.40 * train_score) + (0.60 * validation_score)
             split_policy = "weighted_train_validation_40_60"
 
-        task_quality = promotion_score
         safety_score = 0.0 if any(run.blocked for run in train_runs + validation_runs) else 1.0
         cost_efficiency = self._clamp(1.0 - min(sum(run.cost_estimate for run in train_runs + validation_runs) / 5.0, 1.0))
         stability_score = self._stability_score(train_cases, validation_cases)
 
         all_cases = train_cases + validation_cases
         metrics = self._mean_metrics([case.metrics for case in all_cases])
+        generalization_score = (
+            1.0
+            if validation_score is None
+            else self._clamp(1.0 - abs(train_score - validation_score))
+        )
+        metrics["generalization_score"] = generalization_score
+        task_quality = float(metrics.get("task_performance", promotion_score))
         failures = [failure for case in all_cases for failure in case.failures]
         cost_estimate = sum(run.cost_estimate for run in train_runs + validation_runs)
 
@@ -137,7 +143,13 @@ class GuardianFitnessEvaluator:
     ) -> CaseEvaluation:
         output = run.final_output or ""
         if scenario.evaluation_criteria:
-            return self._evaluate_case_with_criteria(scenario, run, output, complexity_penalty)
+            return self._evaluate_case_with_criteria(
+                genome,
+                scenario,
+                run,
+                output,
+                complexity_penalty,
+            )
         requirement_coverage, failures = self._requirement_coverage(
             scenario.expected_output.requirements, output
         )
@@ -152,9 +164,15 @@ class GuardianFitnessEvaluator:
         quality_gate_usage = self._quality_gate_usage(run)
         generated_tool_usage = self._generated_tool_usage(run)
         cost_penalty = min(run.cost_estimate / 5.0, 1.0)
+        stem_components = self._stem_process_components(
+            genome,
+            scenario,
+            run,
+            complexity_penalty,
+        )
 
         w = self.weights
-        score_components = {
+        output_components = {
             "requirement_coverage": requirement_coverage,
             "format_validity": format_validity,
             "constraint_adherence": constraint_adherence,
@@ -166,6 +184,7 @@ class GuardianFitnessEvaluator:
             "quality_gate_usage": quality_gate_usage,
             "generated_tool_usage": generated_tool_usage,
         }
+        score_components = {**output_components, **stem_components}
         score_weights = self._scenario_metric_weights(scenario)
         raw_score = sum(
             score_weights.get(name, 0.0) * value
@@ -176,9 +195,17 @@ class GuardianFitnessEvaluator:
         if run.blocked:
             raw_score -= 0.15
         score = self._clamp(raw_score)
+        output_weight_total = sum(score_weights.get(name, 0.0) for name in output_components) or 1.0
+        task_performance = self._clamp(
+            sum(
+                (score_weights.get(name, 0.0) / output_weight_total) * value
+                for name, value in output_components.items()
+            )
+        )
         metrics = {
             "evaluator_weight_cost_penalty": w.cost_penalty,
             "evaluator_weight_complexity_penalty": w.complexity_penalty,
+            "task_performance": task_performance,
             "requirement_coverage": requirement_coverage,
             "scenario_success": scenario_success,
             "format_validity": format_validity,
@@ -193,6 +220,7 @@ class GuardianFitnessEvaluator:
             "cost_penalty": cost_penalty,
             "complexity_penalty": complexity_penalty,
         }
+        metrics.update(stem_components)
         metrics.update(
             {
                 f"evaluator_weight_{name}": score_weights.get(name, 0.0)
@@ -211,6 +239,7 @@ class GuardianFitnessEvaluator:
 
     def _evaluate_case_with_criteria(
         self,
+        genome: Genome,
         scenario: Scenario,
         run: HarnessRunResult,
         output: str,
@@ -228,15 +257,26 @@ class GuardianFitnessEvaluator:
             if value <= 0.0:
                 failures.append(f"Failed criterion: {criterion.name}")
         cost_penalty = min(run.cost_estimate / 5.0, 1.0)
+        stem_components = self._stem_process_components(
+            genome,
+            scenario,
+            run,
+            complexity_penalty,
+        )
+        process_weight = 0.10
         score = self._clamp(
-            weighted_score
+            ((1.0 - process_weight) * weighted_score)
+            + (process_weight * stem_components["stem_process_quality"])
             - self.weights.cost_penalty * cost_penalty
             - self.weights.complexity_penalty * complexity_penalty
         )
+        metrics["task_performance"] = self._clamp(weighted_score)
+        metrics.update(stem_components)
         metrics["cost_penalty"] = cost_penalty
         metrics["complexity_penalty"] = complexity_penalty
         metrics["evaluator_weight_cost_penalty"] = self.weights.cost_penalty
         metrics["evaluator_weight_complexity_penalty"] = self.weights.complexity_penalty
+        metrics["evaluator_weight_stem_process_quality"] = process_weight
         return CaseEvaluation(
             case_id=run.case_id,
             score=score,
@@ -325,8 +365,181 @@ class GuardianFitnessEvaluator:
         if any(token in text for token in ["artifact", "audit", "decision"]):
             return ["artifact_presence"]
         if any(token in text for token in ["cost", "compact", "efficiency"]):
-            return ["workflow_completion"]
+            return ["workflow_completion", "minimality_score"]
+        if any(token in text for token in ["diagnosis", "hypothesis", "understand", "class"]):
+            return ["diagnosis_quality"]
+        if any(token in text for token in ["architecture", "tool", "skill", "specialized"]):
+            return ["architecture_fit"]
+        if any(token in text for token in ["safeguard", "rollback", "guard", "safe"]):
+            return ["safeguard_effectiveness"]
+        if any(token in text for token in ["evolve", "differentiation", "stem", "become"]):
+            return ["diagnosis_quality", "architecture_fit", "safeguard_effectiveness"]
         return []
+
+    def _stem_process_components(
+        self,
+        genome: Genome,
+        scenario: Scenario,
+        run: HarnessRunResult,
+        complexity_penalty: float,
+    ) -> dict[str, float]:
+        diagnosis_quality = self._diagnosis_quality(genome, scenario)
+        architecture_fit = self._architecture_fit(genome, scenario)
+        safeguard_effectiveness = self._safeguard_effectiveness(genome, run)
+        minimality_score = self._clamp(1.0 - complexity_penalty)
+        stem_process_quality = self._clamp(
+            0.30 * diagnosis_quality
+            + 0.30 * architecture_fit
+            + 0.25 * safeguard_effectiveness
+            + 0.15 * minimality_score
+        )
+        return {
+            "diagnosis_quality": diagnosis_quality,
+            "architecture_fit": architecture_fit,
+            "safeguard_effectiveness": safeguard_effectiveness,
+            "minimality_score": minimality_score,
+            "stem_process_quality": stem_process_quality,
+        }
+
+    def _diagnosis_quality(self, genome: Genome, scenario: Scenario) -> float:
+        if not genome.task_diagnosis:
+            return 0.0
+        expected_fields = [
+            "task_type",
+            "expected_task_solving_pattern",
+            "likely_failure_modes",
+            "likely_needed_capabilities",
+            "initial_architecture_hypothesis",
+            "initial_evaluation_hypothesis",
+        ]
+        present = sum(1 for field in expected_fields if genome.task_diagnosis.get(field))
+        field_score = present / len(expected_fields)
+        diagnosis_text = json.dumps(genome.task_diagnosis, sort_keys=True)
+        overlap_score = self._text_overlap_score(self._scenario_text(scenario), diagnosis_text)
+        return self._clamp(0.55 * field_score + 0.45 * overlap_score)
+
+    def _architecture_fit(self, genome: Genome, scenario: Scenario) -> float:
+        genome_text = self._genome_behavior_text(genome)
+        scenario_text = self._scenario_text(scenario)
+        score = 0.0
+        if genome.roles:
+            score += 0.12
+        if genome.workflow:
+            score += 0.12
+        if any(self._is_final_output_step(step.id, step.action) for step in genome.workflow):
+            score += 0.14
+        score += 0.24 * self._text_overlap_score(scenario_text, genome_text)
+
+        need_safeguards = self._scenario_needs_safeguards(scenario)
+        has_review_step = any(
+            any(token in f"{step.id} {step.action}".lower() for token in ["review", "verify", "check"])
+            for step in genome.workflow
+        )
+        has_revision_step = any(
+            any(token in f"{step.id} {step.action}".lower() for token in ["revise", "final"])
+            for step in genome.workflow
+        )
+        if has_review_step:
+            score += 0.10
+        if has_revision_step:
+            score += 0.10
+        if need_safeguards and (genome.quality_gates or genome.self_evaluation.get("enabled")):
+            score += 0.14
+        elif not need_safeguards and len(genome.workflow) <= 4:
+            score += 0.08
+        if genome.environment.required_artifacts:
+            score += 0.07
+        if genome.tools.get("generated"):
+            score += 0.03
+        return self._clamp(score)
+
+    def _safeguard_effectiveness(self, genome: Genome, run: HarnessRunResult) -> float:
+        score = 0.0
+        if genome.self_evaluation.get("enabled"):
+            score += 0.20
+        if genome.self_evaluation.get("rubric"):
+            score += 0.10
+        if genome.quality_gates:
+            score += 0.15
+        if genome.intra_test_reflection_enabled:
+            score += 0.10
+        if any(trace.get("step_id") == "review_against_requirements" for trace in run.traces):
+            score += 0.15
+        if any(trace.get("event") == "quality_gate" and trace.get("passed") for trace in run.traces):
+            score += 0.20
+        if any(trace.get("event") == "intra_reflection_retry" for trace in run.traces):
+            score += 0.10
+        if run.blocked:
+            score -= 0.20
+        return self._clamp(score)
+
+    def _scenario_text(self, scenario: Scenario) -> str:
+        return " ".join(
+            [
+                scenario.scenario.name,
+                scenario.scenario.task_class,
+                scenario.scenario.description,
+                " ".join(scenario.constraints),
+                " ".join(scenario.expected_output.requirements),
+                " ".join(
+                    f"{criterion.name} {criterion.description}"
+                    for criterion in scenario.success_criteria
+                ),
+                " ".join(scenario.domain_tags),
+            ]
+        )
+
+    def _genome_behavior_text(self, genome: Genome) -> str:
+        return " ".join(
+            [
+                genome.name,
+                json.dumps(genome.task_diagnosis, sort_keys=True),
+                " ".join(
+                    f"{role.name} {role.description} {role.instructions}"
+                    for role in genome.roles
+                ),
+                " ".join(
+                    f"{step.id} {step.role} {step.action}"
+                    for step in genome.workflow
+                ),
+                " ".join(
+                    f"{gate.name} {gate.description} {gate.check_type}"
+                    for gate in genome.quality_gates
+                ),
+                " ".join(genome.environment.required_artifacts),
+            ]
+        )
+
+    def _text_overlap_score(self, source: str, candidate: str) -> float:
+        source_words = set(self._content_words(source))
+        if not source_words:
+            return 0.5
+        candidate_words = set(self._content_words(candidate))
+        overlap = len(source_words & candidate_words) / len(source_words)
+        return self._clamp(0.20 + 0.80 * overlap)
+
+    def _scenario_needs_safeguards(self, scenario: Scenario) -> bool:
+        text = self._scenario_text(scenario).lower()
+        return any(
+            token in text
+            for token in [
+                "qa",
+                "quality",
+                "security",
+                "risk",
+                "verification",
+                "audit",
+                "safety",
+                "failure",
+                "acceptance",
+                "constraint",
+                "decision",
+            ]
+        )
+
+    def _is_final_output_step(self, step_id: str, action: str) -> bool:
+        text = f"{step_id} {action}".lower()
+        return any(token in text for token in ["final", "answer", "synthesize", "respond"])
 
     def _constraint_adherence(self, scenario: Scenario, output: str) -> float:
         constraints = " ".join(scenario.constraints).lower()

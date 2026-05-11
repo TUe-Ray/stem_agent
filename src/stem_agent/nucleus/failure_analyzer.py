@@ -54,6 +54,9 @@ class FailureAnalyzer:
     def _metric_deficit_patterns(self, metrics: dict[str, float]) -> list[FailurePattern]:
         patterns: list[FailurePattern] = []
         checks = [
+            ("Low diagnosis quality", "diagnosis_quality", "diagnosis_gap", "zero_order_redesign", 0.55),
+            ("Low architecture fit", "architecture_fit", "architecture_mismatch", "add_workflow_step", 0.55),
+            ("Low safeguard effectiveness", "safeguard_effectiveness", "safeguard_gap", "add_quality_gate", 0.55),
             ("Low self-review usage", "self_review_usage", "review_loop_missing", "add_review_step", 0.60),
             ("Low quality-gate usage", "quality_gate_usage", "quality_gate_missing", "add_quality_gate", 0.60),
             ("Low artifact presence", "artifact_presence", "artifact_gap", "modify_environment", 0.50),
