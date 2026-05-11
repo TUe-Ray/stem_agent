@@ -3,76 +3,76 @@
     {
       "case_id": "train_001",
       "failures": [],
-      "final_output": "## Summary\nCreate a focused, useful response for: Help me plan a simple morning routine..\n\n## Acceptance Criteria\n- The output names the goal.\n- The output gives concrete steps.\n- The output includes a final answer.\n\n## Steps\n1. Clarify the desired outcome in one sentence.\n2. Break the work into the next visible actions.\n3. Check the draft against the scenario requirements.\n4. Deliver the smallest complete final answer.\n\n## QA Report\nQuality review: summary, steps, and final answer are present.\n\n## Decision Log\n- Use a compact structured answer instead of a long exploratory exchange.\n\n## Final Answer\nUse the plan above as the operating path, then revise only if a required section is missing.\n\n## Review Notes Applied\n\n## Review Notes\n- Checked 3 scenario requirements.\n- Missing sections: none.\n- Recommendation: revise final output only where required sections are absent.\n\nFinal answer checked against the evolved review loop.",
+      "final_output": "```markdown\n# Morning Routine Plan\n\n## Summary\nThis is a simple, effective morning routine designed to start your day positively, boosting energy and mindfulness without complexity.\n\n## Concrete Steps\n1. **Wake up early** (e.g., 6:30 AM) - Give yourself enough time to wake up without rush.\n2. **Hydrate** - Drink a glass of water to kickstart your metabolism.\n3. **Stretch or light exercise** (5-10 minutes) - Gentle movements to awaken your body.\n4. **Personal hygiene** - Brush teeth, wash face, shower if desired.\n5. **Healthy breakfast** - Eat something nutritious to fuel your morning.\n6. **Plan your day** (5 minutes) - Review your top priorities or schedule.\n7. **Mindfulness or meditation** (optional, 5 minutes) - Center your mind and reduce stress.\n\n## Final Answer\nA simple morning routine consists of waking up early, hydrating, doing light exercise, completing personal hygiene, having a healthy breakfast, briefly planning your day, and optionally practicing mindfulness. This balanced approach helps you feel energized, organized, and calm to start your day well.\n```",
       "metrics": {
-        "artifact_presence": 1.0,
-        "complexity_penalty": 0.31,
-        "cost_penalty": 0.008,
+        "artifact_presence": 0.0,
+        "complexity_penalty": 0.0,
+        "cost_penalty": 0.002,
         "format_validity": 1.0,
         "generated_tool_usage": 0.0,
         "quality_gate_usage": 0.0,
         "requirement_coverage": 1.0,
         "scenario_success": 0.9999999999999999,
-        "self_review_usage": 0.75,
-        "workflow_completion": 0.9999999999999999
+        "self_review_usage": 0.0,
+        "workflow_completion": 0.44999999999999996
       },
-      "score": 0.7842600000000001
+      "score": 0.48294000000000004
     },
     {
       "case_id": "train_002",
       "failures": [],
-      "final_output": "## Summary\nCreate a focused, useful response for: I need to organize my messy project notes..\n\n## Acceptance Criteria\n- The output names the goal.\n- The output gives concrete steps.\n- The output includes a final answer.\n\n## Steps\n1. Clarify the desired outcome in one sentence.\n2. Break the work into the next visible actions.\n3. Check the draft against the scenario requirements.\n4. Deliver the smallest complete final answer.\n\n## QA Report\nQuality review: summary, steps, and final answer are present.\n\n## Decision Log\n- Use a compact structured answer instead of a long exploratory exchange.\n\n## Final Answer\nUse the plan above as the operating path, then revise only if a required section is missing.\n\n## Review Notes Applied\n\n## Review Notes\n- Checked 3 scenario requirements.\n- Missing sections: none.\n- Recommendation: revise final output only where required sections are absent.\n\nFinal answer checked against the evolved review loop.",
+      "final_output": "```markdown\n# Organizing Messy Project Notes\n\n## Summary\nOrganizing messy project notes improves clarity, productivity, and enables easier retrieval of important information. By categorizing and structuring your notes systematically, you will transform disorganized content into a clear, actionable knowledge base.\n\n## Concrete Steps\n1. **Gather All Notes**  \n   Collect all your project notes from various sources (physical notebooks, digital files, emails, apps) into one place.\n\n2. **Choose a Tool or Format**  \n   Decide on a single platform or format to organize your notes (e.g., note-taking apps like Notion, OneNote, Evernote, or plain folders/files).\n\n3. **Sort Notes by Themes or Topics**  \n   Group your notes by project phases, topics, or types (e.g., ideas, tasks, meeting minutes, resources).\n\n4. **Create a Hierarchical Structure**  \n   Within your chosen tool, create folders, tags, or notebooks to mirror the themes or stages of your project.\n\n5. **Consolidate Redundant or Fragmented Notes**  \n   Merge scattered notes on similar topics into cohesive, comprehensive entries.\n\n6. **Add Titles, Dates, and Keywords**  \n   Clearly label notes with descriptive titles, dates, and searchable keywords to improve future retrieval.\n\n7. **Make Action Items and Key Points Stand Out**  \n   Highlight or tag actionable items and important takeaways for easy following up.\n\n8. **Regularly Review and Update**  \n   Set a recurring schedule to revisit and update notes, ensuring they stay relevant and organized.\n\n## Final Answer\nTo organize your messy project notes, first gather all notes together, then choose a single organizing tool or method. Sort your notes by themes or project stages, create a clear hierarchical structure, and consolidate overlapping content. Enhance notes with clear titles, dates, and keywords, and highlight key action items. Finally, commit to regular reviews to maintain organization and ensure the notes remain useful throughout your project lifecycle.\n```",
       "metrics": {
-        "artifact_presence": 1.0,
-        "complexity_penalty": 0.31,
-        "cost_penalty": 0.008,
+        "artifact_presence": 0.0,
+        "complexity_penalty": 0.0,
+        "cost_penalty": 0.002,
         "format_validity": 1.0,
         "generated_tool_usage": 0.0,
         "quality_gate_usage": 0.0,
         "requirement_coverage": 1.0,
         "scenario_success": 0.9999999999999999,
-        "self_review_usage": 0.75,
-        "workflow_completion": 0.9999999999999999
+        "self_review_usage": 0.0,
+        "workflow_completion": 0.44999999999999996
       },
-      "score": 0.7842600000000001
+      "score": 0.48294000000000004
     },
     {
       "case_id": "val_001",
       "failures": [],
-      "final_output": "## Summary\nCreate a focused, useful response for: Help me prepare for a difficult meeting..\n\n## Acceptance Criteria\n- The output names the goal.\n- The output gives concrete steps.\n- The output includes a final answer.\n\n## Steps\n1. Clarify the desired outcome in one sentence.\n2. Break the work into the next visible actions.\n3. Check the draft against the scenario requirements.\n4. Deliver the smallest complete final answer.\n\n## QA Report\nQuality review: summary, steps, and final answer are present.\n\n## Decision Log\n- Use a compact structured answer instead of a long exploratory exchange.\n\n## Final Answer\nUse the plan above as the operating path, then revise only if a required section is missing.\n\n## Review Notes Applied\n\n## Review Notes\n- Checked 3 scenario requirements.\n- Missing sections: none.\n- Recommendation: revise final output only where required sections are absent.\n\nFinal answer checked against the evolved review loop.",
+      "final_output": "```markdown\n# Preparing for a Difficult Meeting\n\n## Summary\nTo effectively prepare for a difficult meeting, it\u2019s important to clarify your objectives, anticipate challenges, structure your points clearly, and plan how to manage emotions and conflicts. This preparation will increase your confidence and improve the chances of a productive discussion.\n\n## Concrete Steps\n\n1. **Define the Purpose and Goals**\n   - Identify the core issues to address in the meeting.\n   - Set clear, realistic objectives for what you want to achieve.\n\n2. **Gather and Organize Information**\n   - Collect any relevant documents, facts, or data to support your points.\n   - Prepare key messages or arguments you want to communicate.\n\n3. **Anticipate Challenges**\n   - Think about potential objections or difficult reactions from others.\n   - Plan how you will respond calmly and constructively.\n\n4. **Plan Your Communication Approach**\n   - Decide on the tone you want to maintain: respectful, firm, open.\n   - Prepare questions to encourage dialogue and understanding.\n\n5. **Practice and Rehearse**\n   - Run through your points aloud, possibly with a trusted colleague.\n   - Prepare mentally by visualizing a positive outcome.\n\n6. **Manage Your Emotions**\n   - Use techniques such as deep breathing or mindfulness to stay calm.\n   - Remind yourself to stay professional regardless of others\u2019 reactions.\n\n7. **Logistics Check**\n   - Confirm the meeting time, place, and attendees.\n   - Have any materials or notes ready and accessible.\n\n## Final Answer\nBy defining your goals, organizing your facts, anticipating difficulties, planning your communication style, rehearsing, managing emotions, and handling logistics, you will be well-prepared for your difficult meeting. This comprehensive approach will help you stay focused, maintain composure, and work towards a constructive outcome.\n```",
       "metrics": {
-        "artifact_presence": 1.0,
-        "complexity_penalty": 0.31,
-        "cost_penalty": 0.008,
+        "artifact_presence": 0.0,
+        "complexity_penalty": 0.0,
+        "cost_penalty": 0.002,
         "format_validity": 1.0,
         "generated_tool_usage": 0.0,
         "quality_gate_usage": 0.0,
         "requirement_coverage": 1.0,
         "scenario_success": 0.9999999999999999,
-        "self_review_usage": 0.75,
-        "workflow_completion": 0.9999999999999999
+        "self_review_usage": 0.0,
+        "workflow_completion": 0.44999999999999996
       },
-      "score": 0.7842600000000001
+      "score": 0.48294000000000004
     }
   ],
-  "complexity_penalty": 0.31,
-  "cost_estimate": 0.12,
+  "complexity_penalty": 0.0,
+  "cost_estimate": 0.03,
   "failures": [],
   "metrics": {
-    "artifact_presence": 1.0,
-    "complexity_penalty": 0.31,
-    "cost_penalty": 0.008,
+    "artifact_presence": 0.0,
+    "complexity_penalty": 0.0,
+    "cost_penalty": 0.002,
     "format_validity": 1.0,
     "generated_tool_usage": 0.0,
     "quality_gate_usage": 0.0,
     "requirement_coverage": 1.0,
     "scenario_success": 0.9999999999999999,
-    "self_review_usage": 0.75,
-    "workflow_completion": 0.9999999999999999
+    "self_review_usage": 0.0,
+    "workflow_completion": 0.44999999999999996
   },
-  "promotion_score": 0.7842600000000001,
-  "score": 0.7842600000000001,
+  "promotion_score": 0.48294000000000004,
+  "score": 0.48294000000000004,
   "split_policy": "weighted_train_validation_40_60",
-  "train_score": 0.7842600000000001,
-  "validation_score": 0.7842600000000001
+  "train_score": 0.48294000000000004,
+  "validation_score": 0.48294000000000004
 }

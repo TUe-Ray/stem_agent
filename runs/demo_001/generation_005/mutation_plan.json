@@ -2,18 +2,95 @@
   "failure_patterns": [],
   "proposed_mutations": [
     {
-      "expected_improvement": "Improve self-review evidence while staying inside the sandbox.",
-      "mutation_type": "create_tool",
+      "expected_improvement": "Explore a non-greedy candidate outside the current local hill climb.",
+      "mutation_type": "replace_genome",
+      "origin": null,
       "patch": {
-        "code": "from typing import Any, Dict\n\ndef run(input_data: Dict[str, Any]) -> Dict[str, Any]:\n    output = str(input_data.get(\"output\", \"\")).lower()\n    requirements = input_data.get(\"requirements\", [])\n    missing = []\n    for req in requirements:\n        req_text = str(req).lower()\n        important_words = [\n            word.strip(\".,:;!?()[]{}\")\n            for word in req_text.split()\n            if len(word.strip(\".,:;!?()[]{}\")) >= 5\n        ]\n        if important_words and not any(word in output for word in important_words):\n            missing.append(req)\n    total = max(len(requirements), 1)\n    score = 1.0 - (len(missing) / total)\n    return {\"passed\": len(missing) == 0, \"missing\": missing, \"score\": score}\n",
-        "description": "Check whether output appears to cover scenario requirements.",
-        "name": "requirement_sections_checker",
-        "test_code": "from requirement_sections_checker import run\n\ndef test_requirement_sections_checker_detects_missing_requirement():\n    result = run({\n        \"output\": \"Summary: hello\",\n        \"requirements\": [\"Must include a short summary\", \"Must include concrete steps\"],\n    })\n    assert result[\"passed\"] is False\n    assert \"Must include concrete steps\" in result[\"missing\"]\n\ndef test_requirement_sections_checker_accepts_covered_output():\n    result = run({\n        \"output\": \"Summary with concrete steps and final answer\",\n        \"requirements\": [\"Must include summary\", \"Must include concrete steps\"],\n    })\n    assert result[\"score\"] >= 0.5\n"
+        "genome": {
+          "environment": {
+            "artifact_purpose": {},
+            "cleanup_policy": "keep_run_artifacts",
+            "file_templates": {},
+            "required_artifacts": [],
+            "workspace_layout": []
+          },
+          "genome_version": 3,
+          "intra_test_reflection_enabled": false,
+          "max_intra_reflection_retries": 1,
+          "memory": {
+            "schema": {
+              "notes": "string"
+            },
+            "type": "ephemeral"
+          },
+          "name": "toy_structured_answer_zero_order_seed",
+          "quality_gates": [],
+          "retry_policy": {
+            "max_attempts": 1,
+            "revise_on_failure": false
+          },
+          "roles": [
+            {
+              "allowed_tools": [
+                "call_model"
+              ],
+              "description": "Fresh task solver created without relying on the prior genome shape.",
+              "instructions": "Solve the problem from the scenario description. Show useful intermediate work and give the final answer.",
+              "name": "solver"
+            }
+          ],
+          "scenario_name": "toy_structured_answer",
+          "self_evaluation": {
+            "enabled": true,
+            "rubric": [
+              "Must include a short summary",
+              "Must include concrete steps",
+              "Must include final answer"
+            ]
+          },
+          "stop_rule": {
+            "max_generations": 7,
+            "min_delta": 0.03,
+            "patience": 2
+          },
+          "task_diagnosis": {
+            "expected_task_solving_pattern": "Interpret the vague request, extract key information, and generate a structured, actionable output without requesting further clarifications.",
+            "initial_architecture_hypothesis": "A pipeline combining natural language understanding modules with structured response generation components to translate vague inputs into structured JSON outputs.",
+            "initial_evaluation_hypothesis": "Output correctness can be evaluated by compliance with provided constraints and alignment with scenario requirements, prioritizing actionable structured answers over clarifications.",
+            "likely_failure_modes": [
+              "Misinterpretation of vague instructions leading to irrelevant output",
+              "Asking clarification questions despite constraints",
+              "Producing unstructured or overly verbose responses"
+            ],
+            "likely_needed_capabilities": [
+              "Natural language understanding",
+              "Information extraction",
+              "Structured data formatting",
+              "Conciseness and relevance maintenance"
+            ],
+            "task_type": "general structured response generation"
+          },
+          "tools": {
+            "builtin": [
+              "call_model"
+            ],
+            "generated": []
+          },
+          "workflow": [
+            {
+              "action": "Solve the task from scratch using the scenario input and fixed evaluation criteria.",
+              "id": "solve_from_scratch",
+              "input_from": [],
+              "output_key": "final_output",
+              "role": "solver"
+            }
+          ]
+        }
       },
-      "rationale": "Add a safe checker tool that can support evolved quality gates.",
-      "risk": "Adds one generated tool and a small complexity penalty.",
-      "target": "tools.generated"
+      "rationale": "zero_order selected because search stagnated or archive diversity was useful.",
+      "risk": "Whole-genome replacement may remove useful organs and will be safety-checked before evaluation.",
+      "target": "genome"
     }
   ],
-  "summary": "Offline deterministic Nucleus plan based on repeated failure patterns."
+  "summary": "zero_order operator proposed a whole-genome candidate."
 }

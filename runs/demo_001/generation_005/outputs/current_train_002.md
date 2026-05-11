@@ -1,31 +1,34 @@
+```markdown
+# Organizing Messy Project Notes
+
 ## Summary
-Create a focused, useful response for: I need to organize my messy project notes..
+To effectively organize your messy project notes, the best approach is to categorize, prioritize, and digitize the information. This will improve readability, accessibility, and ease of updates.
 
-## Acceptance Criteria
-- The output names the goal.
-- The output gives concrete steps.
-- The output includes a final answer.
+## Concrete Steps
+1. **Gather All Notes**  
+   Collect all your notes, whether physical or digital, into one place for easy sorting.
 
-## Steps
-1. Clarify the desired outcome in one sentence.
-2. Break the work into the next visible actions.
-3. Check the draft against the scenario requirements.
-4. Deliver the smallest complete final answer.
+2. **Sort by Project or Topic**  
+   Group notes based on each project or topic to separate unrelated information.
 
-## QA Report
-Quality review: summary, steps, and final answer are present.
+3. **Categorize Within Each Group**  
+   Further divide notes into categories such as ideas, tasks, references, deadlines, and meeting notes.
 
-## Decision Log
-- Use a compact structured answer instead of a long exploratory exchange.
+4. **Prioritize and Highlight**  
+   Mark urgent and important notes using consistent symbols or colors for quick identification.
+
+5. **Digitize Physical Notes**  
+   Use a scanner or smartphone app to convert paper notes into digital formats, if applicable.
+
+6. **Choose an Organization Tool**  
+   Select a note-taking app or system (e.g., Notion, Evernote, OneNote, or simple folders and files) to store and manage notes digitally.
+
+7. **Create a Consistent Structure**  
+   Define folders, tags, or notebooks reflecting your categories to keep notes organized and searchable.
+
+8. **Regularly Review and Update**  
+   Set weekly or bi-weekly reminders to clean up and update your notes to maintain organization.
 
 ## Final Answer
-Use the plan above as the operating path, then revise only if a required section is missing.
-
-## Review Notes Applied
-
-## Review Notes
-- Checked 3 scenario requirements.
-- Missing sections: none.
-- Recommendation: revise final output only where required sections are absent.
-
-Final answer checked against the evolved review loop.
+To organize your messy project notes, start by gathering all notes and sorting them by project or topic. Categorize notes within each group and prioritize important items with visual markers. Digitize any physical notes and choose a suitable digital tool or system for ongoing management. Establish a clear folder/tag structure within the tool and commit to regular reviews to keep your notes organized and easily accessible.
+```

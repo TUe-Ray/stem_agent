@@ -1,31 +1,32 @@
-## Summary
-Create a focused, useful response for: I need to organize my messy project notes..
+```markdown
+# Summary
+To organize messy project notes effectively, it is important to establish a clear structure and use consistent tools or methods. This will improve accessibility, clarity, and productivity in managing your project information.
 
-## Acceptance Criteria
-- The output names the goal.
-- The output gives concrete steps.
-- The output includes a final answer.
+# Concrete Steps
+1. **Gather All Notes**  
+   Collect all existing notes from different sources (paper, digital files, emails, apps) into one place.
 
-## Steps
-1. Clarify the desired outcome in one sentence.
-2. Break the work into the next visible actions.
-3. Check the draft against the scenario requirements.
-4. Deliver the smallest complete final answer.
+2. **Choose an Organization Method**  
+   Decide on a method that suits your style: folders & subfolders, tagging system, or using note-taking software with search capabilities (e.g., Notion, Evernote, OneNote).
 
-## QA Report
-Quality review: summary, steps, and final answer are present.
+3. **Categorize Notes**  
+   Sort notes into categories such as:
+   - Project phases (Planning, Development, Testing)
+   - Topics or themes (Budget, Research, Meeting Minutes)
+   - Priority or status (To-Do, In Progress, Completed)
 
-## Decision Log
-- Use a compact structured answer instead of a long exploratory exchange.
+4. **Create a Consistent Naming Convention**  
+   Use clear and consistent titles and dates for notes, e.g., `YYYY-MM-DD_Topic_Summary`.
 
-## Final Answer
-Use the plan above as the operating path, then revise only if a required section is missing.
+5. **Digitize Physical Notes**  
+   If any notes are on paper, scan or photograph them and add them into your digital organization system.
 
-## Review Notes Applied
+6. **Consolidate and Summarize**  
+   Summarize key points in each category to reduce clutter and highlight actionable items.
 
-## Review Notes
-- Checked 3 scenario requirements.
-- Missing sections: none.
-- Recommendation: revise final output only where required sections are absent.
+7. **Regular Maintenance Routine**  
+   Schedule periodic reviews (weekly or monthly) to update, prune, and reorganize notes as the project progresses.
 
-Final answer checked against the evolved review loop.
+# Final Answer
+Organize your messy project notes by collecting all notes, selecting a suitable organization method (like folders or a note-taking app), categorizing notes by phase or topic, applying consistent naming, digitizing any physical notes, consolidating information with summaries, and setting up a regular maintenance routine to keep notes clear and useful.
+```

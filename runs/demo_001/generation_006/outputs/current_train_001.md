@@ -1,31 +1,35 @@
-## Summary
-Create a focused, useful response for: Help me plan a simple morning routine..
+```markdown
+### Summary
+This response provides a simple, actionable morning routine tailored for ease and positivity to help start the day effectively.
 
-## Acceptance Criteria
-- The output names the goal.
-- The output gives concrete steps.
-- The output includes a final answer.
+### Concrete Steps
+1. **Wake Up Early**  
+   Aim to wake up at a consistent time each morning (e.g., 6:30 AM) to regulate your body clock.
 
-## Steps
-1. Clarify the desired outcome in one sentence.
-2. Break the work into the next visible actions.
-3. Check the draft against the scenario requirements.
-4. Deliver the smallest complete final answer.
+2. **Hydrate Immediately**  
+   Drink a glass of water to kickstart your metabolism and rehydrate after sleep.
 
-## QA Report
-Quality review: summary, steps, and final answer are present.
+3. **Stretch or Light Exercise**  
+   Spend 5 to 10 minutes doing gentle stretches or light exercises like yoga or a short walk to energize your body.
 
-## Decision Log
-- Use a compact structured answer instead of a long exploratory exchange.
+4. **Personal Hygiene**  
+   Complete your usual hygiene routine such as brushing teeth, washing your face, and showering.
 
-## Final Answer
-Use the plan above as the operating path, then revise only if a required section is missing.
+5. **Healthy Breakfast**  
+   Eat a nutritious breakfast including protein, whole grains, and fruit to fuel your morning.
 
-## Review Notes Applied
+6. **Plan Your Day**  
+   Take 5 minutes to review your tasks or set 2-3 priorities for the day to stay focused.
 
-## Review Notes
-- Checked 3 scenario requirements.
-- Missing sections: none.
-- Recommendation: revise final output only where required sections are absent.
+### Final Answer
+A simple morning routine you can follow is:
 
-Final answer checked against the evolved review loop.
+- Wake up at 6:30 AM  
+- Drink a glass of water right after waking  
+- Do 5-10 minutes of stretching or light exercise  
+- Brush your teeth and wash your face  
+- Eat a balanced breakfast with protein and fruit  
+- Spend 5 minutes planning your main priorities for the day
+
+This routine is easy to maintain and helps you start your day energized and organized.
+```

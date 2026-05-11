@@ -1,31 +1,18 @@
+```markdown
+# Morning Routine Plan
+
 ## Summary
-Create a focused, useful response for: Help me plan a simple morning routine..
+This is a simple, effective morning routine designed to start your day positively, boosting energy and mindfulness without complexity.
 
-## Acceptance Criteria
-- The output names the goal.
-- The output gives concrete steps.
-- The output includes a final answer.
-
-## Steps
-1. Clarify the desired outcome in one sentence.
-2. Break the work into the next visible actions.
-3. Check the draft against the scenario requirements.
-4. Deliver the smallest complete final answer.
-
-## QA Report
-Quality review: summary, steps, and final answer are present.
-
-## Decision Log
-- Use a compact structured answer instead of a long exploratory exchange.
+## Concrete Steps
+1. **Wake up early** (e.g., 6:30 AM) - Give yourself enough time to wake up without rush.
+2. **Hydrate** - Drink a glass of water to kickstart your metabolism.
+3. **Stretch or light exercise** (5-10 minutes) - Gentle movements to awaken your body.
+4. **Personal hygiene** - Brush teeth, wash face, shower if desired.
+5. **Healthy breakfast** - Eat something nutritious to fuel your morning.
+6. **Plan your day** (5 minutes) - Review your top priorities or schedule.
+7. **Mindfulness or meditation** (optional, 5 minutes) - Center your mind and reduce stress.
 
 ## Final Answer
-Use the plan above as the operating path, then revise only if a required section is missing.
-
-## Review Notes Applied
-
-## Review Notes
-- Checked 3 scenario requirements.
-- Missing sections: none.
-- Recommendation: revise final output only where required sections are absent.
-
-Final answer checked against the evolved review loop.
+A simple morning routine consists of waking up early, hydrating, doing light exercise, completing personal hygiene, having a healthy breakfast, briefly planning your day, and optionally practicing mindfulness. This balanced approach helps you feel energized, organized, and calm to start your day well.
+```

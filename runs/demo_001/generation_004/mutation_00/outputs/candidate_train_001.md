@@ -1,31 +1,39 @@
+```markdown
+# Morning Routine Planning
+
 ## Summary
-Create a focused, useful response for: Help me plan a simple morning routine..
+A simple morning routine can help start your day with focus, energy, and calmness. The routine should be short, easy to follow, and cover key areas like waking up, hygiene, nourishment, and preparation for the day.
 
-## Acceptance Criteria
-- The output names the goal.
-- The output gives concrete steps.
-- The output includes a final answer.
+## Concrete Steps
+1. **Wake Up (6:30 - 7:00 AM):**  
+   Set an alarm for a consistent time. Avoid snoozing to build a steady habit.
 
-## Steps
-1. Clarify the desired outcome in one sentence.
-2. Break the work into the next visible actions.
-3. Check the draft against the scenario requirements.
-4. Deliver the smallest complete final answer.
+2. **Hydrate (Immediately):**  
+   Drink a glass of water to rehydrate after sleep.
 
-## QA Report
-Quality review: summary, steps, and final answer are present.
+3. **Stretch or Light Exercise (5 minutes):**  
+   Do simple stretches or a quick walk to wake up your body.
 
-## Decision Log
-- Use a compact structured answer instead of a long exploratory exchange.
+4. **Personal Hygiene (10 minutes):**  
+   Brush your teeth, wash your face, and take a shower if desired.
+
+5. **Healthy Breakfast (15 minutes):**  
+   Eat a balanced meal with proteins, fruits, and whole grains.
+
+6. **Plan Your Day (5 minutes):**  
+   Review your top 3 tasks or goals to focus on during the day.
+
+7. **Mindfulness or Meditation (optional, 5 minutes):**  
+   Spend a few minutes in quiet meditation or deep breathing to clear your mind.
 
 ## Final Answer
-Use the plan above as the operating path, then revise only if a required section is missing.
+**Simple Morning Routine Example:**  
+- 6:30 AM: Wake up and drink a glass of water  
+- 6:35 AM: Stretch for 5 minutes  
+- 6:40 AM: Brush teeth and wash face  
+- 6:50 AM: Eat a healthy breakfast  
+- 7:05 AM: Review daily goals  
+- 7:10 AM: Optional meditation or mindfulness exercise
 
-## Review Notes Applied
-
-## Review Notes
-- Checked 3 scenario requirements.
-- Missing sections: none.
-- Recommendation: revise final output only where required sections are absent.
-
-Final answer checked against the evolved review loop.
+Implementing this routine consistently will help you start your day refreshed and organized.
+```

@@ -2,21 +2,14 @@
   "failure_patterns": [],
   "proposed_mutations": [
     {
-      "expected_improvement": "Improve requirement coverage and reduce missing sections.",
-      "mutation_type": "add_workflow_step",
-      "patch": {
-        "action": "Review the draft or final output against the scenario requirements and write missing sections or revision notes.",
-        "id": "review_against_requirements",
-        "input_from": [
-          "solve_task"
-        ],
-        "output_key": "review_notes",
-        "role": "Founder"
-      },
-      "rationale": "The harness currently produces final output without explicit review.",
-      "risk": "Adds cost and complexity.",
-      "target": "workflow"
+      "expected_improvement": "",
+      "mutation_type": "modify_retry_policy",
+      "origin": null,
+      "patch": {},
+      "rationale": "Current retry policy with only 1 attempt might limit the solver's ability to recover from failures; increasing max_attempts could allow more retries and improve robustness.",
+      "risk": "",
+      "target": ""
     }
   ],
-  "summary": "Offline deterministic Nucleus plan based on repeated failure patterns."
+  "summary": "Current retry policy with only 1 attempt might limit the solver's ability to recover from failures; increasing max_attempts could allow more retries and improve robustness."
 }

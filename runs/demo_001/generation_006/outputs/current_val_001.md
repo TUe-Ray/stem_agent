@@ -1,31 +1,35 @@
-## Summary
-Create a focused, useful response for: Help me prepare for a difficult meeting..
+```markdown
+# Summary  
+Preparing for a difficult meeting requires understanding the meeting's purpose, anticipating challenges, organizing your points clearly, and planning how to respond effectively. This preparation helps you stay confident, communicate clearly, and achieve your goals despite potential tension or conflict.
 
-## Acceptance Criteria
-- The output names the goal.
-- The output gives concrete steps.
-- The output includes a final answer.
+# Concrete Steps  
+1. **Clarify the meeting purpose and goals:**  
+   - Identify the main topics and what you want to achieve.  
+   - Understand the agenda or issues to be discussed.  
 
-## Steps
-1. Clarify the desired outcome in one sentence.
-2. Break the work into the next visible actions.
-3. Check the draft against the scenario requirements.
-4. Deliver the smallest complete final answer.
+2. **Gather relevant information:**  
+   - Collect documents, data, or facts that support your positions.  
+   - Review any previous communications or background related to the meeting.  
 
-## QA Report
-Quality review: summary, steps, and final answer are present.
+3. **Identify potential challenges or objections:**  
+   - Think about difficult questions or opposing viewpoints you might face.  
+   - Prepare calm, factual responses or compromises to address these.  
 
-## Decision Log
-- Use a compact structured answer instead of a long exploratory exchange.
+4. **Plan your key messages:**  
+   - Outline the main points you want to communicate clearly and concisely.  
+   - Practice stating them calmly and confidently.  
 
-## Final Answer
-Use the plan above as the operating path, then revise only if a required section is missing.
+5. **Develop emotional and mental strategies:**  
+   - Practice deep breathing or mindfulness to stay composed.  
+   - Visualize a positive outcome and your successful participation.  
 
-## Review Notes Applied
+6. **Prepare logistics:**  
+   - Confirm meeting time, location, and participants.  
+   - Ensure any needed devices or materials are ready.  
 
-## Review Notes
-- Checked 3 scenario requirements.
-- Missing sections: none.
-- Recommendation: revise final output only where required sections are absent.
+7. **Rehearse if possible:**  
+   - Role-play with a trusted colleague or friend to simulate challenging parts.  
 
-Final answer checked against the evolved review loop.
+# Final Answer  
+To prepare effectively for a difficult meeting, start by clarifying its purpose and goals. Gather all necessary information and anticipate challenges by thinking through difficult questions or opposition. Organize your key messages to deliver them clearly, and develop strategies to maintain composure. Confirm logistical details and rehearse the meeting if possible. This structured preparation will boost your confidence and improve your ability to handle the meeting successfully.
+```

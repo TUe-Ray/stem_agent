@@ -1,31 +1,38 @@
+```markdown
 ## Summary
-Create a focused, useful response for: Help me plan a simple morning routine..
+This response provides a simple and actionable morning routine plan designed to help you start your day efficiently and positively.
 
-## Acceptance Criteria
-- The output names the goal.
-- The output gives concrete steps.
-- The output includes a final answer.
+## Concrete Steps
+1. **Wake Up (6:30 AM)**  
+   Set a consistent wake-up time to regulate your body's internal clock.
 
-## Steps
-1. Clarify the desired outcome in one sentence.
-2. Break the work into the next visible actions.
-3. Check the draft against the scenario requirements.
-4. Deliver the smallest complete final answer.
+2. **Hydrate (6:35 AM)**  
+   Drink a glass of water to kickstart metabolism and rehydrate after sleep.
 
-## QA Report
-Quality review: summary, steps, and final answer are present.
+3. **Stretch or Light Exercise (6:40 AM)**  
+   Spend 5-10 minutes stretching, yoga, or light cardio to wake up your muscles.
 
-## Decision Log
-- Use a compact structured answer instead of a long exploratory exchange.
+4. **Personal Hygiene (6:50 AM)**  
+   Brush your teeth, wash your face, and take a shower.
+
+5. **Healthy Breakfast (7:10 AM)**  
+   Eat a balanced breakfast including protein, healthy fats, and fruits or vegetables.
+
+6. **Plan Your Day (7:30 AM)**  
+   Take 5-10 minutes to review main tasks or goals for the day.
+
+7. **Mindfulness or Quiet Time (7:40 AM)**  
+   Spend a few minutes meditating, journaling, or simply breathing deeply.
 
 ## Final Answer
-Use the plan above as the operating path, then revise only if a required section is missing.
+**Simple Morning Routine Example:**  
+- 6:30 AM: Wake up  
+- 6:35 AM: Drink water  
+- 6:40 AM: Stretch/light exercise (5-10 min)  
+- 6:50 AM: Personal hygiene  
+- 7:10 AM: Healthy breakfast  
+- 7:30 AM: Plan your day (5-10 min)  
+- 7:40 AM: Mindfulness or quiet time (5 min)  
 
-## Review Notes Applied
-
-## Review Notes
-- Checked 3 scenario requirements.
-- Missing sections: none.
-- Recommendation: revise final output only where required sections are absent.
-
-Final answer checked against the evolved review loop.
+This routine balances physical activity, nutrition, planning, and mental well-being to prepare you for a productive day.
+```

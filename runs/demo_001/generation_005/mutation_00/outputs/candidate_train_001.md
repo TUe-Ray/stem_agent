@@ -1,31 +1,37 @@
+```markdown
+# Morning Routine Planning
+
 ## Summary
-Create a focused, useful response for: Help me plan a simple morning routine..
+This plan provides a simple and effective morning routine to help you start your day positively and productively. It focuses on key activities to wake up, energize, and prepare yourself for the day ahead without overwhelming complexity.
 
-## Acceptance Criteria
-- The output names the goal.
-- The output gives concrete steps.
-- The output includes a final answer.
+## Concrete Steps
+1. **Wake Up Early**  
+   Set an alarm to wake up at a consistent early time (e.g., 6:30 AM) to create a stable schedule.
 
-## Steps
-1. Clarify the desired outcome in one sentence.
-2. Break the work into the next visible actions.
-3. Check the draft against the scenario requirements.
-4. Deliver the smallest complete final answer.
+2. **Hydrate**  
+   Drink a glass of water right after waking up to rehydrate your body.
 
-## QA Report
-Quality review: summary, steps, and final answer are present.
+3. **Stretch or Light Exercise (5-10 minutes)**  
+   Do gentle stretching or a short exercise routine (e.g., yoga, jumping jacks) to boost circulation and energy.
 
-## Decision Log
-- Use a compact structured answer instead of a long exploratory exchange.
+4. **Personal Hygiene**  
+   Brush your teeth, wash your face, and take a shower if desired.
+
+5. **Healthy Breakfast**  
+   Eat a nutritious breakfast to fuel your body and brain (e.g., fruit, oatmeal, eggs).
+
+6. **Plan Your Day (5 minutes)**  
+   Review your main tasks and goals for the day, possibly by writing a quick to-do list.
 
 ## Final Answer
-Use the plan above as the operating path, then revise only if a required section is missing.
+Here is a simple morning routine to follow daily:
 
-## Review Notes Applied
+- Wake up at a consistent early time (e.g., 6:30 AM)  
+- Drink a glass of water immediately after waking up  
+- Spend 5-10 minutes on stretching or light exercise  
+- Complete your personal hygiene routine  
+- Eat a healthy breakfast  
+- Spend 5 minutes planning your day with a to-do list or goal review  
 
-## Review Notes
-- Checked 3 scenario requirements.
-- Missing sections: none.
-- Recommendation: revise final output only where required sections are absent.
-
-Final answer checked against the evolved review loop.
+This routine will help you start your mornings energized, focused, and ready for the day ahead.
+```

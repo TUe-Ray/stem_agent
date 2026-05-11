@@ -1,31 +1,37 @@
+```markdown
+# Morning Routine Planning
+
 ## Summary
-Create a focused, useful response for: Help me plan a simple morning routine..
+A simple, effective morning routine helps start the day with energy and focus. This plan includes basic steps to wake up, refresh, energize, and prepare for the day ahead without being overwhelming.
 
-## Acceptance Criteria
-- The output names the goal.
-- The output gives concrete steps.
-- The output includes a final answer.
+## Concrete Steps
+1. **Wake Up Consistently**  
+   Set a regular wake-up time (e.g., 7:00 AM) to regulate your body clock.
 
-## Steps
-1. Clarify the desired outcome in one sentence.
-2. Break the work into the next visible actions.
-3. Check the draft against the scenario requirements.
-4. Deliver the smallest complete final answer.
+2. **Hydrate Immediately**  
+   Drink a glass of water to rehydrate your body after sleep.
 
-## QA Report
-Quality review: summary, steps, and final answer are present.
+3. **Light Movement or Stretching**  
+   Spend 5–10 minutes doing light stretching or a short walk to wake your muscles and improve circulation.
 
-## Decision Log
-- Use a compact structured answer instead of a long exploratory exchange.
+4. **Personal Hygiene**  
+   Brush your teeth and wash your face to feel refreshed.
+
+5. **Healthy Breakfast**  
+   Eat a balanced breakfast with protein, fruits, or whole grains to fuel your morning.
+
+6. **Plan Your Day Briefly**  
+   Take 5 minutes to review your tasks or set priorities to foster a focused mindset.
 
 ## Final Answer
-Use the plan above as the operating path, then revise only if a required section is missing.
+A simple morning routine, lasting about 30 minutes, can be:
 
-## Review Notes Applied
+- Wake up at 7:00 AM  
+- Drink a glass of water  
+- Stretch or walk for 5–10 minutes  
+- Brush teeth and wash face  
+- Eat a healthy breakfast  
+- Review your day’s priorities for 5 minutes  
 
-## Review Notes
-- Checked 3 scenario requirements.
-- Missing sections: none.
-- Recommendation: revise final output only where required sections are absent.
-
-Final answer checked against the evolved review loop.
+Following these steps daily will promote better energy, clarity, and productivity for your day.
+```

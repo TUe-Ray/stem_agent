@@ -1,54 +1,49 @@
-genome_version: 3
-name: toy_structured_answer_seed
+genome_version: 2
+name: toy_structured_answer_zero_order_seed
 scenario_name: toy_structured_answer
 task_diagnosis:
-  task_type: general structured response generation
-  expected_task_solving_pattern: Read the input, extract requirements, draft an answer,
-    check it against scenario requirements, and return a final output.
+  expected_task_solving_pattern: Interpret the scenario description and constraints
+    to generate a structured JSON answer that addresses the request without requiring
+    further clarifications, focusing on actionable and relevant content.
+  initial_architecture_hypothesis: A language model-based agent that parses scenario
+    inputs to identify task type, constraints, and required outputs, then generates
+    corresponding structured responses directly.
+  initial_evaluation_hypothesis: Successful outputs will conform to the requested
+    structured format, avoid unnecessary clarifications, and produce actionable information
+    consistent with scenario details.
   likely_failure_modes:
-  - missing required output sections
-  - low actionability
+  - Asking unnecessary clarification questions
+  - Producing vague or unstructured responses
+  - Ignoring constraints about actionability
+  - Misinterpreting the scenario context or requirements
   likely_needed_capabilities:
-  - structured drafting
-  - requirement checking
-  initial_architecture_hypothesis: Start with a Founder role, then evolve self-evaluation,
-    environment artifacts, and review steps only if fitness shows gaps.
-  initial_evaluation_hypothesis: Use immutable Guardian fitness for coverage, usefulness,
-    format, robustness, cost, and complexity; use genome self-evaluation only inside
-    candidate harnesses.
+  - Natural language understanding
+  - Structured data generation
+  - Constraint adherence
+  - Scenario interpretation
+  task_type: general structured response generation
 roles:
-- name: Founder
-  description: A general-purpose problem solver.
-  instructions: Solve the task directly and return a useful answer.
+- name: solver
+  description: Fresh task solver created without relying on the prior genome shape.
+  instructions: Solve the problem from the scenario description. Show useful intermediate
+    work and give the final answer.
   allowed_tools:
   - call_model
 workflow:
-- id: understand_task
-  role: Founder
-  action: Read the task input and identify what is being asked.
+- id: solve_from_scratch
+  role: solver
+  action: Solve the task from scratch using the scenario input and fixed evaluation
+    criteria.
   input_from: []
-  output_key: understanding
-- id: solve_task
-  role: Founder
-  action: Produce the final output.
-  input_from:
-  - understanding
   output_key: final_output
-- id: review_against_requirements
-  role: Founder
-  action: Review the draft or final output against the scenario requirements and write
-    missing sections or revision notes.
-  input_from:
-  - solve_task
-  output_key: review_notes
 tools:
   builtin:
   - call_model
   generated: []
 memory:
-  type: ephemeral
   schema:
     notes: string
+  type: ephemeral
 quality_gates: []
 self_evaluation:
   enabled: true
@@ -61,37 +56,13 @@ retry_policy:
   revise_on_failure: false
 stop_rule:
   max_generations: 7
-  patience: 2
   min_delta: 0.03
+  patience: 2
 environment:
-  workspace_layout:
-  - artifacts
-  required_artifacts:
-  - artifacts/acceptance_criteria.md
-  - artifacts/draft_output.md
-  - artifacts/qa_report.md
-  - artifacts/decision_log.md
-  - artifacts/final_output.md
-  artifact_purpose:
-    artifacts/acceptance_criteria.md: Track scenario requirements.
-    artifacts/draft_output.md: Hold the candidate draft.
-    artifacts/qa_report.md: Record mutable self-evaluation notes.
-    artifacts/decision_log.md: Explain important harness decisions.
-    artifacts/final_output.md: Store the final response.
-  file_templates:
-    artifacts/acceptance_criteria.md: '# Acceptance Criteria
-
-      '
-    artifacts/draft_output.md: '# Draft Output
-
-      '
-    artifacts/qa_report.md: '# QA Report
-
-      '
-    artifacts/decision_log.md: '# Decision Log
-
-      '
-    artifacts/final_output.md: '# Final Output
-
-      '
+  workspace_layout: []
+  required_artifacts: []
+  artifact_purpose: {}
+  file_templates: {}
   cleanup_policy: keep_run_artifacts
+intra_test_reflection_enabled: false
+max_intra_reflection_retries: 1

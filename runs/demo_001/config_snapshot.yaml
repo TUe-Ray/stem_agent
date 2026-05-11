@@ -37,6 +37,12 @@ scenario:
   - name: cost_efficiency
     weight: 0.1
     description: Does it avoid unnecessary steps?
+  evaluation_criteria: []
+  signal_policy:
+    layer_1_enabled: true
+    expose_aggregate_score: true
+    expose_score_delta: true
+    expose_direction: true
   evolution:
     max_generations: 7
     patience: 2
@@ -46,22 +52,37 @@ scenario:
     max_workflow_steps: 8
     max_roles: 6
     max_environment_artifacts: 8
+  domain_tags: []
+  convergence_policy:
+    plateau_window: 5
+    plateau_epsilon: 0.01
+    skill_saturation_threshold: 0.7
+    hidden_eval_stability_window: 3
+    hidden_eval_stability_epsilon: 0.01
+    absolute_score_threshold: 1.01
+    max_generations: 7
+    budget_token_limit: 200000
+  convergence_policy_explicit: false
 train_cases:
 - id: train_001
   input:
     user_request: Help me plan a simple morning routine.
   reference_notes: Should include summary, steps, and final recommendation.
+  expected_output: null
 - id: train_002
   input:
     user_request: I need to organize my messy project notes.
   reference_notes: Should give concrete organization method.
+  expected_output: null
 validation_cases:
 - id: val_001
   input:
     user_request: Help me prepare for a difficult meeting.
   reference_notes: Should be structured and actionable.
+  expected_output: null
 settings:
-  model: gpt-5.5
+  model: gpt-4.1-mini
+  openai_endpoint: auto
   max_cost_usd: 2.0
   workspace_dir: workspace
-  offline_mode: true
+  test_mode: false

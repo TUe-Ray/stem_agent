@@ -1,22 +1,31 @@
+```markdown
+# Morning Routine Plan
+
 ## Summary
-Create a focused, useful response for: Help me plan a simple morning routine..
+A simple morning routine helps start the day with focus, energy, and calmness. This plan includes practical, easy steps to wake up refreshed, prepare your body and mind, and set a positive tone for the rest of the day.
 
-## Acceptance Criteria
-- The output names the goal.
-- The output gives concrete steps.
-- The output includes a final answer.
+## Concrete Steps
+1. **Wake Up Early**  
+   Set a consistent wake-up time (e.g., 6:30 AM) to regulate your internal clock.
 
-## Steps
-1. Clarify the desired outcome in one sentence.
-2. Break the work into the next visible actions.
-3. Check the draft against the scenario requirements.
-4. Deliver the smallest complete final answer.
+2. **Hydrate Immediately**  
+   Drink a glass of water right after waking up to rehydrate your body.
 
-## QA Report
-Quality review: summary, steps, and final answer are present.
+3. **Stretch or Light Exercise (5-10 minutes)**  
+   Do gentle stretching or a brief walk to wake up your muscles and improve circulation.
 
-## Decision Log
-- Use a compact structured answer instead of a long exploratory exchange.
+4. **Personal Hygiene (10-15 minutes)**  
+   Brush your teeth, wash your face, and take a shower if desired.
+
+5. **Healthy Breakfast**  
+   Eat a simple, balanced breakfast (e.g., oatmeal, fruit, or eggs) to fuel your body.
+
+6. **Plan Your Day (5 minutes)**  
+   Review key tasks or set goals for the day to focus your mind.
+
+7. **Mindfulness or Breathing Exercise (2-5 minutes)**  
+   Practice deep breathing or a short meditation to calm and center yourself.
 
 ## Final Answer
-Use the plan above as the operating path, then revise only if a required section is missing.
+To plan a simple morning routine, follow these actionable steps daily: wake up at a fixed time, hydrate, do light exercise, perform personal hygiene, have a healthy breakfast, plan your day, and practice mindfulness briefly. This structure ensures a balanced start that supports physical health and mental clarity.
+```

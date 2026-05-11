@@ -3,19 +3,23 @@ name: toy_structured_answer_seed
 scenario_name: toy_structured_answer
 task_diagnosis:
   task_type: general structured response generation
-  expected_task_solving_pattern: Read the input, extract requirements, draft an answer,
-    check it against scenario requirements, and return a final output.
+  expected_task_solving_pattern: Interpret vague request, map it to structured format,
+    generate clear, actionable structured output
   likely_failure_modes:
-  - missing required output sections
-  - low actionability
+  - Misinterpretation of vague request
+  - Overly verbose or unstructured responses
+  - Asking unnecessary clarifying questions
+  - Failure to produce actionable output
   likely_needed_capabilities:
-  - structured drafting
-  - requirement checking
-  initial_architecture_hypothesis: Start with a Founder role, then evolve self-evaluation,
-    environment artifacts, and review steps only if fitness shows gaps.
-  initial_evaluation_hypothesis: Use immutable Guardian fitness for coverage, usefulness,
-    format, robustness, cost, and complexity; use genome self-evaluation only inside
-    candidate harnesses.
+  - Natural language understanding
+  - Information structuring
+  - Conciseness and clarity in output
+  - Knowledge of JSON schema and formatting
+  initial_architecture_hypothesis: A natural language understanding module followed
+    by a structured output generator that maps extracted intent and constraints into
+    JSON format
+  initial_evaluation_hypothesis: Evaluate correctness and usefulness of structured
+    output against scenario constraints and clarity of actionable items
 roles:
 - name: Founder
   description: A general-purpose problem solver.
@@ -59,3 +63,5 @@ environment:
   artifact_purpose: {}
   file_templates: {}
   cleanup_policy: keep_run_artifacts
+intra_test_reflection_enabled: false
+max_intra_reflection_retries: 1
