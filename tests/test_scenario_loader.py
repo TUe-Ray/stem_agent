@@ -8,7 +8,9 @@ def test_scenario_loader_reads_yaml_and_jsonl_cases():
 
     assert bundle.scenario.name == "toy_structured_answer"
     assert len(bundle.train_cases) == 2
-    assert len(bundle.validation_cases) == 1
+    assert len(bundle.validation_cases) == 2
+    assert len(bundle.external_benchmark_cases) == 2
+    assert len(bundle.final_holdout_cases) == 2
     assert bundle.train_cases[0].input["user_request"]
 
 

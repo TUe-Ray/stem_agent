@@ -344,7 +344,7 @@ class Guardian:
         return score
 
     def should_promote(self, old_score: float, new_score: float, min_delta: float) -> bool:
-        return (new_score - old_score) >= min_delta
+        return (new_score - old_score) + 1e-9 >= min_delta
 
     def rollback(self, version_id: str) -> None:
         # File rollback is handled by VersionStore; this method documents the kernel boundary.

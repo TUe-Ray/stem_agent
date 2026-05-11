@@ -4,13 +4,16 @@ from pydantic import BaseModel
 
 
 class EvaluatorWeights(BaseModel):
-    requirement_coverage: float = 0.28
-    format_validity: float = 0.14
-    artifact_presence: float = 0.12
-    self_review_usage: float = 0.16
-    workflow_completion: float = 0.14
-    quality_gate_usage: float = 0.08
-    generated_tool_usage: float = 0.08
+    requirement_coverage: float = 0.20
+    format_validity: float = 0.08
+    constraint_adherence: float = 0.10
+    actionability: float = 0.16
+    input_specificity: float = 0.14
+    artifact_presence: float = 0.08
+    self_review_usage: float = 0.14
+    workflow_completion: float = 0.08
+    quality_gate_usage: float = 0.10
+    generated_tool_usage: float = 0.04
     cost_penalty: float = 0.03
     complexity_penalty: float = 0.05
 
@@ -18,6 +21,9 @@ class EvaluatorWeights(BaseModel):
         return {
             "requirement_coverage": self.requirement_coverage,
             "format_validity": self.format_validity,
+            "constraint_adherence": self.constraint_adherence,
+            "actionability": self.actionability,
+            "input_specificity": self.input_specificity,
             "artifact_presence": self.artifact_presence,
             "self_review_usage": self.self_review_usage,
             "workflow_completion": self.workflow_completion,

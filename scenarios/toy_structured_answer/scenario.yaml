@@ -44,9 +44,12 @@ success_criteria:
 evolution:
   max_generations: 7
   patience: 2
-  min_delta: 0.03
+  min_delta: 0.005
   max_mutations_per_generation: 4
-  max_cost_usd: 2.0
+  max_cost_usd: 5.0
   max_workflow_steps: 8
   max_roles: 6
   max_environment_artifacts: 8
+  signal_mode: "internal_plus_external_score"
+  external_signal_weight: 0.25
+  calibrator_max_weight_delta: 0.03

@@ -1,0 +1,2 @@
+{"id":"external_001","input":{"user_request":"Help me make a 30-minute plan to clean up a chaotic inbox before a client call, focusing only on messages that could change today's decisions."},"reference_notes":"External dev case for specificity, prioritization, and actionability."}
+{"id":"external_002","input":{"user_request":"Draft a structured answer for choosing between exercising, meal prep, and sleep when I have only 45 minutes tonight and feel exhausted."},"reference_notes":"External dev case should reward tradeoffs and a practical final recommendation."}

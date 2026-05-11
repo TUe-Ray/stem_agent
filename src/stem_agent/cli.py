@@ -222,13 +222,26 @@ def inspect(run_path: Path) -> None:
 def compare(run_path: Path) -> None:
     baseline = _read_eval(run_path / "generation_000" / "eval_result.json")
     final = _read_eval(run_path / "final_evaluation" / "eval_result.json")
-    typer.echo(f"Baseline score: {baseline['promotion_score']:.4f}")
+    typer.echo(f"Baseline score: {baseline['promotion_score']:.6f}")
     baseline_score_path = run_path / "baseline_genome_score.json"
     if baseline_score_path.exists():
         baseline_score = json.loads(baseline_score_path.read_text(encoding="utf-8"))
-        typer.echo(f"Baseline genome score: {float(baseline_score['score']):.4f}")
-    typer.echo(f"Final score: {final['promotion_score']:.4f}")
-    typer.echo(f"Improvement: {final['promotion_score'] - baseline['promotion_score']:.4f}")
+        typer.echo(f"Baseline genome score: {float(baseline_score['score']):.6f}")
+    typer.echo(f"Final score: {final['promotion_score']:.6f}")
+    typer.echo(f"Improvement: {final['promotion_score'] - baseline['promotion_score']:.6f}")
+    baseline_external_path = run_path / "generation_000" / "external_benchmark" / "eval_result.json"
+    final_external_path = run_path / "final_evaluation" / "external_benchmark" / "eval_result.json"
+    if baseline_external_path.exists() or final_external_path.exists():
+        baseline_external = _read_eval(baseline_external_path) if baseline_external_path.exists() else None
+        final_external = _read_eval(final_external_path) if final_external_path.exists() else None
+        typer.echo(
+            "External benchmark: "
+            f"{_optional_score(baseline_external)} -> {_optional_score(final_external)}"
+        )
+    holdout_path = run_path / "final_holdout" / "eval_result.json"
+    if holdout_path.exists():
+        holdout = _read_eval(holdout_path)
+        typer.echo(f"Final holdout score: {holdout['promotion_score']:.6f}")
     lineage_path = run_path / "lineage.jsonl"
     if lineage_path.exists():
         promoted = []
@@ -416,6 +429,12 @@ def _read_eval(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _optional_score(eval_result: dict | None) -> str:
+    if eval_result is None:
+        return "n/a"
+    return f"{float(eval_result['promotion_score']):.6f}"
+
+
 def _parse_signal_policy_overrides(items: list[str]) -> dict[str, bool]:
     overrides: dict[str, bool] = {}
     for item in items:
@@ -529,10 +548,6 @@ def _infer_scenario_path(frozen_genome: Path) -> Path:
     return Path("scenarios/toy_structured_answer")
 
 
-if __name__ == "__main__":
-    app()
-
-
 @app.command("audit-signal-leak")
 def audit_signal_leak(run_dir: Path, scenario_path: Path) -> None:
     bundle = load_scenario(scenario_path)
@@ -544,3 +559,7 @@ def audit_signal_leak(run_dir: Path, scenario_path: Path) -> None:
     for path in nucleus_visible_artifact_paths(run_dir):
         auditor.assert_no_leak_in_file(path)
     typer.echo("Signal leak audit: PASS")
+
+
+if __name__ == "__main__":
+    app()

@@ -56,11 +56,16 @@ class EvolutionLoop:
         signal_mode: str,
         external_signal_weight: float,
     ) -> EvaluationResult:
-        if signal_mode != "internal_plus_external_score" or external_result is None:
-            return internal_result.model_copy(update={"metrics": {**internal_result.metrics, "internal_promotion_score": float(internal_result.promotion_score), "external_dev_score": 0.0, "external_signal_weight": 0.0, "signal_mode": signal_mode}, "split_policy": f"{internal_result.split_policy}+{signal_mode}"})
+        signal_metrics = {f"signal_mode_{signal_mode}": 1.0}
+        if external_result is None:
+            return internal_result.model_copy(update={"metrics": {**internal_result.metrics, "internal_promotion_score": float(internal_result.promotion_score), "external_dev_score": 0.0, "external_signal_weight": 0.0, **signal_metrics}, "split_policy": f"{internal_result.split_policy}+{signal_mode}"})
         external_score = float(external_result.train_score)
+        if signal_mode == "calibrated_internal":
+            return internal_result.model_copy(update={"metrics": {**internal_result.metrics, "internal_promotion_score": float(internal_result.promotion_score), "external_dev_score": external_score, "external_signal_weight": 0.0, **signal_metrics}, "split_policy": f"{internal_result.split_policy}+calibrated_internal_observed"})
+        if signal_mode != "internal_plus_external_score":
+            return internal_result.model_copy(update={"metrics": {**internal_result.metrics, "internal_promotion_score": float(internal_result.promotion_score), "external_dev_score": external_score, "external_signal_weight": 0.0, **signal_metrics}, "split_policy": f"{internal_result.split_policy}+{signal_mode}"})
         combined = (1.0 - external_signal_weight) * float(internal_result.promotion_score) + external_signal_weight * external_score
-        return internal_result.model_copy(update={"score": combined, "promotion_score": combined, "metrics": {**internal_result.metrics, "internal_promotion_score": float(internal_result.promotion_score), "external_dev_score": external_score, "external_signal_weight": float(external_signal_weight), "signal_mode": signal_mode}, "split_policy": "internal_plus_external_score_weighted"})
+        return internal_result.model_copy(update={"score": combined, "promotion_score": combined, "metrics": {**internal_result.metrics, "internal_promotion_score": float(internal_result.promotion_score), "external_dev_score": external_score, "external_signal_weight": float(external_signal_weight), **signal_metrics}, "split_policy": "internal_plus_external_score_weighted"})
 
     def _fitness_vector(self, result: EvaluationResult) -> dict[str, float]:
         return {
@@ -1181,6 +1186,13 @@ class EvolutionLoop:
             event_sink=event_sink,
         )
         self._write_json(final_dir / "eval_result.json", final_result.model_dump(mode="json"))
+        self._run_final_holdout(
+            best_genome,
+            bundle,
+            run_dir,
+            generation=generation,
+            event_sink=event_sink,
+        )
         self._write_json(run_dir / "run_metadata.json", self._run_metadata(final_result))
         lineage.record_freeze(
             generation,
@@ -1389,84 +1401,26 @@ class EvolutionLoop:
             bundle.scenario,
             workspace_dir=workspace_dir,
         )
-        train_runs = []
-        for case in bundle.train_cases:
-            self._emit_event(
-                event_sink,
-                {
-                    "event": "case_start",
-                    "generation": generation,
-                    "label": label,
-                    "split": "train",
-                    "case_id": case.id,
-                    "mutation_index": mutation_index,
-                },
-            )
-            run = self.harness_runner.run_case(
-                harness,
-                case,
-                trace_sink=self._case_trace_sink(
-                    event_sink,
-                    generation=generation,
-                    label=label,
-                    split="train",
-                    case_id=case.id,
-                    mutation_index=mutation_index,
-                ),
-                run_dir=run_root,
-            )
-            train_runs.append(run)
-            self._emit_event(
-                event_sink,
-                {
-                    "event": "case_complete",
-                    "generation": generation,
-                    "label": label,
-                    "split": "train",
-                    "case_id": case.id,
-                    "mutation_index": mutation_index,
-                    "output_summary": self._short_output_summary(run.final_output),
-                },
-            )
-        validation_runs = []
-        for case in bundle.validation_cases:
-            self._emit_event(
-                event_sink,
-                {
-                    "event": "case_start",
-                    "generation": generation,
-                    "label": label,
-                    "split": "validation",
-                    "case_id": case.id,
-                    "mutation_index": mutation_index,
-                },
-            )
-            run = self.harness_runner.run_case(
-                harness,
-                case,
-                trace_sink=self._case_trace_sink(
-                    event_sink,
-                    generation=generation,
-                    label=label,
-                    split="validation",
-                    case_id=case.id,
-                    mutation_index=mutation_index,
-                ),
-                run_dir=run_root,
-            )
-            validation_runs.append(run)
-            self._emit_event(
-                event_sink,
-                {
-                    "event": "case_complete",
-                    "generation": generation,
-                    "label": label,
-                    "split": "validation",
-                    "case_id": case.id,
-                    "mutation_index": mutation_index,
-                    "output_summary": self._short_output_summary(run.final_output),
-                },
-            )
+        train_runs = self._run_cases_for_split(
+            harness,
+            bundle.train_cases,
+            label,
+            "train",
+            run_root,
+            generation=generation,
+            mutation_index=mutation_index,
+            event_sink=event_sink,
+        )
+        validation_runs = self._run_cases_for_split(
+            harness,
+            bundle.validation_cases,
+            label,
+            "validation",
+            run_root,
+            generation=generation,
+            mutation_index=mutation_index,
+            event_sink=event_sink,
+        )
         self._write_runs(generation_dir, label, train_runs + validation_runs)
         self._emit_event(
             event_sink,
@@ -1479,13 +1433,168 @@ class EvolutionLoop:
                 "traces_path": str(generation_dir / f"{label}_traces.jsonl"),
             },
         )
-        return self.guardian.evaluate_candidate(
+        internal_result = self.guardian.evaluate_candidate(
             genome,
             bundle.scenario,
             train_runs,
             validation_runs,
             run_dir=run_root,
         )
+        external_result = self._run_external_benchmark(
+            genome,
+            bundle,
+            generation_dir,
+            label,
+            run_root,
+            generation=generation,
+            mutation_index=mutation_index,
+            event_sink=event_sink,
+        )
+        return self._combine_external_signal(
+            internal_result=internal_result,
+            external_result=external_result,
+            signal_mode=bundle.scenario.evolution.signal_mode,
+            external_signal_weight=bundle.scenario.evolution.external_signal_weight,
+        )
+
+    def _run_cases_for_split(
+        self,
+        harness,
+        cases,
+        label: str,
+        split: str,
+        run_root: Path,
+        *,
+        generation: int | None,
+        mutation_index: int | None,
+        event_sink: Callable[[dict[str, Any]], None] | None,
+    ) -> list[HarnessRunResult]:
+        runs: list[HarnessRunResult] = []
+        for case in cases:
+            self._emit_event(
+                event_sink,
+                {
+                    "event": "case_start",
+                    "generation": generation,
+                    "label": label,
+                    "split": split,
+                    "case_id": case.id,
+                    "mutation_index": mutation_index,
+                },
+            )
+            run = self.harness_runner.run_case(
+                harness,
+                case,
+                trace_sink=self._case_trace_sink(
+                    event_sink,
+                    generation=generation,
+                    label=label,
+                    split=split,
+                    case_id=case.id,
+                    mutation_index=mutation_index,
+                ),
+                run_dir=run_root,
+            )
+            runs.append(run)
+            self._emit_event(
+                event_sink,
+                {
+                    "event": "case_complete",
+                    "generation": generation,
+                    "label": label,
+                    "split": split,
+                    "case_id": case.id,
+                    "mutation_index": mutation_index,
+                    "output_summary": self._short_output_summary(run.final_output),
+                },
+            )
+        return runs
+
+    def _run_external_benchmark(
+        self,
+        genome: Genome,
+        bundle: ScenarioBundle,
+        generation_dir: Path,
+        label: str,
+        run_root: Path,
+        *,
+        generation: int | None,
+        mutation_index: int | None,
+        event_sink: Callable[[dict[str, Any]], None] | None,
+    ) -> EvaluationResult | None:
+        signal_mode = bundle.scenario.evolution.signal_mode
+        if signal_mode not in {"internal_plus_external_score", "calibrated_internal"}:
+            return None
+        if not bundle.external_benchmark_cases:
+            return None
+        benchmark_dir = generation_dir / "external_benchmark"
+        benchmark_dir.mkdir(parents=True, exist_ok=True)
+        harness = self.harness_builder.materialize(
+            genome,
+            bundle.scenario,
+            workspace_dir=benchmark_dir / f"{label}_workspace",
+        )
+        runs = self._run_cases_for_split(
+            harness,
+            bundle.external_benchmark_cases,
+            label,
+            "external_benchmark",
+            run_root,
+            generation=generation,
+            mutation_index=mutation_index,
+            event_sink=event_sink,
+        )
+        self._write_runs(benchmark_dir, label, runs)
+        result = self.guardian.evaluate_candidate(
+            genome,
+            bundle.scenario,
+            runs,
+            [],
+            run_dir=run_root,
+            audit=False,
+        )
+        self._write_json(benchmark_dir / "eval_result.json", result.model_dump(mode="json"))
+        return result
+
+    def _run_final_holdout(
+        self,
+        genome: Genome,
+        bundle: ScenarioBundle,
+        run_dir: Path,
+        *,
+        generation: int,
+        event_sink: Callable[[dict[str, Any]], None] | None,
+    ) -> EvaluationResult | None:
+        if not bundle.final_holdout_cases:
+            return None
+        holdout_dir = run_dir / "final_holdout"
+        holdout_dir.mkdir(parents=True, exist_ok=True)
+        harness = self.harness_builder.materialize(
+            genome,
+            bundle.scenario,
+            workspace_dir=holdout_dir / "workspace",
+        )
+        runs = self._run_cases_for_split(
+            harness,
+            bundle.final_holdout_cases,
+            "final_holdout",
+            "final_holdout",
+            run_dir,
+            generation=generation,
+            mutation_index=None,
+            event_sink=event_sink,
+        )
+        self._write_runs(holdout_dir, "final_holdout", runs)
+        result = self.guardian.evaluate_candidate(
+            genome,
+            bundle.scenario,
+            runs,
+            [],
+            run_dir=run_dir,
+            audit=False,
+        )
+        self._write_json(holdout_dir / "eval_result.json", result.model_dump(mode="json"))
+        return result
 
     def _run_root_for_artifact_dir(self, artifact_dir: Path) -> Path:
         if artifact_dir.name.startswith("mutation_"):

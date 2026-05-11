@@ -69,6 +69,11 @@ STRUCTURED FAILURE PATTERNS:
 Your job: propose ONE mutation to the genome that may improve harness performance.
 You do NOT know the specific validation cases. You do NOT know per-case scores.
 Base your proposal on the genome structure and the directional feedback above.
+Prefer metric-deficit fixes over retry-policy changes. Only propose retry changes for
+explicit cost, budget, blocked-run, or failure-recovery patterns. For structured answer
+tasks, prefer this order when applicable: self-evaluation, review step, revise-final
+step, lightweight quality gate, then a safe generated checker tool. Avoid adding roles
+or whole-genome redesigns when complexity pressure is present.
 
 Output JSON only:
 {{

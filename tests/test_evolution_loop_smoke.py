@@ -4,12 +4,12 @@ from stem_agent.config import Settings
 from stem_agent.evolution.loop import EvolutionLoop
 from stem_agent.genome.loader import load_genome
 from stem_agent.harness.builder import HarnessBuilder
-from stem_agent.harness.runner import HarnessRunner
+from stem_agent.harness.runner import HarnessRunResult, HarnessRunner
 from stem_agent.harness.role_runner import RoleRunner
 from stem_agent.kernel.evaluator import GuardianFitnessEvaluator
 from stem_agent.nucleus.model_client import ModelClient
 from stem_agent.scenarios.loader import load_scenario
-from stem_agent.scenarios.schema import TaskCase
+from stem_agent.scenarios.schema import SuccessCriterion, TaskCase
 
 
 def test_evolution_loop_smoke_creates_frozen_genome_and_report(tmp_path):
@@ -25,7 +25,7 @@ def test_evolution_loop_smoke_creates_frozen_genome_and_report(tmp_path):
     assert result.final_score > result.baseline_score
     lineage = (result.run_dir / "lineage.jsonl").read_text(encoding="utf-8")
     assert "mutation_promoted" in lineage
-    assert "mutation_rejected" in lineage
+    assert "mutation_rejected" in lineage or "mutation_rolled_back" in lineage
     assert "freeze" in lineage
 
 
@@ -107,7 +107,7 @@ def test_evolution_loop_can_stream_training_events(tmp_path):
     assert "mutation_plan" in event_types
     assert "mutation_proposed" in event_types
     assert "mutation_promoted" in event_types
-    assert "mutation_rejected" in event_types
+    assert {"mutation_rejected", "mutation_rolled_back"} & event_types
     harness_event = next(event for event in events if event["event"] == "harness_trace")
     assert harness_event["case_id"]
     assert harness_event["trace"]["event"] in {
@@ -135,7 +135,7 @@ def test_tiny_task_operator_demo_has_lineage_narrative_and_environment(tmp_path)
     assert frozen.tools["generated"]
     assert "Differentiation Story" in report
     assert "Guardian promoted" in report
-    assert "Guardian rejected" in report
+    assert "Rejected Or Rolled Back Mutations" in report
     assert "Baseline genome score" in report
     assert "Evolved genome score" in report
 
@@ -267,3 +267,64 @@ def test_requirement_matching_is_shared_by_evaluator_and_quality_gate(tmp_path):
     missing = runner._missing_required_sections(harness, output.lower())
     assert "Must include a short summary" not in missing
     assert "Must include final answer" not in missing
+
+
+def test_success_criteria_affect_default_evaluator_score():
+    bundle = load_scenario("scenarios/toy_structured_answer")
+    genome = load_genome("src/stem_agent/genome/default_genome.yaml")
+    run = TaskCase(
+        id="criterion_case",
+        input={"user_request": "Plan a budget meeting about a vendor renewal."},
+    )
+    harness_run = HarnessRunResult(
+        case_id=run.id,
+        case_input=dict(run.input),
+        final_output=(
+            "## Summary\nGeneric response.\n\n"
+            "## Concrete Steps\n- Do the work.\n\n"
+            "## Final Answer\nProceed."
+        ),
+    )
+    evaluator = GuardianFitnessEvaluator()
+
+    requirement_scenario = bundle.scenario.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    name="requirement_coverage",
+                    weight=1.0,
+                    description="Only required sections matter.",
+                )
+            ]
+        },
+        deep=True,
+    )
+    usefulness_scenario = bundle.scenario.model_copy(
+        update={
+            "success_criteria": [
+                SuccessCriterion(
+                    name="usefulness",
+                    weight=1.0,
+                    description="Specific, actionable usefulness matters.",
+                )
+            ]
+        },
+        deep=True,
+    )
+
+    requirement_score = evaluator.evaluate(
+        genome,
+        requirement_scenario,
+        [harness_run],
+        [],
+        audit=False,
+    ).promotion_score
+    usefulness_score = evaluator.evaluate(
+        genome,
+        usefulness_scenario,
+        [harness_run],
+        [],
+        audit=False,
+    ).promotion_score
+
+    assert requirement_score > usefulness_score

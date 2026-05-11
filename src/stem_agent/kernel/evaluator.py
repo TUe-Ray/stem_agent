@@ -295,7 +295,18 @@ class GuardianFitnessEvaluator:
         if not mapped:
             return self.weights.normalized().metric_weights()
         total = sum(max(value, 0.0) for value in mapped.values()) or 1.0
-        return {key: max(value, 0.0) / total for key, value in mapped.items()}
+        scenario_weights = {key: max(value, 0.0) / total for key, value in mapped.items()}
+        default_weights = self.weights.normalized().metric_weights()
+        scenario_share = 0.65
+        default_share = 0.35
+        keys = set(scenario_weights) | set(default_weights)
+        blended = {
+            key: scenario_share * scenario_weights.get(key, 0.0)
+            + default_share * default_weights.get(key, 0.0)
+            for key in keys
+        }
+        blended_total = sum(max(value, 0.0) for value in blended.values()) or 1.0
+        return {key: max(value, 0.0) / blended_total for key, value in blended.items()}
 
     def _success_criterion_metrics(self, name: str, description: str) -> list[str]:
         text = f"{name} {description}".lower()

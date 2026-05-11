@@ -17,8 +17,6 @@ class FailurePattern(BaseModel):
 
 class FailureAnalyzer:
     def analyze_patterns(self, evaluation: EvaluationResult) -> list[FailurePattern]:
-        if not evaluation.failures:
-            return []
         counts = Counter(evaluation.failures)
         total = max(sum(counts.values()), 1)
         patterns: list[FailurePattern] = []
@@ -33,6 +31,7 @@ class FailureAnalyzer:
                     suggested_operator=suggested_operator,
                 )
             )
+        patterns.extend(self._metric_deficit_patterns(evaluation.metrics))
         return patterns
 
     def analyze(self, evaluation: EvaluationResult) -> list[str]:
@@ -51,3 +50,37 @@ class FailureAnalyzer:
         if "cost" in lowered or "budget" in lowered:
             return "cost_pressure", "modify_retry_policy"
         return "unknown", None
+
+    def _metric_deficit_patterns(self, metrics: dict[str, float]) -> list[FailurePattern]:
+        patterns: list[FailurePattern] = []
+        checks = [
+            ("Low self-review usage", "self_review_usage", "review_loop_missing", "add_review_step", 0.60),
+            ("Low quality-gate usage", "quality_gate_usage", "quality_gate_missing", "add_quality_gate", 0.60),
+            ("Low artifact presence", "artifact_presence", "artifact_gap", "modify_environment", 0.50),
+            ("Low actionability", "actionability", "weak_actionability", "add_revision_step", 0.65),
+            ("Low input specificity", "input_specificity", "weak_input_specificity", "add_revision_step", 0.65),
+        ]
+        for label, metric_name, category, operator, threshold in checks:
+            value = float(metrics.get(metric_name, 1.0))
+            if value < threshold:
+                patterns.append(
+                    FailurePattern(
+                        kind=f"{label}: {metric_name}={value:.3f}",
+                        count=1,
+                        severity=round(threshold - value, 4),
+                        category=category,
+                        suggested_operator=operator,
+                    )
+                )
+        complexity = float(metrics.get("complexity_penalty", 0.0))
+        if complexity >= 0.35:
+            patterns.append(
+                FailurePattern(
+                    kind=f"High complexity penalty: complexity_penalty={complexity:.3f}",
+                    count=1,
+                    severity=round(complexity, 4),
+                    category="complexity_pressure",
+                    suggested_operator="simplify_genome",
+                )
+            )
+        return patterns[:5]

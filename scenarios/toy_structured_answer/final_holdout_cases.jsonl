@@ -1,0 +1,2 @@
+{"id":"final_001","input":{"user_request":"Create a structured plan for recovering from a failed product launch review where the team needs next steps, ownership, and a calm final recommendation."},"reference_notes":"Final holdout case for post-run research reporting only."}
+{"id":"final_002","input":{"user_request":"Help me decide how to spend the first hour after discovering a project risk that affects budget, timeline, and stakeholder trust."},"reference_notes":"Final holdout case should reward risk-aware prioritization without leaking into Nucleus."}

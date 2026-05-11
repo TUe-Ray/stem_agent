@@ -1,1 +1,2 @@
-{"id":"val_001","input":{"user_request":"Help me prepare for a difficult meeting."},"reference_notes":"Should be structured and actionable."}
+{"id":"val_001","input":{"user_request":"Help me prepare for a difficult meeting with my manager about missed deadlines, where I need to take responsibility and propose a recovery plan."},"reference_notes":"Should be structured, accountable, specific, and actionable without asking follow-up questions."}
+{"id":"val_002","input":{"user_request":"Create a concise plan for deciding which of three overdue client requests to handle first when only one can be completed today."},"reference_notes":"Should include prioritization criteria, concrete steps, and a final recommendation."}

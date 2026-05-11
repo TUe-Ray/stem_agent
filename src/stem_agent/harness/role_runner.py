@@ -91,7 +91,7 @@ class RoleRunner:
                 "Write down the desired outcome, pick the first action, and schedule a quick check."
             )
 
-        if environment_aware and self._is_deadline_manager_meeting(request):
+        if (enhanced or environment_aware) and self._is_deadline_manager_meeting(request):
             return self._deadline_manager_meeting_output(request)
 
         sections = [

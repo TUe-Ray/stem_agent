@@ -180,16 +180,8 @@ class MutationPlanner:
         mutations: list[MutationProposal] = []
         targeted_mutations: list[MutationProposal] = []
         primary = structured_failure_patterns[0] if structured_failure_patterns else None
-        if primary and primary.category == "missing_required_section":
-            if not genome.quality_gates:
-                targeted_mutations.append(MutationProposal(
-                    mutation_type="add_quality_gate", target="quality_gates",
-                    rationale="Primary failure pattern indicates missing required sections.",
-                    expected_improvement="Enforce required sections before delivery.",
-                    risk="May introduce strict gating and extra retries.",
-                    patch={"name":"required_sections_gate","description":"Check required sections before final delivery.","check_type":"schema","required":True},
-                ))
-        elif primary and primary.category == "reasoning_or_calculation_error":
+        categories = {pattern.category for pattern in structured_failure_patterns or []}
+        if primary and primary.category == "reasoning_or_calculation_error":
             if not self._workflow_has(genome, "verification_step"):
                 targeted_mutations.append(MutationProposal(
                     mutation_type="add_workflow_step", target="workflow",
@@ -220,8 +212,8 @@ class MutationPlanner:
                 MutationProposal(
                     mutation_type="modify_self_evaluation",
                     target="self_evaluation",
-                    rationale="Previous runs missed required output sections.",
-                    expected_improvement="Improve requirement coverage without changing Guardian fitness.",
+                    rationale="Metric feedback shows the harness lacks an explicit self-review loop.",
+                    expected_improvement="Create evaluator-visible review intent before adding more complex organs.",
                     risk="The harness may spend extra effort reviewing its own draft.",
                     patch={
                         "enabled": True,
@@ -229,22 +221,11 @@ class MutationPlanner:
                     },
                 )
             )
-            mutations.append(
-                MutationProposal(
-                    mutation_type="create_tool",
-                    target="tools.generated",
-                    rationale="Try to inspect workspace files for extra context.",
-                    expected_improvement="Could improve artifact awareness.",
-                    risk="Unsafe filesystem access must be blocked by Guardian.",
-                    patch={
-                        "name": "unsafe_workspace_probe",
-                        "description": "Unsafe demo tool that Guardian should reject.",
-                        "code": "import os\n\ndef run(input_data):\n    return {'cwd': os.getcwd()}\n",
-                        "test_code": "def test_unsafe_workspace_probe():\n    assert True\n",
-                    },
-                )
-            )
-        elif not genome.environment.required_artifacts:
+        elif (
+            not genome.environment.required_artifacts
+            and "artifact_gap" in categories
+            and self._scenario_wants_artifacts(scenario)
+        ):
             mutations.append(
                 MutationProposal(
                     mutation_type="modify_environment",
@@ -380,6 +361,22 @@ class MutationPlanner:
 
     def _workflow_has(self, genome: Genome, step_id: str) -> bool:
         return any(step.id == step_id for step in genome.workflow)
+
+    def _scenario_wants_artifacts(self, scenario: Scenario) -> bool:
+        text = " ".join(scenario.expected_output.requirements).lower()
+        return any(
+            token in text
+            for token in [
+                "acceptance",
+                "qa",
+                "quality review",
+                "decision",
+                "artifact",
+                "verification",
+                "risk",
+                "fallback",
+            ]
+        )
 
     def _generated_tool_names(self, genome: Genome) -> set[str]:
         names: set[str] = set()
