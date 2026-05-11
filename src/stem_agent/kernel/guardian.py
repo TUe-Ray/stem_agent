@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
 from stem_agent.genome.models import EnvironmentSpec, Genome, QualityGate, RoleSpec, WorkflowStep
 from stem_agent.harness.builder import MaterializedHarness
 from stem_agent.harness.runner import HarnessRunner
@@ -156,6 +158,10 @@ class Guardian:
             if not validation.allowed:
                 return validation
 
+        schema_validation = self._validate_mutation_patch_schema(mutation, genome=genome)
+        if not schema_validation.allowed:
+            return schema_validation
+
         if genome and scenario:
             if mutation.mutation_type == "add_workflow_step":
                 if len(genome.workflow) + 1 > scenario.evolution.max_workflow_steps:
@@ -172,6 +178,64 @@ class Guardian:
                     )
 
         return ValidationResult.allow("mutation is inside mutable genome boundary")
+
+    def _validate_mutation_patch_schema(
+        self,
+        mutation: MutationProposal,
+        *,
+        genome: Genome | None = None,
+    ) -> ValidationResult:
+        add_models = {
+            "add_role": RoleSpec,
+            "add_workflow_step": WorkflowStep,
+            "add_quality_gate": QualityGate,
+        }
+        model = add_models.get(mutation.mutation_type)
+        if model is not None:
+            try:
+                model.model_validate(mutation.patch)
+            except ValidationError as exc:
+                return ValidationResult.reject(
+                    self._mutation_schema_error(mutation.mutation_type, exc)
+                )
+
+        if mutation.mutation_type == "replace_genome":
+            if "genome" not in mutation.patch:
+                return ValidationResult.reject("Invalid replace_genome patch: missing genome")
+            try:
+                Genome.model_validate(mutation.patch["genome"])
+            except ValidationError as exc:
+                return ValidationResult.reject(
+                    self._mutation_schema_error(mutation.mutation_type, exc)
+                )
+
+        if mutation.mutation_type in {"edit_role", "edit_workflow_step", "edit_quality_gate"}:
+            if not mutation.target:
+                return ValidationResult.reject(
+                    f"Invalid {mutation.mutation_type} patch: missing target"
+                )
+            if genome is not None:
+                validation = self._validate_edit_patch_schema(mutation, genome)
+                if not validation.allowed:
+                    return validation
+
+        if mutation.mutation_type == "remove_workflow_step":
+            if not mutation.target:
+                return ValidationResult.reject("Invalid remove_workflow_step patch: missing target")
+            if genome is not None and not any(step.id == mutation.target for step in genome.workflow):
+                return ValidationResult.reject(
+                    f"Invalid remove_workflow_step patch: missing workflow step {mutation.target}"
+                )
+
+        if mutation.mutation_type == "modify_environment" and genome is not None:
+            try:
+                self._merge_environment(genome.environment, mutation.patch)
+            except (TypeError, ValueError, ValidationError) as exc:
+                return ValidationResult.reject(
+                    f"Invalid modify_environment patch: {self._exception_summary(exc)}"
+                )
+
+        return ValidationResult.allow("mutation patch schema is valid")
 
     def validate_candidate_safety(
         self,
@@ -390,6 +454,46 @@ class Guardian:
                 items[index] = item.__class__.model_validate(data)
                 return
         raise ValueError(f"Cannot edit missing target: {target}")
+
+    def _validate_edit_patch_schema(
+        self,
+        mutation: MutationProposal,
+        genome: Genome,
+    ) -> ValidationResult:
+        collections: dict[str, tuple[list[Any], str]] = {
+            "edit_role": (list(genome.roles), "name"),
+            "edit_workflow_step": (list(genome.workflow), "id"),
+            "edit_quality_gate": (list(genome.quality_gates), "name"),
+        }
+        items, id_field = collections[mutation.mutation_type]
+        for item in items:
+            if getattr(item, id_field) == mutation.target:
+                data = item.model_dump(mode="json")
+                data.update(mutation.patch)
+                try:
+                    item.__class__.model_validate(data)
+                except ValidationError as exc:
+                    return ValidationResult.reject(
+                        self._mutation_schema_error(mutation.mutation_type, exc)
+                    )
+                return ValidationResult.allow("edit mutation patch schema is valid")
+        return ValidationResult.reject(
+            f"Invalid {mutation.mutation_type} patch: missing target {mutation.target}"
+        )
+
+    def _mutation_schema_error(
+        self,
+        mutation_type: str,
+        exc: ValidationError,
+    ) -> str:
+        details = []
+        for error in exc.errors()[:3]:
+            loc = ".".join(str(part) for part in error.get("loc", ())) or "patch"
+            details.append(f"{loc}: {error.get('msg', 'invalid value')}")
+        return f"Invalid {mutation_type} patch: {'; '.join(details)}"
+
+    def _exception_summary(self, exc: Exception) -> str:
+        return str(exc) or exc.__class__.__name__
 
     def _merge_environment(
         self, environment: EnvironmentSpec, patch: dict[str, Any]

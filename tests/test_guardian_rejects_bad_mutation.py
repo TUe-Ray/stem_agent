@@ -111,6 +111,42 @@ def test_quality_gate_mutation_is_validated_and_applied():
     assert mutated.quality_gates[0].name == "required_sections_gate"
 
 
+def test_guardian_rejects_malformed_quality_gate_mutation_before_apply():
+    mutation = MutationProposal(
+        mutation_type="add_quality_gate",
+        target="",
+        rationale="Add a quality gate, but the LLM returned an empty patch.",
+        expected_improvement="",
+        risk="",
+        patch={},
+    )
+
+    result = Guardian().validate_mutation(mutation)
+
+    assert result.allowed is False
+    assert "Invalid add_quality_gate patch" in result.reason
+    assert "name" in result.reason
+    assert "description" in result.reason
+    assert "check_type" in result.reason
+
+
+def test_guardian_rejects_edit_mutation_without_existing_target():
+    genome = load_default_genome()
+    mutation = MutationProposal(
+        mutation_type="edit_workflow_step",
+        target="missing_step",
+        rationale="Edit a nonexistent workflow step.",
+        expected_improvement="",
+        risk="",
+        patch={"action": "Rewrite the missing step."},
+    )
+
+    result = Guardian().validate_mutation(mutation, genome=genome)
+
+    assert result.allowed is False
+    assert "missing target missing_step" in result.reason
+
+
 def test_safe_generated_tool_can_be_activated_after_tests_pass(tmp_path):
     genome = load_default_genome()
     mutation = MutationProposal(
