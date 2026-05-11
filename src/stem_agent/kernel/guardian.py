@@ -155,6 +155,11 @@ class Guardian:
         if not schema_validation.allowed:
             return schema_validation
 
+        if genome is not None:
+            structural_validation = self._validate_structural_invariants(mutation, genome)
+            if not structural_validation.allowed:
+                return structural_validation
+
         if genome and scenario:
             if mutation.mutation_type == "add_workflow_step":
                 if len(genome.workflow) + 1 > scenario.evolution.max_workflow_steps:
@@ -169,6 +174,11 @@ class Guardian:
                     return ValidationResult.reject(
                         "Environment exceeds configured max_environment_artifacts"
                     )
+
+        if genome is not None:
+            resulting_validation = self._validate_resulting_genome(mutation, genome)
+            if not resulting_validation.allowed:
+                return resulting_validation
 
         return ValidationResult.allow("mutation is inside mutable genome boundary")
 
@@ -229,6 +239,69 @@ class Guardian:
                 )
 
         return ValidationResult.allow("mutation patch schema is valid")
+
+    def _validate_structural_invariants(
+        self,
+        mutation: MutationProposal,
+        genome: Genome,
+    ) -> ValidationResult:
+        patch = mutation.patch
+        if mutation.mutation_type == "add_workflow_step":
+            step_id = str(patch.get("id", ""))
+            if self._workflow_step_exists(genome, step_id):
+                return ValidationResult.reject(
+                    f"Invalid add_workflow_step patch: duplicate workflow step id {step_id}"
+                )
+        if mutation.mutation_type == "edit_workflow_step" and "id" in patch:
+            step_id = str(patch.get("id", ""))
+            if step_id != mutation.target and self._workflow_step_exists(genome, step_id):
+                return ValidationResult.reject(
+                    f"Invalid edit_workflow_step patch: duplicate workflow step id {step_id}"
+                )
+        if mutation.mutation_type == "add_role":
+            role_name = str(patch.get("name", ""))
+            if self._role_exists(genome, role_name):
+                return ValidationResult.reject(
+                    f"Invalid add_role patch: duplicate role name {role_name}"
+                )
+        if mutation.mutation_type == "edit_role" and "name" in patch:
+            role_name = str(patch.get("name", ""))
+            if role_name != mutation.target and self._role_exists(genome, role_name):
+                return ValidationResult.reject(
+                    f"Invalid edit_role patch: duplicate role name {role_name}"
+                )
+        if mutation.mutation_type == "add_quality_gate":
+            gate_name = str(patch.get("name", ""))
+            if self._quality_gate_exists(genome, gate_name):
+                return ValidationResult.reject(
+                    f"Invalid add_quality_gate patch: duplicate quality gate name {gate_name}"
+                )
+        if mutation.mutation_type == "edit_quality_gate" and "name" in patch:
+            gate_name = str(patch.get("name", ""))
+            if gate_name != mutation.target and self._quality_gate_exists(genome, gate_name):
+                return ValidationResult.reject(
+                    f"Invalid edit_quality_gate patch: duplicate quality gate name {gate_name}"
+                )
+        if mutation.mutation_type in {"create_tool", "edit_tool"}:
+            tool_name = str(patch.get("name", ""))
+            if tool_name and tool_name in self._generated_tool_names(genome):
+                return ValidationResult.reject(
+                    f"Invalid {mutation.mutation_type} patch: duplicate generated tool name {tool_name}"
+                )
+        return ValidationResult.allow("mutation structural invariants are valid")
+
+    def _validate_resulting_genome(
+        self,
+        mutation: MutationProposal,
+        genome: Genome,
+    ) -> ValidationResult:
+        try:
+            self.apply_mutation_safely(genome, mutation)
+        except (ValidationError, ValueError, TypeError, KeyError) as exc:
+            return ValidationResult.reject(
+                f"Invalid {mutation.mutation_type} resulting genome: {self._exception_summary(exc)}"
+            )
+        return ValidationResult.allow("resulting genome structure is valid")
 
     def validate_candidate_safety(
         self,
@@ -475,7 +548,31 @@ class Guardian:
         return f"Invalid {mutation_type} patch: {'; '.join(details)}"
 
     def _exception_summary(self, exc: Exception) -> str:
+        if isinstance(exc, ValidationError):
+            details = []
+            for error in exc.errors()[:3]:
+                loc = ".".join(str(part) for part in error.get("loc", ())) or "genome"
+                details.append(f"{loc}: {error.get('msg', 'invalid value')}")
+            return "; ".join(details)
         return str(exc) or exc.__class__.__name__
+
+    def _workflow_step_exists(self, genome: Genome, step_id: str) -> bool:
+        return any(step.id == step_id for step in genome.workflow)
+
+    def _role_exists(self, genome: Genome, role_name: str) -> bool:
+        return any(role.name == role_name for role in genome.roles)
+
+    def _quality_gate_exists(self, genome: Genome, gate_name: str) -> bool:
+        return any(gate.name == gate_name for gate in genome.quality_gates)
+
+    def _generated_tool_names(self, genome: Genome) -> set[str]:
+        names: set[str] = set()
+        for item in genome.tools.get("generated", []) or []:
+            if isinstance(item, dict) and item.get("name"):
+                names.add(str(item["name"]))
+            elif getattr(item, "name", None):
+                names.add(str(item.name))
+        return names
 
     def _merge_environment(
         self, environment: EnvironmentSpec, patch: dict[str, Any]

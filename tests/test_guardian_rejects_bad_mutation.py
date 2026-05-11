@@ -1,4 +1,5 @@
 from stem_agent.genome.loader import load_default_genome
+from stem_agent.genome.models import QualityGate, RoleSpec
 from stem_agent.kernel.guardian import Guardian
 from stem_agent.nucleus.schemas import MutationProposal
 from stem_agent.scenarios.loader import load_scenario
@@ -145,6 +146,137 @@ def test_guardian_rejects_edit_mutation_without_existing_target():
 
     assert result.allowed is False
     assert "missing target missing_step" in result.reason
+
+
+def test_guardian_rejects_duplicate_workflow_step_id_before_apply():
+    genome = load_default_genome()
+    mutation = MutationProposal(
+        mutation_type="add_workflow_step",
+        target="workflow",
+        rationale="Live model reused an existing step id.",
+        expected_improvement="",
+        risk="",
+        patch={
+            "id": "solve_task",
+            "role": "Founder",
+            "action": "Duplicate the solve step.",
+            "input_from": ["understand_task"],
+            "output_key": "duplicate_output",
+        },
+    )
+
+    result = Guardian().validate_mutation(mutation, genome=genome)
+
+    assert result.allowed is False
+    assert "duplicate workflow step id solve_task" in result.reason
+
+
+def test_guardian_rejects_edit_workflow_step_to_existing_id():
+    genome = load_default_genome()
+    mutation = MutationProposal(
+        mutation_type="edit_workflow_step",
+        target="understand_task",
+        rationale="Live model tried to rename a step to an existing id.",
+        expected_improvement="",
+        risk="",
+        patch={"id": "solve_task"},
+    )
+
+    result = Guardian().validate_mutation(mutation, genome=genome)
+
+    assert result.allowed is False
+    assert "duplicate workflow step id solve_task" in result.reason
+
+
+def test_guardian_rejects_duplicate_role_quality_gate_and_tool_names():
+    genome = load_default_genome()
+    genome.roles.append(
+        RoleSpec(
+            name="Reviewer",
+            description="Reviews drafts.",
+            instructions="Review drafts.",
+            allowed_tools=[],
+        )
+    )
+    genome.quality_gates.append(
+        QualityGate(
+            name="required_sections_gate",
+            description="Check required sections.",
+            check_type="schema",
+            required=True,
+        )
+    )
+    genome.tools.setdefault("generated", []).append(
+        {
+            "name": "requirement_checker",
+            "description": "Existing generated checker.",
+            "kind": "generated",
+            "path": "checker.py",
+            "test_path": "test_checker.py",
+        }
+    )
+    guardian = Guardian()
+
+    duplicate_role = guardian.validate_mutation(
+        MutationProposal(
+            mutation_type="edit_role",
+            target="Reviewer",
+            patch={"name": "Founder"},
+        ),
+        genome=genome,
+    )
+    duplicate_gate = guardian.validate_mutation(
+        MutationProposal(
+            mutation_type="add_quality_gate",
+            target="quality_gates",
+            patch={
+                "name": "required_sections_gate",
+                "description": "Duplicate gate.",
+                "check_type": "schema",
+                "required": True,
+            },
+        ),
+        genome=genome,
+    )
+    duplicate_tool = guardian.validate_mutation(
+        MutationProposal(
+            mutation_type="create_tool",
+            target="tools.generated",
+            patch={
+                "name": "requirement_checker",
+                "description": "Duplicate generated checker.",
+                "code": "def run(input_data):\n    return {'ok': True}\n",
+                "test_code": "from requirement_checker import run\n\ndef test_run():\n    assert run({})['ok']\n",
+            },
+        ),
+        genome=genome,
+    )
+
+    assert duplicate_role.allowed is False
+    assert "duplicate role name Founder" in duplicate_role.reason
+    assert duplicate_gate.allowed is False
+    assert "duplicate quality gate name required_sections_gate" in duplicate_gate.reason
+    assert duplicate_tool.allowed is False
+    assert "duplicate generated tool name requirement_checker" in duplicate_tool.reason
+
+
+def test_guardian_rejects_replace_genome_with_duplicate_workflow_ids_before_apply():
+    genome = load_default_genome()
+    replacement = genome.model_dump(mode="json")
+    replacement["workflow"].append(dict(replacement["workflow"][0]))
+    mutation = MutationProposal(
+        mutation_type="replace_genome",
+        target="genome",
+        rationale="Whole-genome proposal duplicated a workflow id.",
+        expected_improvement="",
+        risk="",
+        patch={"genome": replacement},
+    )
+
+    result = Guardian().validate_mutation(mutation, genome=genome)
+
+    assert result.allowed is False
+    assert "workflow step ids must be unique" in result.reason
 
 
 def test_safe_generated_tool_can_be_activated_after_tests_pass(tmp_path):

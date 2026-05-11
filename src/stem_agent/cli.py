@@ -270,6 +270,9 @@ def evolve(
             signal_policy_override=_parse_signal_policy_overrides(signal_policy_override or []),
             event_sink=event_sink,
         )
+    except Exception as exc:
+        _mark_run_failed(run_id, exc, command="evolve")
+        raise
     finally:
         if progress:
             progress.finish(status=result.status if result else "stopped")
@@ -433,12 +436,16 @@ def resume_run(
 ) -> None:
     control = EvolutionControl(Path("runs") / run_id, run_id)
     control.write_command("resume", status="REQUESTED")
-    result = EvolutionLoop().resume(
-        run_id,
-        git_branch=git_branch,
-        git_commit=git_commit,
-        git_push=git_push,
-    )
+    try:
+        result = EvolutionLoop().resume(
+            run_id,
+            git_branch=git_branch,
+            git_commit=git_commit,
+            git_push=git_push,
+        )
+    except Exception as exc:
+        _mark_run_failed(run_id, exc, command="resume")
+        raise
     typer.echo(f"Run directory: {result.run_dir}")
     typer.echo(f"Status: {result.status}")
     typer.echo(f"Final score: {result.final_score:.4f}")
@@ -514,6 +521,19 @@ def _optional_score(eval_result: dict | None) -> str:
     if eval_result is None:
         return "n/a"
     return f"{float(eval_result['promotion_score']):.6f}"
+
+
+def _mark_run_failed(run_id: str, exc: Exception, *, command: str) -> None:
+    EvolutionControl(Path("runs") / run_id, run_id).set_status(
+        "FAILED",
+        command=command,
+        message=_failure_message(exc),
+    )
+
+
+def _failure_message(exc: Exception) -> str:
+    message = str(exc).splitlines()[0] if str(exc) else exc.__class__.__name__
+    return f"{exc.__class__.__name__}: {message}"[:500]
 
 
 def _parse_signal_policy_overrides(items: list[str]) -> dict[str, bool]:

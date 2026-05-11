@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from stem_agent.config import Settings, load_settings
 from stem_agent.evolution.control import EvolutionControl, scenario_hash_from_file
@@ -679,7 +679,77 @@ class EvolutionLoop:
                         continue
                     mutation = activated_mutation
 
-                mutated_genome = self.guardian.apply_mutation_safely(genome, mutation)
+                try:
+                    mutated_genome = self.guardian.apply_mutation_safely(genome, mutation)
+                except (ValidationError, ValueError, TypeError, KeyError) as exc:
+                    reason = (
+                        f"Invalid {mutation.mutation_type} resulting genome: "
+                        f"{self._exception_summary(exc)}"
+                    )
+                    rejection_signal = bundle.scenario.signal_policy.build_nucleus_signal(
+                        generation=generation,
+                        mutation_type=mutation.mutation_type,
+                        current_score=candidate_result.promotion_score,
+                        previous_score=candidate_result.promotion_score,
+                    )
+                    signal_history.append(rejection_signal)
+                    lineage.record_rejected_mutation(
+                        generation,
+                        mutation.mutation_type,
+                        mutation.target,
+                        reason,
+                        operator_type=operator.name,
+                        mutation_rejected_by="apply_validator",
+                        nucleus_signal=nucleus_signal_to_dict(rejection_signal),
+                    )
+                    self._emit_event(
+                        event_sink,
+                        {
+                            "event": "mutation_rejected",
+                            "generation": generation,
+                            "index": index,
+                            "mutation_type": mutation.mutation_type,
+                            "target": mutation.target,
+                            "reason": reason,
+                            "operator_type": operator.name,
+                            "mutation_rejected_by": "apply_validator",
+                        },
+                    )
+                    self._save_checkpoint(
+                        control,
+                        scenario_hash,
+                        generation,
+                        generation,
+                        "mutation_rejected_by_apply_validator",
+                        genome,
+                        best_genome,
+                        baseline_result,
+                        best_result,
+                        patience_left,
+                        stop_reason,
+                    )
+                    git.commit_safe(
+                        f"stem_agent apply-rejected {mutation.mutation_type}", [run_dir]
+                    )
+                    control_result = self._handle_control_safe_point(
+                        control=control,
+                        git=git,
+                        bundle=bundle,
+                        run_dir=run_dir,
+                        generation=generation,
+                        genome=genome,
+                        best_genome=best_genome,
+                        baseline_genome=baseline_genome,
+                        baseline_result=baseline_result,
+                        best_result=best_result,
+                        patience_left=patience_left,
+                        scenario_hash=scenario_hash,
+                        stop_reason=stop_reason,
+                        lineage=lineage,
+                    )
+                    if control_result:
+                        return control_result
+                    continue
                 save_genome(mutated_genome, mutation_dir / "genome.yaml")
                 safety_validation = self.guardian.validate_candidate_safety(
                     genome,
@@ -1725,6 +1795,15 @@ class EvolutionLoop:
         if result.failures:
             return "; ".join(result.failures[:3])
         return "Candidate satisfied visible requirements with acceptable complexity."
+
+    def _exception_summary(self, exc: Exception) -> str:
+        if isinstance(exc, ValidationError):
+            details = []
+            for error in exc.errors()[:3]:
+                loc = ".".join(str(part) for part in error.get("loc", ())) or "genome"
+                details.append(f"{loc}: {error.get('msg', 'invalid value')}")
+            return "; ".join(details)
+        return str(exc).splitlines()[0] if str(exc) else exc.__class__.__name__
 
     def _run_metadata(self, final_result: EvaluationResult) -> dict:
         mode = "test double" if self.settings.test_mode else "openai-api"

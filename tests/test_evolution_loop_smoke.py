@@ -9,6 +9,7 @@ from stem_agent.harness.runner import HarnessRunResult, HarnessRunner
 from stem_agent.harness.role_runner import RoleRunner
 from stem_agent.kernel.evaluator import GuardianFitnessEvaluator
 from stem_agent.nucleus.model_client import ModelClient
+from stem_agent.nucleus.schemas import MutationPlan, MutationProposal
 from stem_agent.scenarios.loader import load_scenario
 from stem_agent.scenarios.schema import SuccessCriterion, TaskCase
 
@@ -88,6 +89,50 @@ def test_lineage_contains_rejected_or_rolled_back_mutation(tmp_path):
     lineage = (result.run_dir / "lineage.jsonl").read_text(encoding="utf-8")
 
     assert "mutation_rejected" in lineage or "mutation_rolled_back" in lineage
+
+
+def test_evolution_loop_rejects_duplicate_workflow_step_without_crashing(tmp_path):
+    loop = EvolutionLoop(
+        settings=Settings(test_mode=True),
+        runs_root=tmp_path / "runs",
+    )
+
+    def duplicate_step_plan(**kwargs):
+        _ = kwargs
+        return MutationPlan(
+            summary="Live-like bad mutation reused an existing workflow id.",
+            proposed_mutations=[
+                MutationProposal(
+                    mutation_type="add_workflow_step",
+                    target="workflow",
+                    rationale="Reuse solve_task to simulate malformed live model output.",
+                    expected_improvement="",
+                    risk="Duplicate workflow id.",
+                    patch={
+                        "id": "solve_task",
+                        "role": "Founder",
+                        "action": "Duplicate the existing solve step.",
+                        "input_from": ["understand_task"],
+                        "output_key": "duplicate_output",
+                    },
+                )
+            ],
+        )
+
+    loop.nucleus.plan = duplicate_step_plan
+
+    result = loop.evolve("scenarios/toy_structured_answer", "duplicate_step_001")
+    events = [
+        json.loads(line)
+        for line in (result.run_dir / "lineage.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+
+    assert result.status == "FROZEN"
+    assert any(
+        event["event"] == "mutation_rejected"
+        and "duplicate workflow step id solve_task" in event["reason"]
+        for event in events
+    )
 
 
 def test_evolution_loop_can_stream_training_events(tmp_path):

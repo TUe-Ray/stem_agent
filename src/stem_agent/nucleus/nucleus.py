@@ -89,6 +89,7 @@ Output JSON only as a MutationPlan:
 }}
 
 Patch requirements:
+- Mutations must not create duplicate workflow step ids, role names, quality gate names, or generated tool names.
 - add_quality_gate patch: {{"name": "...", "description": "...", "check_type": "schema", "required": true}}
 - add_workflow_step patch: {{"id": "...", "role": "<existing role>", "action": "...", "input_from": ["..."], "output_key": "..."}}
 - modify_self_evaluation patch: {{"enabled": true, "rubric": ["..."]}}
