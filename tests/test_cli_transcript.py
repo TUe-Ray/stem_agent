@@ -168,7 +168,7 @@ def test_format_training_detail_event_structures_case_progress():
     assert "traces:  runs/demo_001/final_evaluation/frozen_traces.jsonl" in artifacts
 
 
-def test_training_reporter_prints_progress_and_details_without_ansi():
+def test_training_reporter_separates_details_from_non_ansi_status():
     stream = StringIO()
     reporter = _TrainingTerminalReporter(
         3,
@@ -189,7 +189,37 @@ def test_training_reporter_prints_progress_and_details_without_ansi():
     )
 
     output = stream.getvalue()
-    assert output.splitlines()[0].startswith("🧬 Training")
+    lines = output.splitlines()
+    training_lines = [line for line in lines if line.startswith("🧬 Training")]
+    assert lines[0].startswith("🧬 Training")
+    assert len(training_lines) == 1
     assert "=== Generation 1 ===" in output
     assert "Evaluation complete: current" in output
-    assert "score 0.4200" in output
+    assert "promotion score: 0.4200" in output
+
+
+def test_training_reporter_keeps_ansi_status_on_dedicated_line():
+    stream = StringIO()
+    reporter = _TrainingTerminalReporter(
+        3,
+        stream=stream,
+        force_ansi=True,
+    )
+
+    reporter.on_event({"event": "generation_start", "generation": 1, "genome_version": "v1"})
+    reporter.on_event(
+        {
+            "event": "evaluation_complete",
+            "generation": 1,
+            "label": "current",
+            "score": 0.42,
+            "train_score": 0.4,
+            "validation_score": 0.45,
+        }
+    )
+
+    output = stream.getvalue()
+    assert "\033[2K" in output
+    assert "=== Generation 1 ===" in output
+    assert "Evaluation complete: current" in output
+    assert output.rstrip().endswith("score 0.4200 | best 0.4200")

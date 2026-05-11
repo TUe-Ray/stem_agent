@@ -66,7 +66,6 @@ class TrainingTerminalReporter:
         self.phase = "starting"
         self.current_score: float | None = None
         self.best_score: float | None = None
-        self._lines_below_status = 1
         self._write_initial_status()
 
     def on_event(self, event: dict[str, Any]) -> None:
@@ -133,35 +132,34 @@ class TrainingTerminalReporter:
             "budget_exceeded": "budget exceeded",
         }
         self.phase = finish_labels.get(status_lower, status_lower)
-        self._render_status()
-        self.stream.write("\n")
+        if self.use_ansi:
+            self.stream.write("\r\033[2K" + self._status_line() + "\n")
+        else:
+            self.stream.write(self._status_line() + "\n")
         self.stream.flush()
 
     def _write_initial_status(self) -> None:
-        self.stream.write(self._status_line() + "\n")
+        ending = "" if self.use_ansi else "\n"
+        self.stream.write(self._status_line() + ending)
         self.stream.flush()
 
     def _render_status(self) -> None:
+        if not self.use_ansi:
+            return
         line = self._status_line()
-        if self.use_ansi:
-            self.stream.write(
-                f"\033[{self._lines_below_status}A"
-                "\r\033[2K"
-                f"{line}"
-                f"\033[{self._lines_below_status}B"
-                "\r"
-            )
-        else:
-            self.stream.write(f"{line}\n")
+        self.stream.write("\r\033[2K" + line)
         self.stream.flush()
 
     def _write_detail(self, detail: str) -> None:
         if not detail:
             return
         text = detail.rstrip() + "\n"
-        self.stream.write(text)
         if self.use_ansi:
-            self._lines_below_status += text.count("\n")
+            self.stream.write("\r\033[2K")
+            self.stream.write(text)
+            self.stream.write(self._status_line())
+        else:
+            self.stream.write(text)
         self.stream.flush()
 
     def _status_line(self) -> str:
