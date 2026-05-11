@@ -1,0 +1,90 @@
+scenario:
+  name: research_synthesis_mini
+  description: >
+    Synthesize supplied notes for a focused research question, separate evidence from inference,
+    identify uncertainty, and recommend a next action.
+  task_class: deep_research_synthesis
+
+input_format:
+  type: text
+  fields:
+    - name: user_request
+      required: true
+    - name: source_notes
+      required: true
+
+expected_output:
+  type: markdown
+  requirements:
+    - Must include a short Summary section.
+    - Must include an Evidence Map.
+    - Must include Assumptions and Unknowns.
+    - Must include Confidence or caveats.
+    - Must include a Recommendation.
+    - Must include a Final Answer.
+
+constraints:
+  - Use only the supplied notes as evidence.
+  - Distinguish evidence from inference.
+  - Do not fabricate citations, sources, or measurements.
+  - Prefer a clear recommendation with confidence level.
+
+available_builtin_tools:
+  - call_model
+
+success_criteria:
+  - name: requirement_coverage
+    weight: 0.30
+    description: Required synthesis sections are present.
+  - name: source_grounding
+    weight: 0.30
+    description: Claims are grounded in supplied notes and label inference.
+  - name: uncertainty_handling
+    weight: 0.20
+    description: Assumptions, unknowns, and confidence are explicit.
+  - name: recommendation_quality
+    weight: 0.20
+    description: Recommendation follows from the evidence and caveats.
+
+evaluation_criteria:
+  - name: required_sections
+    weight: 0.45
+    method: section_check
+    description: Output includes the benchmark-required sections.
+  - name: evidence_grounding
+    weight: 0.25
+    method: section_check
+    pattern: Must distinguish evidence from inference.
+    description: Output separates source evidence from interpretation.
+  - name: uncertainty_handling
+    weight: 0.15
+    method: section_check
+    pattern: Must include Assumptions and Unknowns.
+    description: Output names unknowns and confidence.
+  - name: usefulness
+    weight: 0.15
+    method: heuristic_usefulness
+    description: Output is specific, actionable, and constraint-aware.
+
+signal_policy:
+  layer_1_enabled: true
+  expose_aggregate_score: true
+  expose_score_delta: true
+  expose_direction: true
+
+evolution:
+  max_generations: 6
+  patience: 2
+  min_delta: 0.015
+  max_mutations_per_generation: 4
+  max_cost_usd: 4.0
+  max_workflow_steps: 8
+  max_roles: 6
+  max_environment_artifacts: 8
+  signal_mode: internal_plus_external_score
+  external_signal_weight: 0.20
+
+domain_tags:
+  - deep_research
+  - synthesis
+  - evidence_grounding

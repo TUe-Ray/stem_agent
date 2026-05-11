@@ -212,6 +212,44 @@ Run the frozen harness after training:
 stem_agent execute runs/gsm8k_full_001/frozen_genome.yaml --input "A class has 6 tables with 4 students each. How many students are there?"
 ```
 
+## 🧪 Robustness Mini Suite
+
+The repo also includes three small, static robustness benchmarks that exercise different task classes.
+They are not official leaderboards; use them to ask whether a stem agent can adapt beyond the default structured-answer demo.
+
+List the available benchmarks:
+
+```bash
+stem_agent list-benchmarks
+```
+
+| Scenario | Task class | What it tests |
+|---|---|---|
+| `security_review_mini` | `security_review_triage` | Defensive security review, severity ranking, remediation, and verification. |
+| `research_synthesis_mini` | `deep_research_synthesis` | Grounded synthesis from supplied notes, uncertainty, confidence, and recommendation. |
+| `release_qa_triage_mini` | `release_quality_triage` | Release readiness, targeted test plan, risk register, go/no-go call, and rollback. |
+
+Run them one at a time:
+
+```bash
+make evolve-security-review-mini
+make evolve-research-synthesis-mini
+make evolve-release-qa-triage-mini
+```
+
+Or run the mini suite sequentially:
+
+```bash
+make evolve-robustness-mini
+```
+
+Each mini benchmark includes:
+
+- train and validation cases for promotion
+- external benchmark cases for an aggregate auxiliary signal
+- hidden cases for observational leakage-safe checks
+- final holdout cases for the frozen harness
+
 ## 🛑 Safe Stop Controls
 
 Training can be safely paused, resumed, inspected, or frozen. These commands use the run id, not the run path:
@@ -366,6 +404,8 @@ scenario.yaml
 train_cases.jsonl
 validation_cases.jsonl
 hidden_cases.jsonl    # optional
+external_benchmark_cases.jsonl  # optional auxiliary signal
+final_holdout_cases.jsonl       # optional final frozen-harness check
 ```
 
 Create a starter scenario:

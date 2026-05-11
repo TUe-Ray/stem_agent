@@ -1,0 +1,91 @@
+scenario:
+  name: release_qa_triage_mini
+  description: >
+    Triage a software release for quality risk, identify blockers, produce a targeted test plan,
+    and make a go/no-go recommendation with rollback steps.
+  task_class: release_quality_triage
+
+input_format:
+  type: text
+  fields:
+    - name: user_request
+      required: true
+    - name: release_context
+      required: true
+
+expected_output:
+  type: markdown
+  requirements:
+    - Must include a short Summary section.
+    - Must include a Test Plan.
+    - Must include a Risk Register.
+    - Must include Acceptance Criteria.
+    - Must include a Go/No-Go Recommendation.
+    - Must include a Final Answer.
+
+constraints:
+  - Identify release blockers before nice-to-have work.
+  - Include owners, dependencies, and rollback checks when relevant.
+  - Do not ask unnecessary clarification questions.
+  - Prefer actionable QA triage over generic process advice.
+
+available_builtin_tools:
+  - call_model
+  - inspect_workspace
+
+success_criteria:
+  - name: requirement_coverage
+    weight: 0.30
+    description: Required release-triage sections are present.
+  - name: risk_and_recovery
+    weight: 0.25
+    description: Risks, mitigations, owners, dependencies, and rollback paths are explicit.
+  - name: verification_quality
+    weight: 0.25
+    description: Test plan and acceptance criteria are concrete and release-specific.
+  - name: decision_quality
+    weight: 0.20
+    description: Go/no-go call follows from the evidence.
+
+evaluation_criteria:
+  - name: required_sections
+    weight: 0.45
+    method: section_check
+    description: Output includes the benchmark-required sections.
+  - name: risk_register
+    weight: 0.20
+    method: section_check
+    pattern: Must include a Risk Register.
+    description: Output names release risks and mitigations.
+  - name: release_decision
+    weight: 0.20
+    method: section_check
+    pattern: Must include a Go/No-Go Recommendation.
+    description: Output makes an explicit release decision.
+  - name: usefulness
+    weight: 0.15
+    method: heuristic_usefulness
+    description: Output is specific, actionable, and constraint-aware.
+
+signal_policy:
+  layer_1_enabled: true
+  expose_aggregate_score: true
+  expose_score_delta: true
+  expose_direction: true
+
+evolution:
+  max_generations: 6
+  patience: 2
+  min_delta: 0.015
+  max_mutations_per_generation: 4
+  max_cost_usd: 4.0
+  max_workflow_steps: 8
+  max_roles: 6
+  max_environment_artifacts: 8
+  signal_mode: internal_plus_external_score
+  external_signal_weight: 0.20
+
+domain_tags:
+  - release_qa
+  - triage
+  - verification

@@ -1,4 +1,4 @@
-.PHONY: test evolve-demo inspect-demo compare-demo init-gsm8k-demo evolve-gsm8k-demo init-gsm8k-full evolve-gsm8k-full
+.PHONY: test evolve-demo inspect-demo compare-demo init-gsm8k-demo evolve-gsm8k-demo init-gsm8k-full evolve-gsm8k-full list-benchmarks evolve-security-review-mini evolve-research-synthesis-mini evolve-release-qa-triage-mini evolve-robustness-mini
 
 test:
 	python3 -m pytest
@@ -23,3 +23,20 @@ init-gsm8k-full:
 
 evolve-gsm8k-full:
 	stem_agent evolve scenarios/gsm8k_full --run-id gsm8k_full_001
+
+list-benchmarks:
+	stem_agent list-benchmarks
+
+evolve-security-review-mini:
+	stem_agent evolve scenarios/security_review_mini --run-id security_review_mini_001
+
+evolve-research-synthesis-mini:
+	stem_agent evolve scenarios/research_synthesis_mini --run-id research_synthesis_mini_001
+
+evolve-release-qa-triage-mini:
+	stem_agent evolve scenarios/release_qa_triage_mini --run-id release_qa_triage_mini_001
+
+evolve-robustness-mini:
+	stem_agent evolve scenarios/security_review_mini --run-id security_review_mini_001
+	stem_agent evolve scenarios/research_synthesis_mini --run-id research_synthesis_mini_001
+	stem_agent evolve scenarios/release_qa_triage_mini --run-id release_qa_triage_mini_001

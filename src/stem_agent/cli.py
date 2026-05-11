@@ -20,6 +20,7 @@ from stem_agent.evolution.control import EvolutionControl
 from stem_agent.evolution.loop import EvolutionLoop
 from stem_agent.evolution.visuals import VisualizationBuilder
 from stem_agent.benchmarks.gsm8k import download_gsm8k_sample
+from stem_agent.benchmarks.robustness_suite import ROBUSTNESS_BENCHMARKS
 from stem_agent.cli_compare_ablations import compare_ablations as compare_ablations_report
 from stem_agent.genome.loader import load_genome
 from stem_agent.harness.builder import HarnessBuilder
@@ -187,6 +188,40 @@ def init_benchmark(
         f"✅ Initialized {scenario_name} at {path} "
         f"({len(train_cases)} train, {len(val_cases)} validation, {len(hidden_cases)} hidden)"
     )
+
+
+@app.command("list-benchmarks")
+def list_benchmarks() -> None:
+    rows = [
+        (
+            "gsm8k_demo",
+            "structured_reasoning",
+            "scenarios/gsm8k_demo",
+            "Small math-reasoning smoke benchmark. Run init-benchmark first.",
+            "stem_agent init-benchmark gsm8k_demo",
+        ),
+        (
+            "gsm8k_full",
+            "structured_reasoning",
+            "scenarios/gsm8k_full",
+            "Larger GSM8K setup for report-oriented runs. Run init-benchmark first.",
+            "stem_agent init-benchmark gsm8k_full",
+        ),
+    ]
+    rows.extend(
+        (
+            benchmark.name,
+            benchmark.task_class,
+            benchmark.path,
+            benchmark.focus,
+            benchmark.evolve_command,
+        )
+        for benchmark in ROBUSTNESS_BENCHMARKS
+    )
+    typer.echo("| Name | Task class | Path | Focus | Command |")
+    typer.echo("|---|---|---|---|---|")
+    for name, task_class, path, focus, command in rows:
+        typer.echo(f"| `{name}` | `{task_class}` | `{path}` | {focus} | `{command}` |")
 
 
 @app.command()

@@ -1,0 +1,91 @@
+scenario:
+  name: security_review_mini
+  description: >
+    Review a product or engineering change for defensive security risk, rank the findings,
+    and propose remediation plus verification steps.
+  task_class: security_review_triage
+
+input_format:
+  type: text
+  fields:
+    - name: user_request
+      required: true
+    - name: system_context
+      required: false
+
+expected_output:
+  type: markdown
+  requirements:
+    - Must include a short Summary section.
+    - Must include a Threat Model section.
+    - Must include Findings with severity or risk ranking.
+    - Must include a Remediation Plan.
+    - Must include a Verification Checklist.
+    - Must include a Final Answer.
+
+constraints:
+  - Keep the review defensive and remediation-focused.
+  - Avoid exploit instructions beyond the minimum needed to describe risk.
+  - Call out assumptions and uncertainty.
+  - Prioritize fixes by user impact and likelihood.
+
+available_builtin_tools:
+  - call_model
+  - inspect_workspace
+
+success_criteria:
+  - name: requirement_coverage
+    weight: 0.35
+    description: Required security-review sections are present.
+  - name: risk_prioritization
+    weight: 0.25
+    description: Findings are ranked by severity, likelihood, and user impact.
+  - name: actionable_remediation
+    weight: 0.25
+    description: Remediation steps are concrete and defensive.
+  - name: verification_quality
+    weight: 0.15
+    description: Verification checklist proves the risk was reduced.
+
+evaluation_criteria:
+  - name: required_sections
+    weight: 0.45
+    method: section_check
+    description: Output includes the benchmark-required sections.
+  - name: security_prioritization
+    weight: 0.25
+    method: section_check
+    pattern: Must include Findings with severity or risk ranking.
+    description: Output ranks security findings by risk.
+  - name: remediation_specificity
+    weight: 0.20
+    method: section_check
+    pattern: Must include a Remediation Plan.
+    description: Output names concrete remediation work.
+  - name: usefulness
+    weight: 0.10
+    method: heuristic_usefulness
+    description: Output is specific, actionable, and constraint-aware.
+
+signal_policy:
+  layer_1_enabled: true
+  expose_aggregate_score: true
+  expose_score_delta: true
+  expose_direction: true
+
+evolution:
+  max_generations: 6
+  patience: 2
+  min_delta: 0.015
+  max_mutations_per_generation: 4
+  max_cost_usd: 4.0
+  max_workflow_steps: 8
+  max_roles: 6
+  max_environment_artifacts: 8
+  signal_mode: internal_plus_external_score
+  external_signal_weight: 0.20
+
+domain_tags:
+  - security_review
+  - risk_triage
+  - defensive_security
