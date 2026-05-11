@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -44,6 +44,9 @@ class EvaluationCriterion(BaseModel):
     pattern: str | None = None
 
 
+EvolutionSignalMode = Literal["internal_only", "internal_plus_external_score", "calibrated_internal"]
+
+
 class EvolutionConfig(BaseModel):
     max_generations: int = 5
     patience: int = 2
@@ -53,6 +56,24 @@ class EvolutionConfig(BaseModel):
     max_workflow_steps: int = 8
     max_roles: int = 6
     max_environment_artifacts: int = 8
+
+    signal_mode: EvolutionSignalMode = "internal_only"
+    external_signal_weight: float = 0.25
+    calibrator_max_weight_delta: float = 0.03
+
+    @field_validator("external_signal_weight")
+    @classmethod
+    def external_signal_weight_range(cls, value: float) -> float:
+        if value < 0.0 or value > 1.0:
+            raise ValueError("external_signal_weight must be between 0 and 1")
+        return value
+
+    @field_validator("calibrator_max_weight_delta")
+    @classmethod
+    def calibrator_max_weight_delta_range(cls, value: float) -> float:
+        if value < 0.0 or value > 0.25:
+            raise ValueError("calibrator_max_weight_delta must be between 0 and 0.25")
+        return value
 
 
 class Scenario(BaseModel):

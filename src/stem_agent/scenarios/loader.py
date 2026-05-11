@@ -14,6 +14,8 @@ class ScenarioBundle(BaseModel):
     scenario: Scenario
     train_cases: list[TaskCase]
     validation_cases: list[TaskCase]
+    external_benchmark_cases: list[TaskCase] = []
+    final_holdout_cases: list[TaskCase] = []
 
 
 def _read_jsonl(path: Path) -> list[TaskCase]:
@@ -50,4 +52,6 @@ def load_scenario(path: str | Path) -> ScenarioBundle:
         scenario=scenario,
         train_cases=_read_jsonl(root / "train_cases.jsonl"),
         validation_cases=_read_jsonl(root / "validation_cases.jsonl"),
+        external_benchmark_cases=_read_jsonl(root / "external_benchmark_cases.jsonl"),
+        final_holdout_cases=_read_jsonl(root / "final_holdout_cases.jsonl"),
     )

@@ -11,6 +11,7 @@ from stem_agent.genome.models import Genome
 from stem_agent.harness.runner import HarnessRunResult
 from stem_agent.llm.client import build_guardian_system_prompt
 from stem_agent.nucleus.model_client import ModelClient
+from stem_agent.kernel.evaluator_weights import EvaluatorWeights
 from stem_agent.scenarios.schema import Scenario
 
 
@@ -42,8 +43,9 @@ class EvaluationResult(BaseModel):
 class GuardianFitnessEvaluator:
     """Immutable promotion evaluator. Nucleus is not allowed to mutate this."""
 
-    def __init__(self, model_client: ModelClient | None = None):
+    def __init__(self, model_client: ModelClient | None = None, weights: EvaluatorWeights | None = None):
         self.model_client = model_client or ModelClient()
+        self.weights = weights or EvaluatorWeights()
 
     def configure_run(self, run_dir: str | Path | None) -> None:
         self.model_client.configure_run(run_dir)
@@ -145,21 +147,31 @@ class GuardianFitnessEvaluator:
         generated_tool_usage = self._generated_tool_usage(run)
         cost_penalty = min(run.cost_estimate / 5.0, 1.0)
 
+        w = self.weights
         raw_score = (
-            0.28 * requirement_coverage
-            + 0.14 * format_validity
-            + 0.12 * artifact_presence
-            + 0.16 * self_review_usage
-            + 0.14 * workflow_completion
-            + 0.08 * quality_gate_usage
-            + 0.08 * generated_tool_usage
-            - 0.03 * cost_penalty
-            - 0.05 * complexity_penalty
+            w.requirement_coverage * requirement_coverage
+            + w.format_validity * format_validity
+            + w.artifact_presence * artifact_presence
+            + w.self_review_usage * self_review_usage
+            + w.workflow_completion * workflow_completion
+            + w.quality_gate_usage * quality_gate_usage
+            + w.generated_tool_usage * generated_tool_usage
+            - w.cost_penalty * cost_penalty
+            - w.complexity_penalty * complexity_penalty
         )
         if run.blocked:
             raw_score -= 0.15
         score = self._clamp(raw_score)
         metrics = {
+            "evaluator_weight_requirement_coverage": w.requirement_coverage,
+            "evaluator_weight_format_validity": w.format_validity,
+            "evaluator_weight_artifact_presence": w.artifact_presence,
+            "evaluator_weight_self_review_usage": w.self_review_usage,
+            "evaluator_weight_workflow_completion": w.workflow_completion,
+            "evaluator_weight_quality_gate_usage": w.quality_gate_usage,
+            "evaluator_weight_generated_tool_usage": w.generated_tool_usage,
+            "evaluator_weight_cost_penalty": w.cost_penalty,
+            "evaluator_weight_complexity_penalty": w.complexity_penalty,
             "requirement_coverage": requirement_coverage,
             "scenario_success": scenario_success,
             "format_validity": format_validity,
