@@ -165,7 +165,7 @@ class TrainingTerminalReporter:
         score = "score n/a" if self.current_score is None else f"score {self.current_score:.4f}"
         best = "best n/a" if self.best_score is None else f"best {self.best_score:.4f}"
         line = (
-            f"Training progress [{bar}] {self.completed}/{self.total_generations} | "
+            f"Training progress 🧬 [{bar}] {self.completed}/{self.total_generations} | "
             f"{self.phase} | {score} | {best}"
         )
         return self._fit_to_terminal(line)
