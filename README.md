@@ -159,32 +159,57 @@ stem_agent inspect runs/openai_001
 
 Note: the app does not auto-load `.env`. Source it in each new shell before running `stem_agent`.
 
-## 🧪 Train On GSM8K Mini
+## 🧪 GSM8K Demo vs Full Training
 
-Use this when you want a benchmark-style math reasoning run.
+`stem_agent` has two GSM8K presets:
+
+- `gsm8k_demo`: a small smoke benchmark. Use it to confirm the math-reasoning training loop runs end to end.
+- `gsm8k_full`: a larger fixed-seed training/evaluation setup. Use it for reports or more credible benchmark-style experiments.
+
+`gsm8k_demo` is intentionally small and should not be reported as an official GSM8K result.
+The old `gsm8k_mini` name is kept only as a backwards-compatible alias for `gsm8k_demo`.
 
 ```bash
-stem_agent init-benchmark gsm8k_mini --n-train 30 --n-val 20
-stem_agent evolve scenarios/gsm8k_mini --run-id gsm8k_001
-stem_agent inspect runs/gsm8k_001
+stem_agent init-benchmark gsm8k_demo
+stem_agent evolve scenarios/gsm8k_demo --run-id gsm8k_demo_001
+stem_agent inspect runs/gsm8k_demo_001
 ```
+
+For fuller training:
+
+```bash
+stem_agent init-benchmark gsm8k_full
+stem_agent evolve scenarios/gsm8k_full --run-id gsm8k_full_001
+stem_agent inspect runs/gsm8k_full_001
+```
+
+Default split sizes:
+
+| Preset | Intended use | Train | Validation | Hidden |
+|---|---|---:|---:|---:|
+| `gsm8k_demo` | smoke test / quick demo | 5 | 5 | 10 |
+| `gsm8k_full` | report-oriented training run | 100 | 100 | 200 |
+
+`gsm8k_full` expects access to the official GSM8K data through `datasets` or the upstream
+grade-school-math JSONL files. The built-in fallback rows are only meant to keep
+`gsm8k_demo` usable offline.
 
 What each command does:
 
-- `init-benchmark`: downloads and writes the scenario train/validation data
+- `init-benchmark`: downloads and writes the scenario train/validation/hidden data
 - `evolve`: runs mutation, evaluation, archive selection, rollback, and final freeze
 - `inspect`: prints the top-level report
 
-The readable report is saved at:
+The readable report is saved under the selected run directory, for example:
 
 ```text
-runs/gsm8k_001/report.md
+runs/gsm8k_full_001/report.md
 ```
 
 Run the frozen harness after training:
 
 ```bash
-stem_agent execute runs/gsm8k_001/frozen_genome.yaml --input "A class has 6 tables with 4 students each. How many students are there?"
+stem_agent execute runs/gsm8k_full_001/frozen_genome.yaml --input "A class has 6 tables with 4 students each. How many students are there?"
 ```
 
 ## 🛑 Safe Stop Controls
@@ -192,10 +217,10 @@ stem_agent execute runs/gsm8k_001/frozen_genome.yaml --input "A class has 6 tabl
 Training can be safely paused, resumed, inspected, or frozen. These commands use the run id, not the run path:
 
 ```bash
-stem_agent pause gsm8k_001
-stem_agent status gsm8k_001
-stem_agent resume gsm8k_001
-stem_agent freeze-now gsm8k_001
+stem_agent pause gsm8k_full_001
+stem_agent status gsm8k_full_001
+stem_agent resume gsm8k_full_001
+stem_agent freeze-now gsm8k_full_001
 ```
 
 Meaning:
@@ -208,7 +233,7 @@ Meaning:
 Abort without promoting the current candidate:
 
 ```bash
-stem_agent abort gsm8k_001
+stem_agent abort gsm8k_full_001
 ```
 
 ## 📖 What To Read First
@@ -234,8 +259,8 @@ It contains:
 Use only the two main inspection commands unless you are debugging:
 
 ```bash
-stem_agent inspect runs/gsm8k_001
-stem_agent visualize runs/gsm8k_001
+stem_agent inspect runs/gsm8k_full_001
+stem_agent visualize runs/gsm8k_full_001
 ```
 
 `inspect` is the normal human view. `visualize` writes extra markdown panels under `runs/<run_id>/visuals/`.
@@ -321,8 +346,8 @@ signal_policy:
 Run a signal-policy ablation:
 
 ```bash
-stem_agent evolve scenarios/gsm8k_mini --run-id gsm8k_blind --signal-policy-override layer_1_enabled=false
-stem_agent evolve scenarios/gsm8k_mini --run-id gsm8k_signal
+stem_agent evolve scenarios/gsm8k_full --run-id gsm8k_blind --signal-policy-override layer_1_enabled=false
+stem_agent evolve scenarios/gsm8k_full --run-id gsm8k_signal
 stem_agent compare-ablations runs/gsm8k_blind runs/gsm8k_signal
 ```
 

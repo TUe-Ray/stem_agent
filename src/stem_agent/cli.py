@@ -113,34 +113,80 @@ def init_scenario(path: Path) -> None:
 @app.command("init-benchmark")
 def init_benchmark(
     name: str,
-    n_train: int = typer.Option(30, "--n-train"),
-    n_val: int = typer.Option(20, "--n-val"),
+    n_train: Optional[int] = typer.Option(None, "--n-train"),
+    n_val: Optional[int] = typer.Option(None, "--n-val"),
+    n_hidden: Optional[int] = typer.Option(None, "--n-hidden"),
     seed: int = typer.Option(42, "--seed"),
 ) -> None:
-    if name != "gsm8k_mini":
-        raise typer.BadParameter("Supported benchmark: gsm8k_mini")
-    path = Path("scenarios") / name
+    preset = _gsm8k_benchmark_preset(name)
+    scenario_name = str(preset["scenario_name"])
+    train_count = n_train if n_train is not None else int(preset["n_train"])
+    val_count = n_val if n_val is not None else int(preset["n_val"])
+    hidden_count = n_hidden if n_hidden is not None else int(preset["n_hidden"])
+    if train_count <= 0 or val_count <= 0 or hidden_count < 0:
+        raise typer.BadParameter("GSM8K split sizes must be positive; --n-hidden may be zero")
+
+    path = Path("scenarios") / scenario_name
     path.mkdir(parents=True, exist_ok=True)
-    all_cases, _ = download_gsm8k_sample(n_train=n_train + n_val + 10, n_val=0, seed=seed)
-    train_cases = [dict(item, id=f"train_{index + 1:03d}") for index, item in enumerate(all_cases[:n_train])]
-    val_cases = [
-        dict(item, id=f"val_{index + 1:03d}")
-        for index, item in enumerate(all_cases[n_train : n_train + n_val])
-    ]
-    hidden_cases = [
-        dict(item, id=f"hidden_{index + 1:03d}")
-        for index, item in enumerate(all_cases[n_train + n_val : n_train + n_val + 10])
-    ]
+    if preset["source_policy"] == "official_train_test":
+        train_source, _ = download_gsm8k_sample(
+            n_train=train_count,
+            n_val=0,
+            seed=seed,
+            split="train",
+        )
+        test_source, _ = download_gsm8k_sample(
+            n_train=val_count + hidden_count,
+            n_val=0,
+            seed=seed,
+            split="test",
+        )
+        train_cases = [
+            dict(item, id=f"train_{index + 1:03d}")
+            for index, item in enumerate(train_source)
+        ]
+        val_cases = [
+            dict(item, id=f"val_{index + 1:03d}")
+            for index, item in enumerate(test_source[:val_count])
+        ]
+        hidden_cases = [
+            dict(item, id=f"hidden_{index + 1:03d}")
+            for index, item in enumerate(test_source[val_count : val_count + hidden_count])
+        ]
+    else:
+        all_cases, _ = download_gsm8k_sample(
+            n_train=train_count + val_count + hidden_count,
+            n_val=0,
+            seed=seed,
+            split="test",
+        )
+        train_cases = [
+            dict(item, id=f"train_{index + 1:03d}")
+            for index, item in enumerate(all_cases[:train_count])
+        ]
+        val_cases = [
+            dict(item, id=f"val_{index + 1:03d}")
+            for index, item in enumerate(all_cases[train_count : train_count + val_count])
+        ]
+        hidden_cases = [
+            dict(item, id=f"hidden_{index + 1:03d}")
+            for index, item in enumerate(
+                all_cases[train_count + val_count : train_count + val_count + hidden_count]
+            )
+        ]
     train_inputs = {json.dumps(item["input"], sort_keys=True) for item in train_cases}
     val_inputs = {json.dumps(item["input"], sort_keys=True) for item in val_cases}
     if train_inputs & val_inputs:
         raise RuntimeError("GSM8K train/validation split overlap detected")
-    scenario = _gsm8k_scenario_yaml()
+    scenario = _gsm8k_scenario_yaml(scenario_name, preset=str(preset["preset"]))
     (path / "scenario.yaml").write_text(yaml.safe_dump(scenario, sort_keys=False), encoding="utf-8")
     _write_jsonl(path / "train_cases.jsonl", train_cases)
     _write_jsonl(path / "validation_cases.jsonl", val_cases)
     _write_jsonl(path / "hidden_cases.jsonl", hidden_cases)
-    typer.echo(f"✅ Initialized benchmark at {path}")
+    typer.echo(
+        f"✅ Initialized {scenario_name} at {path} "
+        f"({len(train_cases)} train, {len(val_cases)} validation, {len(hidden_cases)} hidden)"
+    )
 
 
 @app.command()
@@ -465,11 +511,77 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     )
 
 
-def _gsm8k_scenario_yaml() -> dict[str, Any]:
+def _gsm8k_benchmark_preset(name: str) -> dict[str, Any]:
+    presets: dict[str, dict[str, Any]] = {
+        "gsm8k_demo": {
+            "scenario_name": "gsm8k_demo",
+            "preset": "demo",
+            "n_train": 5,
+            "n_val": 5,
+            "n_hidden": 10,
+            "source_policy": "sampled_test_smoke",
+        },
+        "gsm8k_mini": {
+            "scenario_name": "gsm8k_demo",
+            "preset": "demo",
+            "n_train": 5,
+            "n_val": 5,
+            "n_hidden": 10,
+            "source_policy": "sampled_test_smoke",
+        },
+        "gsm8k_full": {
+            "scenario_name": "gsm8k_full",
+            "preset": "full",
+            "n_train": 100,
+            "n_val": 100,
+            "n_hidden": 200,
+            "source_policy": "official_train_test",
+        },
+    }
+    try:
+        return presets[name]
+    except KeyError as exc:
+        raise typer.BadParameter(
+            "Supported GSM8K benchmarks: gsm8k_demo, gsm8k_full "
+            "(legacy alias: gsm8k_mini)"
+        ) from exc
+
+
+def _gsm8k_scenario_yaml(name: str, *, preset: str) -> dict[str, Any]:
+    if preset == "full":
+        description = (
+            "Fuller GSM8K research scenario using official train examples for training "
+            "and held-out official test examples for validation/hidden evaluation"
+        )
+        evolution = {
+            "max_generations": 12,
+            "patience": 4,
+            "min_delta": 0.01,
+            "max_mutations_per_generation": 4,
+            "max_cost_usd": 10.0,
+            "max_workflow_steps": 8,
+            "max_roles": 6,
+            "max_environment_artifacts": 8,
+        }
+    else:
+        description = (
+            "Small GSM8K smoke scenario for checking that math-reasoning evolution runs end to end"
+        )
+        evolution = {
+            "max_generations": 5,
+            "patience": 2,
+            "min_delta": 0.02,
+            "max_mutations_per_generation": 4,
+            "max_cost_usd": 2.0,
+            "max_workflow_steps": 8,
+            "max_roles": 6,
+            "max_environment_artifacts": 8,
+        }
+
     return {
         "scenario": {
-            "name": "gsm8k_mini",
-            "description": "Grade school math word problems requiring multi-step arithmetic reasoning",
+            "name": name,
+            "description": description,
             "task_class": "structured_reasoning",
         },
         "input_format": {
@@ -526,16 +638,7 @@ def _gsm8k_scenario_yaml() -> dict[str, Any]:
                 "description": "Reasoning does not introduce unsupported numbers.",
             },
         ],
-        "evolution": {
-            "max_generations": 10,
-            "patience": 4,
-            "min_delta": 0.03,
-            "max_mutations_per_generation": 4,
-            "max_cost_usd": 2.0,
-            "max_workflow_steps": 8,
-            "max_roles": 6,
-            "max_environment_artifacts": 8,
-        },
+        "evolution": evolution,
     }
 
 

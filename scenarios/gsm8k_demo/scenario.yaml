@@ -1,6 +1,6 @@
 scenario:
-  name: gsm8k_mini
-  description: Grade school math word problems requiring multi-step arithmetic reasoning
+  name: gsm8k_demo
+  description: Small GSM8K smoke scenario for checking that math-reasoning evolution runs end to end
   task_class: structured_reasoning
 input_format:
   type: text
@@ -43,9 +43,9 @@ success_criteria:
     weight: 0.1
     description: Reasoning does not introduce unsupported numbers.
 evolution:
-  max_generations: 10
-  patience: 4
-  min_delta: 0.03
+  max_generations: 5
+  patience: 2
+  min_delta: 0.02
   max_mutations_per_generation: 4
   max_cost_usd: 2.0
   max_workflow_steps: 8

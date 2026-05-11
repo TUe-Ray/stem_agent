@@ -7,17 +7,28 @@ import urllib.request
 from typing import Any
 
 
-GSM8K_TEST_URL = (
-    "https://raw.githubusercontent.com/openai/grade-school-math/"
-    "master/grade_school_math/data/test.jsonl"
-)
+GSM8K_URLS = {
+    "train": (
+        "https://raw.githubusercontent.com/openai/grade-school-math/"
+        "master/grade_school_math/data/train.jsonl"
+    ),
+    "test": (
+        "https://raw.githubusercontent.com/openai/grade-school-math/"
+        "master/grade_school_math/data/test.jsonl"
+    ),
+}
 
 
-def download_gsm8k_sample(n_train: int = 30, n_val: int = 20, seed: int = 42) -> tuple[list, list]:
+def download_gsm8k_sample(
+    n_train: int = 30,
+    n_val: int = 20,
+    seed: int = 42,
+    split: str = "test",
+) -> tuple[list, list]:
     """
     Download a GSM8K sample and return non-overlapping train/validation cases.
     """
-    rows = _load_gsm8k_rows()
+    rows = _load_gsm8k_rows(split=split)
     rng = random.Random(seed)
     shuffled = list(rows)
     rng.shuffle(shuffled)
@@ -40,20 +51,22 @@ def exact_match_after_extraction(predicted: str, expected: str) -> float:
     return 1.0 if _normalize_number(numbers[-1]) == _normalize_number(expected) else 0.0
 
 
-def _load_gsm8k_rows() -> list[dict[str, Any]]:
+def _load_gsm8k_rows(split: str = "test") -> list[dict[str, Any]]:
+    if split not in GSM8K_URLS:
+        raise ValueError(f"Unsupported GSM8K split: {split}")
     try:
         try:
             from datasets import load_dataset  # type: ignore
         except ImportError:
             load_dataset = None
         if load_dataset is not None:
-            dataset = load_dataset("gsm8k", "main", split="test")
+            dataset = load_dataset("gsm8k", "main", split=split)
             return [{"question": row["question"], "answer": row["answer"]} for row in dataset]
     except Exception:
         pass
 
     try:
-        with urllib.request.urlopen(GSM8K_TEST_URL, timeout=5) as response:
+        with urllib.request.urlopen(GSM8K_URLS[split], timeout=5) as response:
             text = response.read().decode("utf-8")
         return [json.loads(line) for line in text.splitlines() if line.strip()]
     except Exception:

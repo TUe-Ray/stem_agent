@@ -290,7 +290,7 @@ class EvolutionLoop:
             )
             seed_genome = (
                 self._gsm8k_baseline_genome(bundle.scenario.name)
-                if bundle.scenario.name == "gsm8k_mini"
+                if bundle.scenario.name in {"gsm8k_demo", "gsm8k_full", "gsm8k_mini"}
                 else load_default_genome()
             )
             genome = self.nucleus.attach_diagnosis(seed_genome, diagnosis, bundle.scenario)
