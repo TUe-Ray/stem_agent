@@ -133,6 +133,41 @@ def test_format_training_detail_event_shows_run_overview():
     assert "hidden evaluation: not configured" in overview
 
 
+def test_format_training_detail_event_structures_case_progress():
+    started = _format_training_detail_event(
+        {
+            "event": "case_start",
+            "label": "frozen",
+            "split": "validation",
+            "case_id": "val_001",
+        }
+    )
+    completed = _format_training_detail_event(
+        {
+            "event": "case_complete",
+            "label": "frozen",
+            "split": "validation",
+            "case_id": "val_001",
+            "output_summary": "```markdown ### Summary Prepare clearly. ```",
+        }
+    )
+    artifacts = _format_training_detail_event(
+        {
+            "event": "evaluation_artifacts_written",
+            "label": "frozen",
+            "outputs_dir": "runs/demo_001/final_evaluation/outputs",
+            "traces_path": "runs/demo_001/final_evaluation/frozen_traces.jsonl",
+        }
+    )
+
+    assert started == "▶ Case started  | label=frozen | split=validation | case=val_001"
+    assert "✅ Case complete | label=frozen | split=validation | case=val_001" in completed
+    assert "preview: ### Summary Prepare clearly." in completed
+    assert "💾 Artifacts     | label=frozen" in artifacts
+    assert "outputs: runs/demo_001/final_evaluation/outputs" in artifacts
+    assert "traces:  runs/demo_001/final_evaluation/frozen_traces.jsonl" in artifacts
+
+
 def test_training_reporter_prints_progress_and_details_without_ansi():
     stream = StringIO()
     reporter = _TrainingTerminalReporter(

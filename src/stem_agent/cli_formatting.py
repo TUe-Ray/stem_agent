@@ -411,21 +411,20 @@ def format_training_detail_event(event: dict) -> str:
             lines.append(f"  {mutation}")
         return "\n".join(lines)
     if event_type == "case_start":
-        return (
-            f"  running {event.get('label')} {event.get('split')} case "
-            f"{event.get('case_id')}"
-        )
+        return f"▶ Case started  | {_case_context(event)}"
     if event_type == "case_complete":
-        return (
-            f"  completed {event.get('label')} {event.get('split')} case "
-            f"{event.get('case_id')}: {event.get('output_summary')}"
+        return "\n".join(
+            [
+                f"✅ Case complete | {_case_context(event)}",
+                f"   preview: {_clean_output_preview(event.get('output_summary'))}",
+            ]
         )
     if event_type == "evaluation_artifacts_written":
         return "\n".join(
             [
-                f"Evaluation artifacts written for {event.get('label')}",
-                f"  outputs: {event.get('outputs_dir')}",
-                f"  traces: {event.get('traces_path')}",
+                f"💾 Artifacts     | label={event.get('label')}",
+                f"   outputs: {event.get('outputs_dir')}",
+                f"   traces:  {event.get('traces_path')}",
             ]
         )
     if event_type == "evaluation_complete":
@@ -558,6 +557,21 @@ def _mutation_context(event: dict) -> str:
     if mutation_index is None:
         return ""
     return f"Mutation candidate: {mutation_index}"
+
+
+def _case_context(event: dict) -> str:
+    return (
+        f"label={event.get('label')} | "
+        f"split={event.get('split')} | "
+        f"case={event.get('case_id')}"
+    )
+
+
+def _clean_output_preview(summary: object) -> str:
+    text = " ".join(str(summary or "").split())
+    for marker in ("```markdown", "```"):
+        text = text.replace(marker, "").strip()
+    return text or "empty output"
 
 
 def format_transcript_event(trace: dict) -> str:
