@@ -17,6 +17,7 @@ from stem_agent.genome.loader import load_genome
 from stem_agent.harness.builder import HarnessBuilder
 from stem_agent.harness.runner import HarnessRunner
 from stem_agent.kernel.versioning import GitProvenance, GitRunConfig
+from stem_agent.kernel.signal_audit import SignalLeakAuditor, nucleus_visible_artifact_paths
 from stem_agent.kernel.versioning import GenomeArchive
 from stem_agent.scenarios.loader import load_scenario
 from stem_agent.scenarios.schema import TaskCase
@@ -820,3 +821,16 @@ def _infer_scenario_path(frozen_genome: Path) -> Path:
 
 if __name__ == "__main__":
     app()
+
+
+@app.command("audit-signal-leak")
+def audit_signal_leak(run_dir: Path, scenario_path: Path) -> None:
+    bundle = load_scenario(scenario_path)
+    ids = [c.id for c in bundle.final_holdout_cases]
+    texts = [str(c.input) for c in bundle.final_holdout_cases]
+    ids.extend(c.id for c in bundle.external_benchmark_cases)
+    texts.extend(str(c.input) for c in bundle.external_benchmark_cases)
+    auditor = SignalLeakAuditor(forbidden_case_ids=ids, forbidden_case_texts=texts)
+    for path in nucleus_visible_artifact_paths(run_dir):
+        auditor.assert_no_leak_in_file(path)
+    typer.echo("Signal leak audit: PASS")

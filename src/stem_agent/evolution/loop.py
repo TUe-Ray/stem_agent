@@ -48,6 +48,20 @@ class EvolutionRunResult(BaseModel):
 
 
 class EvolutionLoop:
+    def _combine_external_signal(
+        self,
+        *,
+        internal_result: EvaluationResult,
+        external_result: EvaluationResult | None,
+        signal_mode: str,
+        external_signal_weight: float,
+    ) -> EvaluationResult:
+        if signal_mode != "internal_plus_external_score" or external_result is None:
+            return internal_result.model_copy(update={"metrics": {**internal_result.metrics, "internal_promotion_score": float(internal_result.promotion_score), "external_dev_score": 0.0, "external_signal_weight": 0.0, "signal_mode": signal_mode}, "split_policy": f"{internal_result.split_policy}+{signal_mode}"})
+        external_score = float(external_result.train_score)
+        combined = (1.0 - external_signal_weight) * float(internal_result.promotion_score) + external_signal_weight * external_score
+        return internal_result.model_copy(update={"score": combined, "promotion_score": combined, "metrics": {**internal_result.metrics, "internal_promotion_score": float(internal_result.promotion_score), "external_dev_score": external_score, "external_signal_weight": float(external_signal_weight), "signal_mode": signal_mode}, "split_policy": "internal_plus_external_score_weighted"})
+
     def _fitness_vector(self, result: EvaluationResult) -> dict[str, float]:
         return {
             "promotion_score": float(result.promotion_score),
