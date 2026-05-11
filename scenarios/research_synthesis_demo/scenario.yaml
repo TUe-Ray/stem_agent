@@ -1,5 +1,5 @@
 scenario:
-  name: research_synthesis_mini
+  name: research_synthesis_demo
   description: >
     Synthesize supplied notes for a focused research question, separate evidence from inference,
     identify uncertainty, and recommend a next action.

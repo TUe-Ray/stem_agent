@@ -18,25 +18,25 @@ class BenchmarkScenario:
 
 ROBUSTNESS_BENCHMARKS: tuple[BenchmarkScenario, ...] = (
     BenchmarkScenario(
-        name="security_review_mini",
+        name="security_review_demo",
         task_class="security_review_triage",
-        path="scenarios/security_review_mini",
+        path="scenarios/security_review_demo",
         focus="Defensive review with threat model, severity ranking, remediation, and verification.",
-        run_id="security_review_mini_001",
+        run_id="security_review_demo_001",
     ),
     BenchmarkScenario(
-        name="research_synthesis_mini",
+        name="research_synthesis_demo",
         task_class="deep_research_synthesis",
-        path="scenarios/research_synthesis_mini",
+        path="scenarios/research_synthesis_demo",
         focus="Grounded synthesis from supplied notes with evidence, uncertainty, and recommendation.",
-        run_id="research_synthesis_mini_001",
+        run_id="research_synthesis_demo_001",
     ),
     BenchmarkScenario(
-        name="release_qa_triage_mini",
+        name="release_qa_triage_demo",
         task_class="release_quality_triage",
-        path="scenarios/release_qa_triage_mini",
+        path="scenarios/release_qa_triage_demo",
         focus="Release readiness triage with test plan, risk register, go/no-go call, and rollback.",
-        run_id="release_qa_triage_mini_001",
+        run_id="release_qa_triage_demo_001",
     ),
 )
 

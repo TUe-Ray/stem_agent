@@ -17,6 +17,8 @@ def test_robustness_benchmark_manifest_covers_distinct_task_classes():
         "deep_research_synthesis",
         "release_quality_triage",
     }
+    assert all(item.name.endswith("_demo") for item in ROBUSTNESS_BENCHMARKS)
+    assert all(item.path.endswith("_demo") for item in ROBUSTNESS_BENCHMARKS)
 
 
 def test_robustness_benchmarks_load_with_generalization_splits():

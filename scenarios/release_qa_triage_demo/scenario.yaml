@@ -1,5 +1,5 @@
 scenario:
-  name: release_qa_triage_mini
+  name: release_qa_triage_demo
   description: >
     Triage a software release for quality risk, identify blockers, produce a targeted test plan,
     and make a go/no-go recommendation with rollback steps.

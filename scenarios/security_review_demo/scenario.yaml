@@ -1,5 +1,5 @@
 scenario:
-  name: security_review_mini
+  name: security_review_demo
   description: >
     Review a product or engineering change for defensive security risk, rank the findings,
     and propose remediation plus verification steps.

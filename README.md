@@ -212,10 +212,13 @@ Run the frozen harness after training:
 stem_agent execute runs/gsm8k_full_001/frozen_genome.yaml --input "A class has 6 tables with 4 students each. How many students are there?"
 ```
 
-## 🧪 Robustness Mini Suite
+## 🧪 Robustness Demo Suite
 
-The repo also includes three small, static robustness benchmarks that exercise different task classes.
-They are not official leaderboards; use them to ask whether a stem agent can adapt beyond the default structured-answer demo.
+The repo also includes three small, static robustness demos that exercise different task classes.
+They follow the same naming idea as `gsm8k_demo`: small enough to run quickly, but not large enough to report as a final benchmark.
+
+The simple mental model is: change the scenario/parser, then let the same stem-agent loop differentiate.
+Here the scenario acts like the task parser: it names the input fields, expected output sections, constraints, and evaluator criteria.
 
 List the available benchmarks:
 
@@ -225,30 +228,33 @@ stem_agent list-benchmarks
 
 | Scenario | Task class | What it tests |
 |---|---|---|
-| `security_review_mini` | `security_review_triage` | Defensive security review, severity ranking, remediation, and verification. |
-| `research_synthesis_mini` | `deep_research_synthesis` | Grounded synthesis from supplied notes, uncertainty, confidence, and recommendation. |
-| `release_qa_triage_mini` | `release_quality_triage` | Release readiness, targeted test plan, risk register, go/no-go call, and rollback. |
+| `security_review_demo` | `security_review_triage` | Reviews designs such as password reset, OAuth callbacks, or CI/CD flows for threat model, severity, remediation, and verification. |
+| `research_synthesis_demo` | `deep_research_synthesis` | Synthesizes supplied notes into evidence, assumptions, unknowns, confidence, recommendation, and final answer. |
+| `release_qa_triage_demo` | `release_quality_triage` | Triage releases such as checkout, billing, API, or migration changes with test plan, risk register, go/no-go call, and rollback. |
 
 Run them one at a time:
 
 ```bash
-make evolve-security-review-mini
-make evolve-research-synthesis-mini
-make evolve-release-qa-triage-mini
+make evolve-security-review-demo
+make evolve-research-synthesis-demo
+make evolve-release-qa-triage-demo
 ```
 
-Or run the mini suite sequentially:
+Or run the demo suite sequentially:
 
 ```bash
-make evolve-robustness-mini
+make evolve-robustness-demo
 ```
 
-Each mini benchmark includes:
+Each demo benchmark includes:
 
 - train and validation cases for promotion
 - external benchmark cases for an aggregate auxiliary signal
 - hidden cases for observational leakage-safe checks
 - final holdout cases for the frozen harness
+
+For full training, create a matching `*_full` scenario with much larger fixed splits.
+The demo rows are useful for smoke tests; a report-oriented full run should have enough examples to measure generalization, for example 50-100 train cases, 50 validation cases, and separate hidden/final holdout sets.
 
 ## 🛑 Safe Stop Controls
 
