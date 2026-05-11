@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from stem_agent.genome.models import Genome
 from stem_agent.kernel.signal_policy import NucleusSignal, SignalPolicy
 from stem_agent.nucleus.operators import CrossoverMutation, FirstOrderMutation, MutationOperator
@@ -78,6 +80,7 @@ class MutationPlanner:
             mutation_history=mutation_history,
             signal_policy=signal_policy,
             failure_patterns=structured_failure_patterns,
+            max_mutations=scenario.evolution.max_mutations_per_generation,
         )
         result = self.model_client.call(
             prompt,
@@ -86,18 +89,125 @@ class MutationPlanner:
             temperature=0.8,
             role="nucleus",
         )
-        if isinstance(result, dict) and "mutation_plan" in result:
-            self.model_client.record_structured_output_repair()
-            result = result["mutation_plan"]
-        # If the LLM returned a single mutation proposal at the root, wrap it.
-        if isinstance(result, dict) and "mutation_type" in result and "proposed_mutations" not in result:
-            self.model_client.record_structured_output_repair()
-            result = {"summary": result.get("rationale", ""), "proposed_mutations": [result]}
+        result = self._normalize_model_result(
+            result,
+            scenario=scenario,
+            genome=genome,
+            failure_patterns=failure_patterns,
+        )
         try:
             return MutationPlan.model_validate(result)
         except Exception as exc:
             self.model_client.record_structured_output_repair()
             raise RuntimeError("Nucleus returned an invalid mutation plan.") from exc
+
+    def _normalize_model_result(
+        self,
+        result: Any,
+        *,
+        scenario: Scenario,
+        genome: Genome,
+        failure_patterns: list[str],
+    ) -> Any:
+        if not isinstance(result, dict):
+            return result
+        if "mutation_plan" in result:
+            self.model_client.record_structured_output_repair()
+            result = result["mutation_plan"]
+            if not isinstance(result, dict):
+                return result
+        if "mutation_type" in result and "proposed_mutations" not in result:
+            self.model_client.record_structured_output_repair()
+            return {
+                "summary": result.get("rationale", ""),
+                "failure_patterns": failure_patterns,
+                "proposed_mutations": [
+                    self._canonicalize_mutation(result, scenario=scenario, genome=genome)
+                ],
+            }
+        if "proposed_mutations" not in result:
+            return result
+        normalized = dict(result)
+        normalized["proposed_mutations"] = [
+            self._canonicalize_mutation(item, scenario=scenario, genome=genome)
+            for item in result.get("proposed_mutations", [])
+            if isinstance(item, dict)
+        ]
+        return normalized
+
+    def _canonicalize_mutation(
+        self,
+        item: dict[str, Any],
+        *,
+        scenario: Scenario,
+        genome: Genome,
+    ) -> dict[str, Any]:
+        mutation = dict(item)
+        mutation_type = str(mutation.get("mutation_type", ""))
+        if mutation_type == "modify_role":
+            mutation_type = "edit_role"
+            self.model_client.record_structured_output_repair()
+        mutation["mutation_type"] = mutation_type
+
+        if not mutation.get("target") and mutation.get("target_field"):
+            mutation["target"] = str(mutation["target_field"])
+            self.model_client.record_structured_output_repair()
+
+        patch = mutation.get("patch")
+        if (patch is None or patch == {}) and "new_value" in mutation:
+            patch = mutation["new_value"]
+            self.model_client.record_structured_output_repair()
+        if patch is None:
+            patch = {}
+        if not isinstance(patch, dict):
+            patch = {"value": patch}
+            self.model_client.record_structured_output_repair()
+
+        if mutation_type == "add_quality_gate" and not self._looks_like_quality_gate_patch(patch):
+            patch = self._default_quality_gate_patch()
+            mutation.setdefault("target", "quality_gates")
+            self.model_client.record_structured_output_repair()
+        elif mutation_type == "add_workflow_step" and not self._looks_like_workflow_step_patch(patch):
+            patch = self._default_review_step_patch(genome)
+            mutation.setdefault("target", "workflow")
+            self.model_client.record_structured_output_repair()
+        elif mutation_type == "modify_self_evaluation" and not patch:
+            patch = {
+                "enabled": True,
+                "rubric": scenario.expected_output.requirements,
+            }
+            mutation.setdefault("target", "self_evaluation")
+            self.model_client.record_structured_output_repair()
+
+        mutation["patch"] = patch
+        mutation.pop("target_field", None)
+        mutation.pop("new_value", None)
+        return mutation
+
+    def _looks_like_quality_gate_patch(self, patch: dict[str, Any]) -> bool:
+        return all(key in patch for key in ["name", "description", "check_type"])
+
+    def _looks_like_workflow_step_patch(self, patch: dict[str, Any]) -> bool:
+        return all(key in patch for key in ["id", "role", "action"])
+
+    def _default_quality_gate_patch(self) -> dict[str, Any]:
+        return {
+            "name": "required_sections_gate",
+            "description": "Check that the output contains required scenario sections before final delivery.",
+            "check_type": "schema",
+            "required": True,
+        }
+
+    def _default_review_step_patch(self, genome: Genome) -> dict[str, Any]:
+        role = genome.workflow[-1].role if genome.workflow else genome.roles[0].name
+        input_from = [genome.workflow[-1].id] if genome.workflow else []
+        return {
+            "id": "review_against_requirements",
+            "role": role,
+            "action": "Review the draft or final output against the scenario requirements and write missing sections or revision notes.",
+            "input_from": input_from,
+            "output_key": "review_notes",
+        }
 
     def _operator_plan(
         self,
@@ -150,6 +260,7 @@ class MutationPlanner:
             mutation_history=mutation_history,
             signal_policy=signal_policy,
             failure_patterns=plan.failure_patterns,
+            max_mutations=scenario.evolution.max_mutations_per_generation,
         )
         self.model_client.audit_call(
             role="nucleus",
@@ -214,7 +325,7 @@ class MutationPlanner:
                     },
                 )
             )
-        elif (
+        if (
             not genome.environment.required_artifacts
             and "artifact_gap" in categories
             and self._scenario_wants_artifacts(scenario)
@@ -253,7 +364,7 @@ class MutationPlanner:
                     },
                 )
             )
-        elif not self._workflow_has(genome, "review_against_requirements"):
+        if not self._workflow_has(genome, "review_against_requirements"):
             mutations.append(
                 MutationProposal(
                     mutation_type="add_workflow_step",
@@ -270,7 +381,23 @@ class MutationPlanner:
                     },
                 )
             )
-        elif not self._workflow_has(genome, "revise_final_output"):
+        if not genome.quality_gates:
+            mutations.append(
+                MutationProposal(
+                    mutation_type="add_quality_gate",
+                    target="quality_gates",
+                    rationale="The harness should not finish without checking required output structure.",
+                    expected_improvement="Reduce missing required sections.",
+                    risk="May reject valid outputs if too strict.",
+                    patch={
+                        "name": "required_sections_gate",
+                        "description": "Check that the output contains required scenario sections before final delivery.",
+                        "check_type": "schema",
+                        "required": True,
+                    },
+                )
+            )
+        if not self._workflow_has(genome, "revise_final_output"):
             mutations.append(
                 MutationProposal(
                     mutation_type="add_workflow_step",
@@ -287,23 +414,7 @@ class MutationPlanner:
                     },
                 )
             )
-        elif not genome.quality_gates:
-            mutations.append(
-                MutationProposal(
-                    mutation_type="add_quality_gate",
-                    target="quality_gates",
-                    rationale="The harness should not finish without checking required output structure.",
-                    expected_improvement="Reduce missing required sections.",
-                    risk="May reject valid outputs if too strict.",
-                    patch={
-                        "name": "required_sections_gate",
-                        "description": "Check that the output contains required scenario sections before final delivery.",
-                        "check_type": "schema",
-                        "required": True,
-                    },
-                )
-            )
-        elif "requirement_sections_checker" not in self._generated_tool_names(genome):
+        if genome.quality_gates and "requirement_sections_checker" not in self._generated_tool_names(genome):
             mutations.append(
                 MutationProposal(
                     mutation_type="create_tool",
@@ -319,9 +430,10 @@ class MutationPlanner:
                     },
                 )
             )
-        elif (
+        if (
             "RequirementChecker" not in {role.name for role in genome.roles}
             and "RequirementChecker" not in lineage_summary
+            and len(mutations) < scenario.evolution.max_mutations_per_generation
         ):
             mutations.append(
                 MutationProposal(

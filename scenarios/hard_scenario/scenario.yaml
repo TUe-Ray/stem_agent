@@ -53,6 +53,35 @@ success_criteria:
     weight: 0.1
     description: "Harness avoids unnecessary complexity."
 
+evaluation_criteria:
+  - name: "required_sections"
+    weight: 0.2
+    method: "section_check"
+    description: "Required control sections are present."
+  - name: "operational_depth"
+    weight: 0.2
+    method: "regex_check"
+    description: "Output names owners, dependencies, and checkpoints."
+    pattern: "(owner|owners).*(dependenc|checkpoint)|(dependenc|checkpoint).*(owner|owners)"
+  - name: "risk_and_recovery"
+    weight: 0.2
+    method: "regex_check"
+    description: "Output includes realistic risks, mitigations, fallback, and recovery."
+    pattern: "(risk|risks).*(mitigation|mitigations).*(fallback|recovery)|(fallback|recovery).*(risk|risks)"
+  - name: "verification_specificity"
+    weight: 0.2
+    method: "regex_check"
+    description: "Verification is concrete and tied to acceptance."
+    pattern: "(verification|verify|checklist).*(acceptance|criterion|criteria)|(acceptance|criterion|criteria).*(verification|verify|checklist)"
+  - name: "reference_alignment"
+    weight: 0.1
+    method: "reference_notes_alignment"
+    description: "Output follows the case reference notes when available."
+  - name: "heuristic_usefulness"
+    weight: 0.1
+    method: "heuristic_usefulness"
+    description: "Output is actionable, specific, and constraint-aware."
+
 evolution:
   max_generations: 10
   patience: 3

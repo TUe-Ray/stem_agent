@@ -271,6 +271,59 @@ def test_requirement_matching_is_shared_by_evaluator_and_quality_gate(tmp_path):
     assert "Must include final answer" not in missing
 
 
+def test_self_evaluation_produces_trace_and_metric(tmp_path):
+    bundle = load_scenario("scenarios/toy_structured_answer")
+    genome = load_genome("src/stem_agent/genome/default_genome.yaml")
+    genome.self_evaluation = {
+        "enabled": True,
+        "rubric": bundle.scenario.expected_output.requirements,
+    }
+    harness = HarnessBuilder().materialize(
+        genome,
+        bundle.scenario,
+        workspace_dir=tmp_path / "self_eval_workspace",
+    )
+    runner = HarnessRunner(RoleRunner(ModelClient(test_mode=True)))
+    run = runner.run_case(harness, bundle.train_cases[0])
+
+    assert any(trace.get("event") == "self_evaluation" for trace in run.traces)
+    result = GuardianFitnessEvaluator().evaluate(
+        genome,
+        bundle.scenario,
+        [run],
+        audit=False,
+    )
+    assert result.metrics["self_review_usage"] > 0.0
+    assert result.metrics["safeguard_effectiveness"] > 0.3
+
+
+def test_reference_notes_alignment_rewards_case_specific_guidance():
+    bundle = load_scenario("scenarios/toy_structured_answer")
+    genome = load_genome("src/stem_agent/genome/default_genome.yaml")
+    evaluator = GuardianFitnessEvaluator()
+    generic = HarnessRunResult(
+        case_id="reference_alignment",
+        case_input={"user_request": "Plan a morning routine."},
+        reference_notes="Should include timed steps, tradeoffs, and final recommendation.",
+        final_output="## Summary\nPlan the morning.\n\n## Steps\n1. Do the work.\n\n## Final Answer\nProceed.",
+    )
+    specific = generic.model_copy(
+        update={
+            "final_output": (
+                "## Summary\nPlan a morning routine with timed steps.\n\n"
+                "## Steps\n1. Make a timed checklist.\n2. Name tradeoffs.\n\n"
+                "## Final Answer\nUse the final recommendation after protecting a buffer."
+            )
+        }
+    )
+
+    generic_score = evaluator.evaluate(genome, bundle.scenario, [generic], audit=False)
+    specific_score = evaluator.evaluate(genome, bundle.scenario, [specific], audit=False)
+
+    assert specific_score.metrics["reference_alignment"] > generic_score.metrics["reference_alignment"]
+    assert specific_score.promotion_score > generic_score.promotion_score
+
+
 def test_success_criteria_affect_default_evaluator_score():
     bundle = load_scenario("scenarios/toy_structured_answer")
     genome = load_genome("src/stem_agent/genome/default_genome.yaml")

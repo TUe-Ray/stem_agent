@@ -292,7 +292,12 @@ class EvolutionLoop:
             best_result = None
             baseline_result = None
             patience_left = bundle.scenario.evolution.patience
-            archive = GenomeArchive(max_size=10, run_dir=run_dir)
+            archive = GenomeArchive(
+                max_size=10,
+                run_dir=run_dir,
+                load_existing=False,
+                reset=True,
+            )
             current_parent_id = None
             stagnation_count = 0
             start_generation = 0
@@ -510,6 +515,7 @@ class EvolutionLoop:
 
             candidate_result = current_result
             generation_terminal_result = current_result
+            budget_stop_requested = False
             for index, mutation in enumerate(plan.proposed_mutations):
                 lineage.record_proposed_mutation(
                     generation,
@@ -748,6 +754,30 @@ class EvolutionLoop:
                     if control_result:
                         return control_result
                     continue
+                estimated_candidate_cost = max(current_result.cost_estimate, 0.01)
+                if not budget.can_spend(estimated_candidate_cost):
+                    stop_reason = "budget limit reached before next candidate evaluation"
+                    lineage.record(
+                        "budget_stop",
+                        generation=generation,
+                        mutation_index=index,
+                        remaining_usd=round(budget.remaining_usd, 4),
+                        estimated_candidate_cost=round(estimated_candidate_cost, 4),
+                        reason=stop_reason,
+                    )
+                    self._emit_event(
+                        event_sink,
+                        {
+                            "event": "budget_stop",
+                            "generation": generation,
+                            "index": index,
+                            "remaining_usd": budget.remaining_usd,
+                            "estimated_candidate_cost": estimated_candidate_cost,
+                            "reason": stop_reason,
+                        },
+                    )
+                    budget_stop_requested = True
+                    break
                 mutated_result = self._run_and_evaluate(
                     mutated_genome,
                     bundle,
@@ -960,6 +990,8 @@ class EvolutionLoop:
                     selected_score=round(selected_score, 4),
                 )
 
+            if budget_stop_requested:
+                break
             patience_left = self._finish_generation_patience(
                 patience_left,
                 generation_improved_best=generation_improved_best,

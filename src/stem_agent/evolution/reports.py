@@ -172,6 +172,7 @@ class ReportBuilder:
             "constraint_adherence",
             "actionability",
             "input_specificity",
+            "reference_alignment",
             "artifact_presence",
             "self_review_usage",
             "workflow_completion",

@@ -9,6 +9,7 @@ class EvaluatorWeights(BaseModel):
     constraint_adherence: float = 0.10
     actionability: float = 0.16
     input_specificity: float = 0.14
+    reference_alignment: float = 0.04
     artifact_presence: float = 0.08
     self_review_usage: float = 0.14
     workflow_completion: float = 0.08
@@ -28,6 +29,7 @@ class EvaluatorWeights(BaseModel):
             "constraint_adherence": self.constraint_adherence,
             "actionability": self.actionability,
             "input_specificity": self.input_specificity,
+            "reference_alignment": self.reference_alignment,
             "artifact_presence": self.artifact_presence,
             "self_review_usage": self.self_review_usage,
             "workflow_completion": self.workflow_completion,

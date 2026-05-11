@@ -158,6 +158,7 @@ class GuardianFitnessEvaluator:
         constraint_adherence = self._constraint_adherence(scenario, output)
         actionability = self._actionability(output)
         input_specificity = self._input_specificity(run, output)
+        reference_alignment = self._reference_notes_alignment(run, output)
         artifact_presence = self._artifact_presence(run)
         self_review_usage = self._self_review_usage(run, output)
         workflow_completion = self._workflow_completion(genome, run)
@@ -178,6 +179,7 @@ class GuardianFitnessEvaluator:
             "constraint_adherence": constraint_adherence,
             "actionability": actionability,
             "input_specificity": input_specificity,
+            "reference_alignment": reference_alignment,
             "artifact_presence": artifact_presence,
             "self_review_usage": self_review_usage,
             "workflow_completion": workflow_completion,
@@ -212,6 +214,7 @@ class GuardianFitnessEvaluator:
             "constraint_adherence": constraint_adherence,
             "actionability": actionability,
             "input_specificity": input_specificity,
+            "reference_alignment": reference_alignment,
             "artifact_presence": artifact_presence,
             "self_review_usage": self_review_usage,
             "workflow_completion": workflow_completion,
@@ -299,7 +302,7 @@ class GuardianFitnessEvaluator:
             return exact_match_after_extraction(output, run.expected_output or "")
         if method == "regex_check":
             expression = pattern or r"\d+.*[\+\-\*\/].*\d+"
-            return 1.0 if re.search(expression, output, re.DOTALL) else 0.0
+            return 1.0 if re.search(expression, output, re.DOTALL | re.IGNORECASE) else 0.0
         if method == "section_check":
             requirements = [pattern] if pattern else scenario.expected_output.requirements
             coverage, _ = self._requirement_coverage(requirements, output)
@@ -307,9 +310,12 @@ class GuardianFitnessEvaluator:
         if method == "heuristic_usefulness":
             return self._clamp(
                 0.45 * self._actionability(output)
-                + 0.35 * self._input_specificity(run, output)
-                + 0.20 * self._constraint_adherence(scenario, output)
+                + 0.25 * self._input_specificity(run, output)
+                + 0.20 * self._reference_notes_alignment(run, output)
+                + 0.10 * self._constraint_adherence(scenario, output)
             )
+        if method == "reference_notes_alignment":
+            return self._reference_notes_alignment(run, output)
         if method == "llm_rubric":
             return self._llm_rubric_score(scenario, run, output)
         if method == "llm_judge":
@@ -355,9 +361,9 @@ class GuardianFitnessEvaluator:
         if any(token in text for token in ["format", "markdown", "structure", "readable"]):
             return ["format_validity"]
         if any(token in text for token in ["useful", "action", "operator"]):
-            return ["actionability", "input_specificity"]
+            return ["actionability", "input_specificity", "reference_alignment"]
         if any(token in text for token in ["specific", "relevant", "context"]):
-            return ["input_specificity"]
+            return ["input_specificity", "reference_alignment"]
         if any(token in text for token in ["constraint", "clarification"]):
             return ["constraint_adherence"]
         if any(token in text for token in ["review", "qa", "verification"]):
@@ -458,6 +464,8 @@ class GuardianFitnessEvaluator:
         if genome.self_evaluation.get("enabled"):
             score += 0.20
         if genome.self_evaluation.get("rubric"):
+            score += 0.10
+        if any(trace.get("event") == "self_evaluation" and trace.get("passed") for trace in run.traces):
             score += 0.10
         if genome.quality_gates:
             score += 0.15
@@ -592,6 +600,17 @@ class GuardianFitnessEvaluator:
         coverage = overlap / max(len(set(input_words)), 1)
         return self._clamp(0.25 + 0.75 * coverage)
 
+    def _reference_notes_alignment(self, run: HarnessRunResult, output: str) -> float:
+        notes = getattr(run, "reference_notes", "") or ""
+        note_words = self._content_words(notes)
+        if not note_words:
+            return 0.5
+        output_words = set(self._content_words(output))
+        important = set(note_words)
+        overlap = sum(1 for word in important if word in output_words)
+        coverage = overlap / max(len(important), 1)
+        return self._clamp(0.20 + 0.80 * coverage)
+
     def _content_words(self, text: str) -> list[str]:
         stop_words = {
             "about",
@@ -623,8 +642,9 @@ class GuardianFitnessEvaluator:
     ) -> float:
         heuristic = self._clamp(
             0.40 * self._actionability(output)
-            + 0.35 * self._input_specificity(run, output)
-            + 0.25 * self._constraint_adherence(scenario, output)
+            + 0.25 * self._input_specificity(run, output)
+            + 0.20 * self._reference_notes_alignment(run, output)
+            + 0.15 * self._constraint_adherence(scenario, output)
         )
         if self.model_client.test_mode:
             return heuristic
@@ -772,6 +792,8 @@ class GuardianFitnessEvaluator:
         if "check the draft" in output_lower or "quality review" in output_lower:
             score += 0.25
         if "review notes applied" in output_lower:
+            score += 0.25
+        if any(trace.get("event") == "self_evaluation" and trace.get("passed") for trace in run.traces):
             score += 0.25
         if any(trace.get("step_id") == "review_against_requirements" for trace in run.traces):
             score += 0.25

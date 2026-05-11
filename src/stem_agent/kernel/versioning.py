@@ -45,14 +45,19 @@ class GenomeArchive:
         *,
         run_dir: str | Path | None = None,
         entries: list[dict[str, Any]] | None = None,
+        load_existing: bool = True,
+        reset: bool = False,
     ):
         self.max_size = max(1, int(max_size))
         self.run_dir = Path(run_dir) if run_dir else None
         self.entries: list[dict[str, Any]] = []
+        if reset and self.archive_path:
+            self.archive_path.parent.mkdir(parents=True, exist_ok=True)
+            self.archive_path.write_text("", encoding="utf-8")
         if entries:
             for entry in entries:
                 self._add_entry(dict(entry), persist=False)
-        elif self.archive_path and self.archive_path.exists():
+        elif load_existing and self.archive_path and self.archive_path.exists():
             self._load_from_jsonl(self.archive_path)
 
     @property

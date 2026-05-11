@@ -23,6 +23,7 @@ class HarnessRunResult(BaseModel):
     blocked: bool = False
     block_reason: str | None = None
     expected_output: str | None = None
+    reference_notes: str = ""
     case_input: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -72,6 +73,9 @@ class HarnessRunner:
                 ),
                 trace_sink,
             )
+            self_eval_trace = self._run_self_evaluation(harness, outputs)
+            if self_eval_trace:
+                self._record_trace(traces, self_eval_trace, trace_sink)
             gate_traces, gate_failure = self._run_quality_gates(harness, outputs)
             for trace in gate_traces:
                 self._record_trace(traces, trace, trace_sink)
@@ -108,6 +112,7 @@ class HarnessRunner:
                     blocked=True,
                     block_reason=gate_failure,
                     expected_output=case.expected_output,
+                    reference_notes=case.reference_notes,
                     case_input=dict(case.input),
                 )
 
@@ -120,6 +125,7 @@ class HarnessRunner:
             traces=traces,
             cost_estimate=self._estimate_cost(traces),
             expected_output=case.expected_output,
+            reference_notes=case.reference_notes,
             case_input=dict(case.input),
         )
 
@@ -251,6 +257,40 @@ class HarnessRunner:
                 return traces, f"Required quality gate failed: {gate.name}"
         return traces, None
 
+    def _run_self_evaluation(
+        self,
+        harness: MaterializedHarness,
+        outputs: dict[str, str],
+    ) -> dict[str, Any] | None:
+        if not harness.genome.self_evaluation.get("enabled"):
+            return None
+        if "final_output" not in outputs:
+            return None
+
+        final_output = self.extract_final(outputs)
+        missing = self._missing_required_sections(harness, final_output.lower())
+        rubric = harness.genome.self_evaluation.get("rubric") or []
+        if isinstance(rubric, str):
+            rubric_items = [rubric] if rubric.strip() else []
+        else:
+            rubric_items = [str(item) for item in rubric]
+        passed = not missing
+        outputs["self_evaluation"] = "\n".join(
+            [
+                "## Self Evaluation",
+                f"- Rubric items checked: {len(rubric_items)}",
+                f"- Missing required sections: {'none' if passed else '; '.join(missing)}",
+            ]
+        )
+        return {
+            "event": "self_evaluation",
+            "step_id": "self_evaluation",
+            "rubric_items": len(rubric_items),
+            "passed": passed,
+            "missing": missing,
+            "status": "completed",
+        }
+
     def _retry_with_reflection(
         self,
         *,
@@ -316,7 +356,8 @@ class HarnessRunner:
     def _estimate_cost(self, traces: list[dict[str, Any]]) -> float:
         workflow_cost = sum(1 for trace in traces if trace.get("event") == "workflow_step") * 0.01
         gate_cost = sum(1 for trace in traces if trace.get("event") == "quality_gate") * 0.002
-        return round(workflow_cost + gate_cost, 4)
+        self_eval_cost = 0.0
+        return round(workflow_cost + gate_cost + self_eval_cost, 4)
 
     def _missing_required_sections(
         self, harness: MaterializedHarness, output: str
