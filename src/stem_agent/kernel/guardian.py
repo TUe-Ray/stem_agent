@@ -136,13 +136,6 @@ class Guardian:
         genome: Genome | None = None,
         scenario: Scenario | None = None,
     ) -> ValidationResult:
-        if mutation.mutation_type == "awm_promoted":
-            try:
-                nested = self._nested_awm_mutation(mutation)
-            except ValueError as exc:
-                return ValidationResult.reject(str(exc))
-            return self.validate_mutation(nested, genome=genome, scenario=scenario)
-
         marker_text = f"{mutation.target} {mutation.rationale} {mutation.patch}".lower()
         for marker in PROTECTED_TARGET_MARKERS:
             if marker in marker_text:
@@ -306,8 +299,6 @@ class Guardian:
         return ValidationResult.allow("generated tool activated after static checks and tests"), activated
 
     def apply_mutation_safely(self, genome: Genome, mutation: MutationProposal) -> Genome:
-        if mutation.mutation_type == "awm_promoted":
-            mutation = self._nested_awm_mutation(mutation)
         mutated = genome.model_copy(deep=True)
         mutated.genome_version += 1
         patch = deepcopy(mutation.patch)
@@ -353,15 +344,6 @@ class Guardian:
             )
             mutated.tools["generated"] = generated
         return Genome.model_validate(mutated.model_dump(mode="json"))
-
-    def _nested_awm_mutation(self, mutation: MutationProposal) -> MutationProposal:
-        nested = mutation.patch.get("proposed_mutation")
-        if not isinstance(nested, dict):
-            raise ValueError("AWM wrapper requires patch.proposed_mutation")
-        nested_type = nested.get("mutation_type")
-        if nested_type == "awm_promoted":
-            raise ValueError("AWM wrapper cannot contain another awm_promoted mutation")
-        return MutationProposal.model_validate(nested)
 
     def evaluate_candidate(self, *args: Any, **kwargs: Any) -> EvaluationResult:
         return self.evaluator.evaluate(*args, **kwargs)

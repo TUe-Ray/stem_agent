@@ -21,7 +21,6 @@ MutationType = Literal[
     "modify_stop_rule",
     "modify_environment",
     "replace_genome",
-    "awm_promoted",
 ]
 
 

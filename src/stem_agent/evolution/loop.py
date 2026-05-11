@@ -33,9 +33,6 @@ from stem_agent.nucleus.operators import ZeroOrderMutation
 from stem_agent.nucleus.schemas import MutationProposal
 from stem_agent.nucleus.scenario_interpreter import ScenarioInterpreter
 from stem_agent.scenarios.loader import ScenarioBundle, load_scenario
-from stem_agent.skills.awm_bridge import AWMBridge
-from stem_agent.skills.extractor import SkillExtractor
-from stem_agent.skills.library import SkillLibrary
 
 
 class EvolutionRunResult(BaseModel):
@@ -88,7 +85,6 @@ class EvolutionLoop:
         harness_builder: HarnessBuilder | None = None,
         harness_runner: HarnessRunner | None = None,
         runs_root: str | Path = "runs",
-        skill_library_path: str | Path | None = None,
     ):
         self.settings = settings or load_settings()
         model_client = ModelClient(
@@ -110,10 +106,6 @@ class EvolutionLoop:
         )
         self.harness_builder = harness_builder or HarnessBuilder()
         self.runs_root = Path(runs_root)
-        default_skill_path = self.runs_root.parent / "skills" / "atoms.jsonl"
-        self.skill_library = SkillLibrary(skill_library_path or default_skill_path)
-        self.skill_extractor = SkillExtractor()
-        self.awm_bridge = AWMBridge()
 
     def resume(
         self,
@@ -318,7 +310,6 @@ class EvolutionLoop:
             hidden_baseline_score=self.guardian.hidden_baseline_score,
         )
         force_zero_order_next = False
-        pending_awm_candidates: list[MutationProposal] = []
 
         for generation in range(start_generation, bundle.scenario.convergence_policy.max_generations):
             generation_improved_best = False
@@ -470,11 +461,6 @@ class EvolutionLoop:
             failure_patterns = [pattern.kind for pattern in failure_pattern_objects]
             operator = ZeroOrderMutation() if force_zero_order_next else select_operator(archive, stagnation_count)
             force_zero_order_next = False
-            reusable_skills = self._retrieve_reusable_skills(
-                bundle=bundle,
-                run_id=run_id,
-            )
-            injected_skill_ids = [skill.id for skill in reusable_skills]
             plan = self.nucleus.plan(
                 scenario=bundle.scenario,
                 genome=genome,
@@ -489,16 +475,7 @@ class EvolutionLoop:
                 archive=archive,
                 mutation_history=signal_history,
                 signal_policy=bundle.scenario.signal_policy,
-                reusable_skills=reusable_skills,
             )
-            if pending_awm_candidates:
-                plan = plan.model_copy(
-                    update={
-                        "summary": "AWM candidates queued before Nucleus plan. " + plan.summary,
-                        "proposed_mutations": pending_awm_candidates + plan.proposed_mutations,
-                    }
-                )
-                pending_awm_candidates = []
             self._write_json(generation_dir / "mutation_plan.json", plan.model_dump(mode="json"))
             lineage.record_mutation_plan(
                 generation,
@@ -819,17 +796,6 @@ class EvolutionLoop:
                     hidden_regression = (
                         baseline_hidden is not None and baseline_hidden - hidden_score > 0.1
                     )
-                    extracted_skill_ids = self._extract_and_store_skills(
-                        old_genome=genome,
-                        new_genome=mutated_genome,
-                        mutation_type=mutation.mutation_type,
-                        score_before=candidate_result.promotion_score,
-                        score_after=mutated_result.promotion_score,
-                        run_id=run_id,
-                        scenario_name=bundle.scenario.name,
-                        generation=generation,
-                        domain_tags=bundle.scenario.effective_domain_tags,
-                    )
                     lineage.record_promoted_mutation(
                         generation,
                         mutation.mutation_type,
@@ -839,7 +805,6 @@ class EvolutionLoop:
                         mutation.rationale,
                         operator_type=operator.name,
                         hidden_eval_regression=hidden_regression,
-                        extracted_skill_ids=extracted_skill_ids,
                         origin=mutation.origin,
                         nucleus_signal=nucleus_signal_to_dict(mutation_signal),
                     )
@@ -1013,46 +978,6 @@ class EvolutionLoop:
                         generation=generation,
                         stagnation_count=stagnation_count,
                     )
-            observed_lift = generation_terminal_result.promotion_score - current_result.promotion_score
-            for skill_id in injected_skill_ids:
-                self.skill_library.record_observed_lift(
-                    skill_id=skill_id,
-                    run_id=run_id,
-                    observed_score_lift=observed_lift,
-                )
-            evicted_skill_ids = self.skill_library.tick_probation(run_id=run_id)
-            if evicted_skill_ids:
-                lineage.record(
-                    "skill_probation_evicted",
-                    generation=generation,
-                    skill_ids=evicted_skill_ids,
-                )
-            pending_awm_candidates = self.awm_bridge.analyze(
-                run_id,
-                {"run_dir": run_dir, "min_occurrences": 3},
-            )
-            if pending_awm_candidates:
-                lineage.record(
-                    "awm_candidates_queued",
-                    generation=generation,
-                    candidate_count=len(pending_awm_candidates),
-                    candidate_ids=[
-                        str(candidate.patch.get("candidate_id"))
-                        for candidate in pending_awm_candidates
-                    ],
-                )
-            saturation_atoms = self.skill_library.query_atoms(
-                bundle.scenario.effective_domain_tags,
-                current_run_id=run_id,
-                current_scenario_name=bundle.scenario.name,
-                top_k=5,
-            )
-            skill_saturation_available = bool(saturation_atoms)
-            skill_saturation = (
-                self.skill_library.saturation_score(bundle.scenario.effective_domain_tags)
-                if skill_saturation_available
-                else 0.0
-            )
             tokens_used_this_generation = max(
                 self._total_tokens_used(run_dir) - tokens_before_generation,
                 0,
@@ -1062,8 +987,6 @@ class EvolutionLoop:
                 validation_score=self._validation_score(generation_terminal_result),
                 hidden_eval_score=self._latest_hidden_score(run_dir, generation),
                 tokens_used_this_generation=tokens_used_this_generation,
-                skill_saturation_score=skill_saturation,
-                skill_saturation_available=skill_saturation_available,
                 zero_order_was_attempted=isinstance(operator, ZeroOrderMutation),
             )
             convergence_decision = convergence.evaluate()
@@ -1727,57 +1650,6 @@ class EvolutionLoop:
 
     def _write_json(self, path: Path, data: dict) -> None:
         path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
-
-    def _retrieve_reusable_skills(
-        self,
-        *,
-        bundle: ScenarioBundle,
-        run_id: str,
-    ):
-        skills = self.skill_library.query_atoms(
-            bundle.scenario.effective_domain_tags,
-            current_run_id=run_id,
-            current_scenario_name=bundle.scenario.name,
-            top_k=5,
-        )
-        for skill in skills:
-            if skill.origin_scenario_name != bundle.scenario.name:
-                self.skill_library.open_probation(
-                    skill.id,
-                    run_id=run_id,
-                    scenario_name=bundle.scenario.name,
-                )
-        return skills
-
-    def _extract_and_store_skills(
-        self,
-        *,
-        old_genome: Genome,
-        new_genome: Genome,
-        mutation_type: str,
-        score_before: float,
-        score_after: float,
-        run_id: str,
-        scenario_name: str,
-        generation: int,
-        domain_tags: list[str],
-    ) -> list[str]:
-        atoms = self.skill_extractor.extract(
-            old_genome=old_genome,
-            new_genome=new_genome,
-            mutation_type=mutation_type,
-            score_before=score_before,
-            score_after=score_after,
-            run_id=run_id,
-            scenario_name=scenario_name,
-            generation_number=generation,
-            scenario_domain_tags=domain_tags,
-        )
-        stored_ids: list[str] = []
-        for atom in atoms:
-            if self.skill_library.add_atom(atom):
-                stored_ids.append(atom.id)
-        return stored_ids
 
     def _validation_score(self, result: EvaluationResult) -> float:
         return float(result.validation_score if result.validation_score is not None else result.promotion_score)

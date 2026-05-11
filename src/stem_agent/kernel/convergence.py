@@ -10,7 +10,6 @@ from pydantic import BaseModel
 class ConvergencePolicy(BaseModel):
     plateau_window: int = 5
     plateau_epsilon: float = 0.01
-    skill_saturation_threshold: float = 0.7
     hidden_eval_stability_window: int = 3
     hidden_eval_stability_epsilon: float = 0.01
     absolute_score_threshold: float = 0.9
@@ -50,8 +49,6 @@ class ConvergenceEngine:
         self.hidden_eval_scores_per_generation: list[float | None] = []
         self.total_tokens_used = 0
         self.current_generation = 0
-        self.current_skill_saturation_score = 0.0
-        self.current_skill_saturation_available = False
         self.current_zero_order_was_attempted = False
         self.plateau_detected = False
         self.zero_order_attempted_after_plateau = False
@@ -70,16 +67,12 @@ class ConvergenceEngine:
         validation_score: float,
         hidden_eval_score: float | None,
         tokens_used_this_generation: int,
-        skill_saturation_score: float,
-        skill_saturation_available: bool = True,
         zero_order_was_attempted: bool,
     ) -> None:
         self.current_generation = generation_number
         self.validation_scores_per_generation.append(validation_score)
         self.hidden_eval_scores_per_generation.append(hidden_eval_score)
         self.total_tokens_used += max(int(tokens_used_this_generation), 0)
-        self.current_skill_saturation_score = skill_saturation_score
-        self.current_skill_saturation_available = skill_saturation_available
         self.current_zero_order_was_attempted = zero_order_was_attempted
         if self.plateau_detected and zero_order_was_attempted:
             self.zero_order_attempted_after_plateau = True
@@ -138,14 +131,8 @@ class ConvergenceEngine:
                 self._log(decision, criteria_votes)
                 return decision
             hidden_stable = self._hidden_eval_stable()
-            saturation_ready = (
-                self.current_skill_saturation_score >= policy.skill_saturation_threshold
-                if self.current_skill_saturation_available
-                else True
-            )
             criteria_votes["hidden_eval_stable"] = hidden_stable
-            criteria_votes["skill_saturation_ready"] = saturation_ready
-            if hidden_stable and saturation_ready:
+            if hidden_stable:
                 decision = ConvergenceDecision(
                     stop=True,
                     action="freeze_best",
@@ -224,8 +211,6 @@ class ConvergenceEngine:
             "validation_score_history": self.validation_scores_per_generation,
             "hidden_eval_score_history": self.hidden_eval_scores_per_generation,
             "total_tokens_used": self.total_tokens_used,
-            "skill_saturation_score": self.current_skill_saturation_score,
-            "skill_saturation_available": self.current_skill_saturation_available,
             "plateau_detected": decision.plateau_detected,
             "zero_order_attempted_after_plateau": self.zero_order_attempted_after_plateau,
             "criteria_votes": criteria_votes,
