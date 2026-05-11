@@ -1,0 +1,2 @@
+{"id":"val_001","input":{"user_request":"Help me prepare a structured response to a customer escalation where we missed a promised delivery date."},"reference_notes":"Should include summary, steps, acceptance criteria, QA review, and final answer."}
+{"id":"val_002","input":{"user_request":"Design a checklist for reviewing a support handoff document before it is sent to the operations team."},"reference_notes":"Should include a structured checklist, QA report, and final recommendation."}

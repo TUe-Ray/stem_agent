@@ -1,0 +1,2 @@
+{"id":"hidden_001","input":{"user_request":"Create a structured plan for a postmortem meeting after a service outage."},"reference_notes":"Should generalize to incident-review style tasks without seeing this case."}
+{"id":"hidden_002","input":{"user_request":"Help me organize a QA review for a release note before publishing it."},"reference_notes":"Should include quality review and final answer."}

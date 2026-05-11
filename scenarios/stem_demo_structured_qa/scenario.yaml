@@ -1,0 +1,60 @@
+scenario:
+  name: stem_demo_structured_qa
+  description: >
+    Produce structured, actionable answers for workplace planning and quality-assurance style tasks.
+    The answer must satisfy explicit output sections and avoid asking unnecessary follow-up questions.
+  task_class: structured_answer_quality_assurance
+input_format:
+  type: text
+  fields:
+    - name: user_request
+      required: true
+expected_output:
+  type: markdown
+  requirements:
+    - Must include a short Summary section.
+    - Must include concrete Steps.
+    - Must include Acceptance Criteria.
+    - Must include a QA Report or quality review.
+    - Must include a Final Answer.
+    - Must avoid unnecessary follow-up questions.
+constraints:
+  - Do not ask unnecessary clarifying questions.
+  - Prefer a complete first-pass answer.
+  - Keep the answer structured and actionable.
+available_builtin_tools:
+  - call_model
+success_criteria:
+  - name: requirement_coverage
+    weight: 0.45
+    description: Output covers all required sections.
+  - name: structure
+    weight: 0.25
+    description: Output is clearly structured in markdown.
+  - name: actionability
+    weight: 0.20
+    description: Output gives concrete next steps.
+  - name: concise_final_answer
+    weight: 0.10
+    description: Output ends with a useful final answer.
+evolution:
+  max_generations: 5
+  patience: 2
+  min_delta: 0.03
+  max_mutations_per_generation: 4
+  max_cost_usd: 2.0
+  max_workflow_steps: 8
+  max_roles: 6
+  max_environment_artifacts: 8
+convergence_policy:
+  plateau_window: 3
+  plateau_epsilon: 0.01
+  hidden_eval_stability_window: 2
+  hidden_eval_stability_epsilon: 0.02
+  absolute_score_threshold: 0.88
+  max_generations: 5
+  budget_token_limit: 200000
+domain_tags:
+  - structured_answer
+  - quality_assurance
+  - workplace_planning
