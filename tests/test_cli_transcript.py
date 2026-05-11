@@ -154,7 +154,7 @@ def test_training_reporter_prints_progress_and_details_without_ansi():
     )
 
     output = stream.getvalue()
-    assert output.splitlines()[0].startswith("Training progress")
+    assert output.splitlines()[0].startswith("🧬 Training")
     assert "=== Generation 1 ===" in output
     assert "Evaluation complete: current" in output
     assert "score 0.4200" in output

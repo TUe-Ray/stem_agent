@@ -107,7 +107,7 @@ def init_scenario(path: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
-    typer.echo(f"Initialized scenario at {path}")
+    typer.echo(f"✅ Initialized scenario at {path}")
 
 
 @app.command("init-benchmark")
@@ -140,7 +140,7 @@ def init_benchmark(
     _write_jsonl(path / "train_cases.jsonl", train_cases)
     _write_jsonl(path / "validation_cases.jsonl", val_cases)
     _write_jsonl(path / "hidden_cases.jsonl", hidden_cases)
-    typer.echo(f"Initialized benchmark at {path}")
+    typer.echo(f"✅ Initialized benchmark at {path}")
 
 
 @app.command()
@@ -192,12 +192,12 @@ def evolve(
     finally:
         if progress:
             progress.finish(status=result.status if result else "stopped")
-    typer.echo(f"Run directory: {result.run_dir}")
-    typer.echo(f"Status: {result.status}")
-    typer.echo(f"Baseline score: {result.baseline_score:.4f}")
-    typer.echo(f"Final score: {result.final_score:.4f}")
-    typer.echo(f"Frozen genome: {result.frozen_genome_path}")
-    typer.echo(f"Report: {result.report_path}")
+    typer.echo(f"📁 Run directory: {result.run_dir}")
+    typer.echo(f"🏷️  Status: {result.status}")
+    typer.echo(f"📉 Baseline score: {result.baseline_score:.4f}")
+    typer.echo(f"🏆 Final score: {result.final_score:.4f}")
+    typer.echo(f"❄️  Frozen genome: {result.frozen_genome_path}")
+    typer.echo(f"📄 Report: {result.report_path}")
 
 
 @app.command()
@@ -222,26 +222,26 @@ def inspect(run_path: Path) -> None:
 def compare(run_path: Path) -> None:
     baseline = _read_eval(run_path / "generation_000" / "eval_result.json")
     final = _read_eval(run_path / "final_evaluation" / "eval_result.json")
-    typer.echo(f"Baseline score: {baseline['promotion_score']:.6f}")
+    typer.echo(f"📉 Baseline score: {baseline['promotion_score']:.6f}")
     baseline_score_path = run_path / "baseline_genome_score.json"
     if baseline_score_path.exists():
         baseline_score = json.loads(baseline_score_path.read_text(encoding="utf-8"))
-        typer.echo(f"Baseline genome score: {float(baseline_score['score']):.6f}")
-    typer.echo(f"Final score: {final['promotion_score']:.6f}")
-    typer.echo(f"Improvement: {final['promotion_score'] - baseline['promotion_score']:.6f}")
+        typer.echo(f"📉 Baseline genome score: {float(baseline_score['score']):.6f}")
+    typer.echo(f"🏆 Final score: {final['promotion_score']:.6f}")
+    typer.echo(f"📈 Improvement: {final['promotion_score'] - baseline['promotion_score']:.6f}")
     baseline_external_path = run_path / "generation_000" / "external_benchmark" / "eval_result.json"
     final_external_path = run_path / "final_evaluation" / "external_benchmark" / "eval_result.json"
     if baseline_external_path.exists() or final_external_path.exists():
         baseline_external = _read_eval(baseline_external_path) if baseline_external_path.exists() else None
         final_external = _read_eval(final_external_path) if final_external_path.exists() else None
         typer.echo(
-            "External benchmark: "
+            "🔬 External benchmark: "
             f"{_optional_score(baseline_external)} -> {_optional_score(final_external)}"
         )
     holdout_path = run_path / "final_holdout" / "eval_result.json"
     if holdout_path.exists():
         holdout = _read_eval(holdout_path)
-        typer.echo(f"Final holdout score: {holdout['promotion_score']:.6f}")
+        typer.echo(f"🎯 Final holdout score: {holdout['promotion_score']:.6f}")
     lineage_path = run_path / "lineage.jsonl"
     if lineage_path.exists():
         promoted = []
@@ -252,9 +252,9 @@ def compare(run_path: Path) -> None:
                 promoted.append(f"{event['mutation_type']} -> {event['target']}")
             if event["event"] in {"mutation_rejected", "mutation_rolled_back"}:
                 rejected.append(f"{event['event']} {event['mutation_type']} -> {event['target']}")
-        typer.echo("Promoted mutations:")
+        typer.echo("✅ Promoted mutations:")
         typer.echo("\n".join(f"  - {item}" for item in promoted) or "  - None")
-        typer.echo("Rejected or rolled back mutations:")
+        typer.echo("❌ Rejected or rolled back mutations:")
         typer.echo("\n".join(f"  - {item}" for item in rejected) or "  - None")
 
 
