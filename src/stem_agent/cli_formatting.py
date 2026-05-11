@@ -63,7 +63,7 @@ class TrainingTerminalReporter:
         self.stream = stream or sys.stdout
         self.use_ansi = self.stream.isatty() if force_ansi is None else force_ansi
         self.completed = 0
-        self.phase = "🚀 starting"
+        self.phase = "starting"
         self.current_score: float | None = None
         self.best_score: float | None = None
         self._lines_below_status = 1
@@ -74,11 +74,11 @@ class TrainingTerminalReporter:
         if kind == "generation_start":
             generation = int(event.get("generation", 0))
             self.completed = min(generation, self.total_generations)
-            self.phase = f"⚙️  gen {generation} starting"
+            self.phase = f"gen {generation} starting"
         elif kind == "evaluation_complete" and event.get("label") == "current":
             generation = int(event.get("generation", 0))
             self.completed = min(generation + 1, self.total_generations)
-            self.phase = f"📊 gen {generation} evaluated"
+            self.phase = f"gen {generation} evaluated"
             self.current_score = float(event.get("score", 0.0))
             self.best_score = max(
                 self.best_score if self.best_score is not None else self.current_score,
@@ -87,29 +87,29 @@ class TrainingTerminalReporter:
         elif kind == "evaluation_start":
             label = event.get("label", "evaluation")
             generation = event.get("generation")
-            self.phase = f"🔬 gen {generation} {label} eval"
+            self.phase = f"gen {generation} {label} eval"
         elif kind == "mutation_plan":
-            self.phase = f"🧠 gen {event.get('generation')} planning"
+            self.phase = f"gen {event.get('generation')} planning"
         elif kind == "mutation_proposed":
-            self.phase = f"💡 gen {event.get('generation')} mutation {event.get('index')}"
+            self.phase = f"gen {event.get('generation')} mutation {event.get('index')}"
         elif kind in {"mutation_rejected", "mutation_rolled_back"}:
-            self.phase = f"❌ gen {event.get('generation')} mutation {event.get('index')} rejected"
+            self.phase = f"gen {event.get('generation')} mutation {event.get('index')} rejected"
         elif kind == "mutation_promoted":
-            self.phase = f"✅ gen {event.get('generation')} mutation {event.get('index')} promoted"
+            self.phase = f"gen {event.get('generation')} mutation {event.get('index')} promoted"
             self.current_score = float(event.get("new_score", 0.0))
             self.best_score = max(
                 self.best_score if self.best_score is not None else self.current_score,
                 self.current_score,
             )
         elif kind == "hidden_evaluation_start":
-            self.phase = f"🕵️  gen {event.get('generation')} hidden eval"
+            self.phase = f"gen {event.get('generation')} hidden eval"
         elif kind == "generation_complete":
             generation = int(event.get("generation", 0))
             self.completed = min(generation + 1, self.total_generations)
-            self.phase = f"🏁 gen {generation} complete"
+            self.phase = f"gen {generation} complete"
         elif kind == "freeze":
             self.completed = self.total_generations
-            self.phase = "❄️  frozen"
+            self.phase = "frozen"
             self.current_score = float(event.get("score", 0.0))
             self.best_score = max(
                 self.best_score if self.best_score is not None else self.current_score,
@@ -127,12 +127,12 @@ class TrainingTerminalReporter:
             self.completed = self.total_generations
         status_lower = status.lower()
         finish_labels = {
-            "frozen": "❄️  frozen",
-            "stopped": "🛑 stopped",
-            "converged": "🎯 converged",
-            "budget_exceeded": "💸 budget exceeded",
+            "frozen": "frozen",
+            "stopped": "stopped",
+            "converged": "converged",
+            "budget_exceeded": "budget exceeded",
         }
-        self.phase = finish_labels.get(status_lower, f"🏁 {status_lower}")
+        self.phase = finish_labels.get(status_lower, status_lower)
         self._render_status()
         self.stream.write("\n")
         self.stream.flush()
@@ -236,23 +236,23 @@ def format_training_transcript_event(event: dict) -> str:
         mode = "resume" if event.get("resume") else "new run"
         return "\n".join(
             [
-                "🚀 [Training / start]",
-                f"🌍 Scenario: {event.get('scenario')}",
-                f"🆔 Run: {event.get('run_id')} ({mode})",
+                "[Training / start]",
+                f"Scenario: {event.get('scenario')}",
+                f"Run: {event.get('run_id')} ({mode})",
             ]
         )
     if event_type == "generation_start":
         return "\n".join(
             [
-                f"🔄 {prefix} / generation_start]",
-                f"🧬 Genome version: {event.get('genome_version')}",
+                f"{prefix} / generation_start]",
+                f"Genome version: {event.get('genome_version')}",
             ]
         )
     if event_type == "evaluation_start":
         return "\n".join(
             [
-                f"📊 {prefix} / {event.get('label')}_evaluation]",
-                f"🧬 Genome version: {event.get('genome_version')}",
+                f"{prefix} / {event.get('label')}_evaluation]",
+                f"Genome version: {event.get('genome_version')}",
                 _mutation_context(event),
             ]
         ).rstrip()
@@ -288,7 +288,7 @@ def format_training_transcript_event(event: dict) -> str:
         failure_text = "; ".join(str(item) for item in failures) if failures else "none"
         return "\n".join(
             [
-                f"🧠 {prefix} / Nucleus]",
+                f"{prefix} / Nucleus]",
                 f"Plan: {event.get('summary')}",
                 f"Proposed mutations: {event.get('proposed_count')}",
                 f"Observed failure patterns: {failure_text}",
@@ -335,7 +335,7 @@ def format_training_transcript_event(event: dict) -> str:
     if event_type == "freeze_recommended":
         return "\n".join(
             [
-                f"🟡 {prefix} / Nucleus]",
+                f"{prefix} / Nucleus]",
                 f"Recommended freeze: {event.get('reason')}",
             ]
         )
@@ -359,30 +359,30 @@ def format_training_detail_event(event: dict) -> str:
         hidden_text = f"{hidden_cases} cases" if hidden_cases else "not configured"
         return "\n".join(
             [
-                "🚀 === stem_agent evolution ===",
-                f"🌍 Scenario: {event.get('scenario')} ({event.get('task_class')})",
-                f"📂 Scenario path: {event.get('scenario_path')}",
-                f"🆔 Run id: {event.get('run_id')} ({mode})",
-                f"📁 Run directory: {event.get('run_dir')}",
-                f"🤖 Model: {event.get('model')}",
-                f"🔗 Endpoint: {event.get('endpoint')}",
+                "=== stem_agent evolution ===",
+                f"Scenario: {event.get('scenario')} ({event.get('task_class')})",
+                f"Scenario path: {event.get('scenario_path')}",
+                f"Run id: {event.get('run_id')} ({mode})",
+                f"Run directory: {event.get('run_dir')}",
+                f"Model: {event.get('model')}",
+                f"Endpoint: {event.get('endpoint')}",
                 "",
-                "⚙️  Configuration overview:",
-                f"  📚 train cases: {event.get('train_case_count')}",
-                f"  📝 validation cases: {event.get('validation_case_count')}",
-                f"  🕵️  hidden evaluation: {hidden_text}",
-                f"  🔄 max generations: {event.get('max_generations')}",
-                f"  🧬 max mutations/generation: {event.get('max_mutations_per_generation')}",
-                f"  ⏳ patience: {event.get('patience')}",
-                f"  📍 min promotion delta: {event.get('min_delta')}",
-                f"  💰 max cost: ${float(event.get('max_cost_usd', 0.0)):.2f}",
+                "Configuration overview:",
+                f"  train cases: {event.get('train_case_count')}",
+                f"  validation cases: {event.get('validation_case_count')}",
+                f"  hidden evaluation: {hidden_text}",
+                f"  max generations: {event.get('max_generations')}",
+                f"  max mutations/generation: {event.get('max_mutations_per_generation')}",
+                f"  patience: {event.get('patience')}",
+                f"  min promotion delta: {event.get('min_delta')}",
+                f"  max cost: ${float(event.get('max_cost_usd', 0.0)):.2f}",
             ]
         )
     if event_type == "generation_start":
         return "\n".join(
             [
-                f"🔄 === Generation {generation} ===",
-                f"🧬 Genome version: {event.get('genome_version')}",
+                f"=== Generation {generation} ===",
+                f"Genome version: {event.get('genome_version')}",
             ]
         )
     if event_type == "diagnosis_complete":
@@ -390,7 +390,7 @@ def format_training_detail_event(event: dict) -> str:
         requirements = event.get("requirement_count")
         return "\n".join(
             [
-                "🔍 Nucleus diagnosis complete",
+                "Nucleus diagnosis complete",
                 f"  Initial hypothesis: {event.get('initial_evaluation_hypothesis')}",
                 f"  Requirements: {requirements}",
                 f"  Constraints: {constraints}",
@@ -400,7 +400,7 @@ def format_training_detail_event(event: dict) -> str:
         label = event.get("label")
         mutation = _mutation_context(event)
         lines = [
-            f"📊 Evaluation starting: {label}",
+            f"Evaluation starting: {label}",
             f"  generation: {generation}",
             f"  genome version: {event.get('genome_version')}",
             f"  workspace: {event.get('workspace_dir')}",
@@ -412,18 +412,18 @@ def format_training_detail_event(event: dict) -> str:
         return "\n".join(lines)
     if event_type == "case_start":
         return (
-            f"  ▶️  running {event.get('label')} {event.get('split')} case "
+            f"  running {event.get('label')} {event.get('split')} case "
             f"{event.get('case_id')}"
         )
     if event_type == "case_complete":
         return (
-            f"  ✅ completed {event.get('label')} {event.get('split')} case "
+            f"  completed {event.get('label')} {event.get('split')} case "
             f"{event.get('case_id')}: {event.get('output_summary')}"
         )
     if event_type == "evaluation_artifacts_written":
         return "\n".join(
             [
-                f"💾 Evaluation artifacts written for {event.get('label')}",
+                f"Evaluation artifacts written for {event.get('label')}",
                 f"  outputs: {event.get('outputs_dir')}",
                 f"  traces: {event.get('traces_path')}",
             ]
@@ -435,7 +435,7 @@ def format_training_detail_event(event: dict) -> str:
         )
         return "\n".join(
             [
-                f"📈 Evaluation complete: {event.get('label')}",
+                f"Evaluation complete: {event.get('label')}",
                 f"  promotion score: {float(event.get('score', 0.0)):.4f}",
                 f"  train score: {float(event.get('train_score', 0.0)):.4f}",
                 f"  validation score: {validation_text}",
@@ -444,7 +444,7 @@ def format_training_detail_event(event: dict) -> str:
     if event_type == "hidden_evaluation_start":
         return "\n".join(
             [
-                "🕵️  Hidden evaluation starting",
+                "Hidden evaluation starting",
                 f"  generation: {generation}",
                 f"  genome id: {event.get('genome_id')}",
                 f"  workspace: {event.get('workspace_dir')}",
@@ -454,7 +454,7 @@ def format_training_detail_event(event: dict) -> str:
     if event_type == "hidden_evaluation_complete":
         return "\n".join(
             [
-                "🔓 Hidden evaluation complete",
+                "Hidden evaluation complete",
                 f"  generation: {generation}",
                 f"  hidden score: {float(event.get('hidden_score', 0.0)):.4f}",
                 f"  label: {event.get('label')}",
@@ -465,7 +465,7 @@ def format_training_detail_event(event: dict) -> str:
         failure_text = "; ".join(str(item) for item in failures) if failures else "none"
         return "\n".join(
             [
-                "🧪 Nucleus mutation plan",
+                "Nucleus mutation plan",
                 f"  operator: {event.get('operator_type')}",
                 f"  summary: {event.get('summary')}",
                 f"  proposed mutations: {event.get('proposed_count')}",
@@ -527,14 +527,14 @@ def format_training_detail_event(event: dict) -> str:
     if event_type == "generation_complete":
         return "\n".join(
             [
-                f"🏁 Generation {generation} complete",
+                f"Generation {generation} complete",
                 f"  best score: {float(event.get('best_score', 0.0)):.4f}",
                 f"  patience left: {event.get('patience_left')}",
                 f"  tokens used this generation: {event.get('tokens_used')}",
             ]
         )
     if event_type == "freeze_recommended":
-        return f"🟡 Nucleus recommended freeze: {event.get('reason')}"
+        return f"Nucleus recommended freeze: {event.get('reason')}"
     if event_type == "freeze":
         return "\n".join(
             [
