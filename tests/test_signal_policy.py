@@ -1,6 +1,7 @@
 import json
 
 import pytest
+import yaml
 
 from stem_agent.config import Settings
 from stem_agent.evolution.loop import EvolutionLoop
@@ -108,3 +109,90 @@ def test_default_signal_policy_exposes_aggregate_scores_for_promotions(tmp_path)
 
     assert signals
     assert all(isinstance(signal["aggregate_score"], float) for signal in signals)
+
+
+def test_hidden_evaluation_details_do_not_enter_nucleus_visible_artifacts(tmp_path):
+    scenario_dir = tmp_path / "hidden_signal_scenario"
+    scenario_dir.mkdir()
+    scenario = {
+        "scenario": {
+            "name": "hidden_signal_scenario",
+            "description": "Exercise hidden evaluation leakage boundaries.",
+            "task_class": "structured_answer",
+        },
+        "input_format": {
+            "type": "text",
+            "fields": [{"name": "user_request", "required": True}],
+        },
+        "expected_output": {
+            "type": "markdown",
+            "requirements": ["Must include a short summary", "Must include final answer"],
+        },
+        "constraints": ["Prefer actionable output"],
+        "available_builtin_tools": ["call_model"],
+        "success_criteria": [
+            {
+                "name": "requirement_coverage",
+                "weight": 1.0,
+                "description": "Output satisfies required sections.",
+            }
+        ],
+        "evolution": {
+            "max_generations": 1,
+            "patience": 1,
+            "min_delta": 0.03,
+            "max_mutations_per_generation": 1,
+            "max_cost_usd": 2.0,
+        },
+    }
+    (scenario_dir / "scenario.yaml").write_text(
+        yaml.safe_dump(scenario, sort_keys=False),
+        encoding="utf-8",
+    )
+    (scenario_dir / "train_cases.jsonl").write_text(
+        json.dumps(
+            {
+                "id": "train_001",
+                "input": {"user_request": "Prepare a short plan."},
+                "reference_notes": "Normal train notes.",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (scenario_dir / "validation_cases.jsonl").write_text(
+        json.dumps(
+            {
+                "id": "val_001",
+                "input": {"user_request": "Prepare another short plan."},
+                "reference_notes": "Normal validation notes.",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    hidden_secret = "SECRET_HIDDEN_EXPECTED_OUTPUT"
+    (scenario_dir / "hidden_cases.jsonl").write_text(
+        json.dumps(
+            {
+                "id": "hidden_001",
+                "input": {"user_request": "Prepare a hidden short plan."},
+                "expected_output": hidden_secret,
+                "reference_notes": hidden_secret,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    loop = EvolutionLoop(
+        settings=Settings(test_mode=True),
+        runs_root=tmp_path / "runs",
+    )
+
+    result = loop.evolve(scenario_dir, "hidden_signal")
+    lineage = (result.run_dir / "lineage.jsonl").read_text(encoding="utf-8")
+    llm_calls = (result.run_dir / "llm_calls.jsonl").read_text(encoding="utf-8")
+
+    assert (result.run_dir / "hidden_eval_log.jsonl").exists()
+    assert hidden_secret not in lineage
+    assert hidden_secret not in llm_calls

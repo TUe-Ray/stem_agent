@@ -10,6 +10,7 @@ from stem_agent.harness.builder import MaterializedHarness
 from stem_agent.harness.intra_adapter import IntraTestAdapter
 from stem_agent.harness.memory import MemoryStore
 from stem_agent.harness.role_runner import RoleRunner
+from stem_agent.kernel.requirements import requirement_section_satisfied
 from stem_agent.scenarios.schema import TaskCase
 
 
@@ -321,21 +322,9 @@ class HarnessRunner:
         self, harness: MaterializedHarness, output: str
     ) -> list[str]:
         missing: list[str] = []
-        checks = {
-            "summary": ["summary"],
-            "step": ["steps", "1.", "- "],
-            "final": ["final answer", "final output", "recommendation"],
-            "acceptance": ["acceptance criteria", "acceptance"],
-            "qa": ["qa report", "quality review", "review"],
-            "decision": ["decision log", "decision"],
-        }
         for requirement in harness.scenario.expected_output.requirements:
-            req = requirement.lower()
-            passed = True
-            for key, needles in checks.items():
-                if key in req:
-                    passed = any(needle in output for needle in needles)
-                    break
+            section_result = requirement_section_satisfied(requirement, output)
+            passed = True if section_result is None else section_result
             if not passed:
                 missing.append(requirement)
         return missing

@@ -326,6 +326,7 @@ class Guardian:
             runs,
             [],
             run_dir=self.run_dir,
+            audit=False,
         )
         score = float(result.train_score)
         item = {

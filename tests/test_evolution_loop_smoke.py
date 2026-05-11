@@ -225,3 +225,45 @@ def test_validation_aware_promotion_and_complexity_pressure():
 
     assert result.validation_score is not None
     assert result.split_policy == "weighted_train_validation_40_60"
+
+
+def test_generation_patience_decrements_once_for_no_best_improvement(tmp_path):
+    loop = EvolutionLoop(
+        settings=Settings(test_mode=True),
+        runs_root=tmp_path / "runs",
+    )
+
+    assert (
+        loop._finish_generation_patience(
+            3,
+            generation_improved_best=False,
+        )
+        == 2
+    )
+    assert (
+        loop._finish_generation_patience(
+            3,
+            generation_improved_best=True,
+        )
+        == 3
+    )
+
+
+def test_requirement_matching_is_shared_by_evaluator_and_quality_gate(tmp_path):
+    bundle = load_scenario("scenarios/toy_structured_answer")
+    genome = load_genome("src/stem_agent/genome/default_genome.yaml")
+    harness = HarnessBuilder().materialize(
+        genome,
+        bundle.scenario,
+        workspace_dir=tmp_path / "shared_requirement_workspace",
+    )
+    evaluator = GuardianFitnessEvaluator()
+    runner = HarnessRunner(RoleRunner(ModelClient(test_mode=True)))
+
+    output = "## Summary\nUseful overview.\n\n## Final Answer\nA concrete recommendation."
+
+    assert evaluator._requirement_satisfied("Must include a short summary", output)
+    assert evaluator._requirement_satisfied("Must include final answer", output)
+    missing = runner._missing_required_sections(harness, output.lower())
+    assert "Must include a short summary" not in missing
+    assert "Must include final answer" not in missing

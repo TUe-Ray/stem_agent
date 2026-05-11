@@ -9,9 +9,10 @@ from pydantic import BaseModel, Field
 
 from stem_agent.genome.models import Genome
 from stem_agent.harness.runner import HarnessRunResult
+from stem_agent.kernel.evaluator_weights import EvaluatorWeights
+from stem_agent.kernel.requirements import requirement_satisfied
 from stem_agent.llm.client import build_guardian_system_prompt
 from stem_agent.nucleus.model_client import ModelClient
-from stem_agent.kernel.evaluator_weights import EvaluatorWeights
 from stem_agent.scenarios.schema import Scenario
 
 
@@ -58,11 +59,13 @@ class GuardianFitnessEvaluator:
         validation_runs: list[HarnessRunResult] | None = None,
         *,
         run_dir: str | Path | None = None,
+        audit: bool = True,
     ) -> EvaluationResult:
         if run_dir is not None:
             self.configure_run(run_dir)
         validation_runs = validation_runs or []
-        self._audit_guardian_call(scenario, train_runs, validation_runs)
+        if audit:
+            self._audit_guardian_call(scenario, train_runs, validation_runs)
         complexity_penalty = self._complexity_penalty(genome)
         train_cases = [
             self._evaluate_case(genome, scenario, run, complexity_penalty)
@@ -140,6 +143,9 @@ class GuardianFitnessEvaluator:
         )
         scenario_success = self._scenario_success(scenario, output)
         format_validity = self._format_validity(output)
+        constraint_adherence = self._constraint_adherence(scenario, output)
+        actionability = self._actionability(output)
+        input_specificity = self._input_specificity(run, output)
         artifact_presence = self._artifact_presence(run)
         self_review_usage = self._self_review_usage(run, output)
         workflow_completion = self._workflow_completion(genome, run)
@@ -148,33 +154,37 @@ class GuardianFitnessEvaluator:
         cost_penalty = min(run.cost_estimate / 5.0, 1.0)
 
         w = self.weights
-        raw_score = (
-            w.requirement_coverage * requirement_coverage
-            + w.format_validity * format_validity
-            + w.artifact_presence * artifact_presence
-            + w.self_review_usage * self_review_usage
-            + w.workflow_completion * workflow_completion
-            + w.quality_gate_usage * quality_gate_usage
-            + w.generated_tool_usage * generated_tool_usage
-            - w.cost_penalty * cost_penalty
-            - w.complexity_penalty * complexity_penalty
+        score_components = {
+            "requirement_coverage": requirement_coverage,
+            "format_validity": format_validity,
+            "constraint_adherence": constraint_adherence,
+            "actionability": actionability,
+            "input_specificity": input_specificity,
+            "artifact_presence": artifact_presence,
+            "self_review_usage": self_review_usage,
+            "workflow_completion": workflow_completion,
+            "quality_gate_usage": quality_gate_usage,
+            "generated_tool_usage": generated_tool_usage,
+        }
+        score_weights = self._scenario_metric_weights(scenario)
+        raw_score = sum(
+            score_weights.get(name, 0.0) * value
+            for name, value in score_components.items()
         )
+        raw_score -= w.cost_penalty * cost_penalty
+        raw_score -= w.complexity_penalty * complexity_penalty
         if run.blocked:
             raw_score -= 0.15
         score = self._clamp(raw_score)
         metrics = {
-            "evaluator_weight_requirement_coverage": w.requirement_coverage,
-            "evaluator_weight_format_validity": w.format_validity,
-            "evaluator_weight_artifact_presence": w.artifact_presence,
-            "evaluator_weight_self_review_usage": w.self_review_usage,
-            "evaluator_weight_workflow_completion": w.workflow_completion,
-            "evaluator_weight_quality_gate_usage": w.quality_gate_usage,
-            "evaluator_weight_generated_tool_usage": w.generated_tool_usage,
             "evaluator_weight_cost_penalty": w.cost_penalty,
             "evaluator_weight_complexity_penalty": w.complexity_penalty,
             "requirement_coverage": requirement_coverage,
             "scenario_success": scenario_success,
             "format_validity": format_validity,
+            "constraint_adherence": constraint_adherence,
+            "actionability": actionability,
+            "input_specificity": input_specificity,
             "artifact_presence": artifact_presence,
             "self_review_usage": self_review_usage,
             "workflow_completion": workflow_completion,
@@ -183,6 +193,12 @@ class GuardianFitnessEvaluator:
             "cost_penalty": cost_penalty,
             "complexity_penalty": complexity_penalty,
         }
+        metrics.update(
+            {
+                f"evaluator_weight_{name}": score_weights.get(name, 0.0)
+                for name in score_components
+            }
+        )
         if run.blocked:
             failures.append("Candidate harness was blocked by a quality gate")
         return CaseEvaluation(
@@ -205,13 +221,22 @@ class GuardianFitnessEvaluator:
         total_weight = sum(max(float(item.weight), 0.0) for item in scenario.evaluation_criteria) or 1.0
         weighted_score = 0.0
         for criterion in scenario.evaluation_criteria:
-            value = self._criterion_score(criterion.method, output, run, criterion.pattern)
+            value = self._criterion_score(criterion.method, scenario, output, run, criterion.pattern)
             metrics[criterion.name] = value
+            metrics[f"evaluator_weight_{criterion.name}"] = max(float(criterion.weight), 0.0) / total_weight
             weighted_score += (max(float(criterion.weight), 0.0) / total_weight) * value
             if value <= 0.0:
                 failures.append(f"Failed criterion: {criterion.name}")
-        score = self._clamp(weighted_score - 0.05 * complexity_penalty)
+        cost_penalty = min(run.cost_estimate / 5.0, 1.0)
+        score = self._clamp(
+            weighted_score
+            - self.weights.cost_penalty * cost_penalty
+            - self.weights.complexity_penalty * complexity_penalty
+        )
+        metrics["cost_penalty"] = cost_penalty
         metrics["complexity_penalty"] = complexity_penalty
+        metrics["evaluator_weight_cost_penalty"] = self.weights.cost_penalty
+        metrics["evaluator_weight_complexity_penalty"] = self.weights.complexity_penalty
         return CaseEvaluation(
             case_id=run.case_id,
             score=score,
@@ -223,6 +248,7 @@ class GuardianFitnessEvaluator:
     def _criterion_score(
         self,
         method: str,
+        scenario: Scenario,
         output: str,
         run: HarnessRunResult,
         pattern: str | None,
@@ -234,9 +260,188 @@ class GuardianFitnessEvaluator:
         if method == "regex_check":
             expression = pattern or r"\d+.*[\+\-\*\/].*\d+"
             return 1.0 if re.search(expression, output, re.DOTALL) else 0.0
+        if method == "section_check":
+            requirements = [pattern] if pattern else scenario.expected_output.requirements
+            coverage, _ = self._requirement_coverage(requirements, output)
+            return coverage
+        if method == "heuristic_usefulness":
+            return self._clamp(
+                0.45 * self._actionability(output)
+                + 0.35 * self._input_specificity(run, output)
+                + 0.20 * self._constraint_adherence(scenario, output)
+            )
+        if method == "llm_rubric":
+            return self._llm_rubric_score(scenario, run, output)
         if method == "llm_judge":
             return self._no_hallucinated_numbers_score(output, run)
         return 0.0
+
+    def _scenario_metric_weights(self, scenario: Scenario) -> dict[str, float]:
+        if not scenario.success_criteria:
+            return self.weights.normalized().metric_weights()
+
+        mapped: dict[str, float] = {}
+        for criterion in scenario.success_criteria:
+            metric_names = self._success_criterion_metrics(
+                criterion.name,
+                criterion.description,
+            )
+            if not metric_names:
+                continue
+            share = max(float(criterion.weight), 0.0) / len(metric_names)
+            for metric_name in metric_names:
+                mapped[metric_name] = mapped.get(metric_name, 0.0) + share
+
+        if not mapped:
+            return self.weights.normalized().metric_weights()
+        total = sum(max(value, 0.0) for value in mapped.values()) or 1.0
+        return {key: max(value, 0.0) / total for key, value in mapped.items()}
+
+    def _success_criterion_metrics(self, name: str, description: str) -> list[str]:
+        text = f"{name} {description}".lower()
+        if any(token in text for token in ["requirement", "coverage", "section"]):
+            return ["requirement_coverage"]
+        if any(token in text for token in ["format", "markdown", "structure", "readable"]):
+            return ["format_validity"]
+        if any(token in text for token in ["useful", "action", "operator"]):
+            return ["actionability", "input_specificity"]
+        if any(token in text for token in ["specific", "relevant", "context"]):
+            return ["input_specificity"]
+        if any(token in text for token in ["constraint", "clarification"]):
+            return ["constraint_adherence"]
+        if any(token in text for token in ["review", "qa", "verification"]):
+            return ["self_review_usage", "quality_gate_usage"]
+        if any(token in text for token in ["artifact", "audit", "decision"]):
+            return ["artifact_presence"]
+        if any(token in text for token in ["cost", "compact", "efficiency"]):
+            return ["workflow_completion"]
+        return []
+
+    def _constraint_adherence(self, scenario: Scenario, output: str) -> float:
+        constraints = " ".join(scenario.constraints).lower()
+        if not constraints:
+            return 1.0
+        score = 1.0
+        if "do not ask" in constraints or "unnecessary clarification" in constraints:
+            question_count = output.count("?")
+            if question_count:
+                score -= min(0.6, question_count * 0.2)
+        if "prefer actionable" in constraints and self._actionability(output) < 0.45:
+            score -= 0.25
+        if "risk" in constraints and "risk" not in output.lower():
+            score -= 0.15
+        return self._clamp(score)
+
+    def _actionability(self, output: str) -> float:
+        lower = output.lower()
+        score = 0.0
+        if re.search(r"(^|\n)\s*(\d+\.|- )", output):
+            score += 0.35
+        action_tokens = [
+            "step",
+            "plan",
+            "action",
+            "check",
+            "review",
+            "prepare",
+            "schedule",
+            "assign",
+            "verify",
+            "confirm",
+            "fallback",
+            "owner",
+        ]
+        score += min(0.35, 0.05 * sum(1 for token in action_tokens if token in lower))
+        if any(marker in lower for marker in ["acceptance criteria", "qa report", "verification checklist"]):
+            score += 0.15
+        if len(output.split()) >= 80:
+            score += 0.15
+        return self._clamp(score)
+
+    def _input_specificity(self, run: HarnessRunResult, output: str) -> float:
+        input_text = " ".join(str(value) for value in (run.case_input or {}).values())
+        input_words = self._content_words(input_text)
+        if not input_words:
+            return 0.5
+        output_words = set(self._content_words(output))
+        overlap = sum(1 for word in set(input_words) if word in output_words)
+        coverage = overlap / max(len(set(input_words)), 1)
+        return self._clamp(0.25 + 0.75 * coverage)
+
+    def _content_words(self, text: str) -> list[str]:
+        stop_words = {
+            "about",
+            "after",
+            "before",
+            "could",
+            "should",
+            "there",
+            "these",
+            "those",
+            "with",
+            "without",
+            "would",
+            "your",
+            "help",
+            "need",
+        }
+        return [
+            word
+            for word in re.findall(r"[a-zA-Z]{4,}", text.lower())
+            if word not in stop_words
+        ]
+
+    def _llm_rubric_score(
+        self,
+        scenario: Scenario,
+        run: HarnessRunResult,
+        output: str,
+    ) -> float:
+        heuristic = self._clamp(
+            0.40 * self._actionability(output)
+            + 0.35 * self._input_specificity(run, output)
+            + 0.25 * self._constraint_adherence(scenario, output)
+        )
+        if self.model_client.test_mode:
+            return heuristic
+        schema = {
+            "type": "object",
+            "properties": {
+                "score": {"type": "number"},
+                "reasoning": {"type": "string"},
+            },
+            "required": ["score", "reasoning"],
+            "additionalProperties": False,
+        }
+        prompt = json.dumps(
+            {
+                "task": scenario.scenario.description,
+                "criteria": [
+                    item.model_dump(mode="json")
+                    for item in scenario.success_criteria
+                ],
+                "case_input": run.case_input,
+                "output": output,
+                "instruction": "Return a score from 0.0 to 1.0 for usefulness, specificity, and constraint adherence.",
+            },
+            sort_keys=True,
+        )
+        try:
+            result = self.model_client.call(
+                prompt,
+                response_schema=schema,
+                system_prompt="You are a strict evaluator. Return only JSON.",
+                temperature=0.0,
+                role="guardian",
+            )
+        except Exception:
+            return heuristic
+        if not isinstance(result, dict):
+            return heuristic
+        try:
+            return self._clamp(float(result.get("score", heuristic)))
+        except (TypeError, ValueError):
+            return heuristic
 
     def _no_hallucinated_numbers_score(self, output: str, run: HarnessRunResult) -> float:
         problem_text = json.dumps(run.case_input or {}, sort_keys=True)
@@ -302,29 +507,7 @@ class GuardianFitnessEvaluator:
         return passed / len(requirements), failures
 
     def _requirement_satisfied(self, requirement: str, output: str) -> bool:
-        req = requirement.lower()
-        out = output.lower()
-        checks = {
-            "summary": ["summary"],
-            "step": ["steps", "1.", "- "],
-            "final": ["final answer", "final output", "recommendation"],
-            "acceptance": ["acceptance criteria", "acceptance"],
-            "qa": ["qa report", "quality review", "review"],
-            "decision": ["decision log", "decision"],
-            "artifact": ["artifact", ".md"],
-        }
-        for key, needles in checks.items():
-            if key in req:
-                return any(needle in out for needle in needles)
-
-        words = [
-            word
-            for word in re.findall(r"[a-zA-Z]{4,}", req)
-            if word not in {"must", "include", "with", "that", "this", "output"}
-        ]
-        if not words:
-            return True
-        return sum(1 for word in words if word in out) >= max(1, len(words) // 2)
+        return requirement_satisfied(requirement, output)
 
     def _scenario_success(self, scenario: Scenario, output: str) -> float:
         out = output.lower()
@@ -349,15 +532,6 @@ class GuardianFitnessEvaluator:
             score += 0.15
         if "final" in output.lower():
             score += 0.1
-        return self._clamp(score)
-
-    def _robustness(self, scenario: Scenario, output: str) -> float:
-        out = output.lower()
-        score = 0.6
-        if "cannot" not in out and "i don't" not in out:
-            score += 0.2
-        if len(output.split()) >= 25:
-            score += 0.2
         return self._clamp(score)
 
     def _artifact_presence(self, run: HarnessRunResult) -> float:

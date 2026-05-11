@@ -316,6 +316,7 @@ class EvolutionLoop:
         pending_awm_candidates: list[MutationProposal] = []
 
         for generation in range(start_generation, bundle.scenario.convergence_policy.max_generations):
+            generation_improved_best = False
             generation_dir = run_dir / f"generation_{generation:03d}"
             generation_dir.mkdir(parents=True, exist_ok=True)
             save_genome(genome, generation_dir / "genome.yaml")
@@ -420,8 +421,7 @@ class EvolutionLoop:
                 best_result = current_result
                 best_genome = genome
                 patience_left = bundle.scenario.evolution.patience
-            else:
-                patience_left -= 1
+                generation_improved_best = True
 
             self._save_checkpoint(
                 control,
@@ -526,7 +526,6 @@ class EvolutionLoop:
                 )
                 break
 
-            promoted_this_generation = False
             candidate_result = current_result
             generation_terminal_result = current_result
             for index, mutation in enumerate(plan.proposed_mutations):
@@ -857,7 +856,6 @@ class EvolutionLoop:
                     genome = mutated_genome
                     candidate_result = mutated_result
                     generation_terminal_result = mutated_result
-                    promoted_this_generation = True
                     if best_result is None or self.guardian.should_promote(
                         best_result.promotion_score,
                         mutated_result.promotion_score,
@@ -866,6 +864,7 @@ class EvolutionLoop:
                         best_result = mutated_result
                         best_genome = mutated_genome
                         patience_left = bundle.scenario.evolution.patience
+                        generation_improved_best = True
                     self._save_checkpoint(
                         control,
                         scenario_hash,
@@ -991,8 +990,10 @@ class EvolutionLoop:
                     selected_score=round(selected_score, 4),
                 )
 
-            if not promoted_this_generation:
-                patience_left -= 1
+            patience_left = self._finish_generation_patience(
+                patience_left,
+                generation_improved_best=generation_improved_best,
+            )
             if len(archive):
                 archive_best_score = archive.best()[2]
                 if last_archive_best_score is not None and archive_best_score - last_archive_best_score <= 0.01:
@@ -1671,6 +1672,16 @@ class EvolutionLoop:
 
     def _validation_score(self, result: EvaluationResult) -> float:
         return float(result.validation_score if result.validation_score is not None else result.promotion_score)
+
+    def _finish_generation_patience(
+        self,
+        patience_left: int,
+        *,
+        generation_improved_best: bool,
+    ) -> int:
+        if generation_improved_best:
+            return patience_left
+        return patience_left - 1
 
     def _latest_hidden_score(self, run_dir: Path, generation: int) -> float | None:
         path = run_dir / "hidden_eval_log.jsonl"
