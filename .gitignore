@@ -30,10 +30,7 @@ dist/
 workspace/*
 !workspace/.gitkeep
 
-# Keep curated demo artifacts, but ignore ad-hoc run outputs by default.
+# Ignore generated run outputs by default.
 runs/*
 !runs/.gitkeep
-!runs/demo_001/
-!runs/demo_001/**
-runs/demo_001/visuals/training_progress.md
 openai_002_review_bundle.tar.gz

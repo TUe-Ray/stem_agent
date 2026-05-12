@@ -1,1 +1,0 @@
-Start by choosing one practical priority for: Turn fixing a messy README into a small task workflow.. Write down the desired outcome, pick the first action, and schedule a quick check.
