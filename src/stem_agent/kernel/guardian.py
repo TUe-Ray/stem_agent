@@ -403,7 +403,21 @@ class Guardian:
         elif mutation.mutation_type == "replace_genome":
             replacement = Genome.model_validate(patch["genome"])
             replacement.genome_version = mutated.genome_version
+            # Preserve previously-promoted quality gates and generated tools
+            preserved_tools = dict(mutated.tools)
+            preserved_gates = list(mutated.quality_gates)
             mutated = replacement
+            # Merge back preserved gates that don't already exist in replacement
+            existing_gate_names = {g.name for g in mutated.quality_gates}
+            for gate in preserved_gates:
+                if gate.name not in existing_gate_names:
+                    mutated.quality_gates.append(gate)
+            # Merge back preserved generated tools
+            existing_tool_names = {t.get("name") for t in mutated.tools.get("generated", []) if isinstance(t, dict)}
+            for tool in preserved_tools.get("generated", []) or []:
+                name = tool.get("name") if isinstance(tool, dict) else getattr(tool, "name", None)
+                if name and name not in existing_tool_names:
+                    mutated.tools.setdefault("generated", []).append(tool)
         elif mutation.mutation_type in {"create_tool", "edit_tool"}:
             generated = list(mutated.tools.get("generated", []) or [])
             generated.append(

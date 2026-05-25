@@ -58,6 +58,10 @@ def build_nucleus_prompt(
             line += f"\n    last rejection: {sig.last_rejection_summary[:200]}"
         history_lines.append(line)
 
+    existing_gates = _existing_gate_summary(current_genome)
+    existing_tools = _existing_tool_summary(current_genome)
+    existing_workflow = _existing_workflow_summary(current_genome)
+
     prompt = f"""You are Nucleus, a genome mutation proposer for a stem agent framework.
 
 TASK CLASS:
@@ -65,6 +69,15 @@ TASK CLASS:
 
 CURRENT GENOME STRUCTURE:
 {format_genome_for_nucleus(current_genome)}
+
+EXISTING QUALITY GATES (DO NOT propose duplicates):
+{existing_gates}
+
+EXISTING GENERATED TOOLS (DO NOT propose duplicates):
+{existing_tools}
+
+EXISTING WORKFLOW STEPS (use step IDs as target for edits):
+{existing_workflow}
 
 RECENT MUTATION HISTORY:
 {chr(10).join(history_lines) if history_lines else "No history yet."}
@@ -75,11 +88,18 @@ STRUCTURED FAILURE PATTERNS:
 Your job: propose 1 to {max(1, max_mutations)} mutations to the genome that may improve harness performance.
 You do NOT know the specific validation cases. You do NOT know per-case scores.
 Base your proposal on the genome structure and the directional feedback above.
-Prefer metric-deficit fixes over retry-policy changes. Only propose retry changes for
-explicit cost, budget, blocked-run, or failure-recovery patterns. For structured answer
-tasks, prefer this order when applicable: self-evaluation, review step, revise-final
-step, lightweight quality gate, then a safe generated checker tool. Avoid adding roles
-or whole-genome redesigns when complexity pressure is present.
+
+CRITICAL RULES:
+- NEVER propose add_quality_gate with a name that already exists in EXISTING QUALITY GATES.
+- NEVER propose create_tool with a name that already exists in EXISTING GENERATED TOOLS.
+- For edit_workflow_step, target MUST be an existing step ID from EXISTING WORKFLOW STEPS (e.g. "solve_task").
+- For edit_role, target MUST be an existing role name (e.g. "Founder").
+- For edit_quality_gate, target MUST be an existing gate name from EXISTING QUALITY GATES.
+- Prefer metric-deficit fixes over retry-policy changes. Only propose retry changes for
+  explicit cost, budget, blocked-run, or failure-recovery patterns.
+- For structured answer tasks, prefer this order: self-evaluation, review step, revise-final
+  step, lightweight quality gate, then a safe generated checker tool.
+- Avoid adding roles or whole-genome redesigns when complexity pressure is present.
 
 Output JSON only as a MutationPlan:
 {{
@@ -88,7 +108,7 @@ Output JSON only as a MutationPlan:
   "proposed_mutations": [
     {{
       "mutation_type": "<one of: add_role | edit_role | add_workflow_step | edit_workflow_step | remove_workflow_step | create_tool | edit_tool | add_quality_gate | edit_quality_gate | modify_memory_schema | modify_retry_policy | modify_self_evaluation | modify_stop_rule | modify_environment>",
-      "target": "<genome field path, e.g. workflow or self_evaluation>",
+      "target": "<genome field path — for edits use the existing item name/id, for adds use the field: roles, workflow, quality_gates, tools.generated, self_evaluation, retry_policy, stop_rule, environment, memory>",
       "rationale": "<why this change, based on mutation history>",
       "expected_improvement": "<which visible aggregate signal should improve>",
       "risk": "<short risk>",
@@ -242,3 +262,34 @@ def _format_failure_patterns(failure_patterns: list[Any]) -> str:
             f"kind={str(data.get('kind', ''))}"
         )
     return "\\n".join(lines) if lines else "No structured failure patterns provided."
+
+
+def _existing_gate_summary(genome: dict[str, Any]) -> str:
+    gates = genome.get("quality_gates", []) or []
+    if not gates:
+        return "None."
+    return "\\n".join(
+        f"  - name={gate.get('name', '?')}  type={gate.get('check_type', '?')}"
+        for gate in gates if isinstance(gate, dict)
+    ) or "None."
+
+
+def _existing_tool_summary(genome: dict[str, Any]) -> str:
+    tools = genome.get("tools", {}) or {}
+    generated = tools.get("generated", []) or []
+    if not generated:
+        return "None."
+    return "\\n".join(
+        f"  - name={t.get('name', '?')}  desc={str(t.get('description', ''))[:80]}"
+        for t in generated if isinstance(t, dict)
+    ) or "None."
+
+
+def _existing_workflow_summary(genome: dict[str, Any]) -> str:
+    workflow = genome.get("workflow", []) or []
+    if not workflow:
+        return "None."
+    return "\\n".join(
+        f"  - id={step.get('id', '?')}  role={step.get('role', '?')}  output={step.get('output_key', '?')}"
+        for step in workflow if isinstance(step, dict)
+    ) or "None."

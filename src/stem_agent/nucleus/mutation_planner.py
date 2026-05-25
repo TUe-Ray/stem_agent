@@ -7,7 +7,7 @@ from stem_agent.kernel.signal_policy import NucleusSignal, SignalPolicy
 from stem_agent.nucleus.operators import CrossoverMutation, FirstOrderMutation, MutationOperator
 from stem_agent.nucleus.model_client import ModelClient
 from stem_agent.nucleus.failure_analyzer import FailurePattern
-from stem_agent.nucleus.nucleus import build_nucleus_prompt
+from stem_agent.nucleus.nucleus import build_nucleus_prompt_with_catalog
 from stem_agent.nucleus.prompts import NUCLEUS_SYSTEM_PROMPT
 from stem_agent.nucleus.schemas import MutationPlan, MutationProposal
 from stem_agent.scenarios.schema import Scenario
@@ -74,7 +74,7 @@ class MutationPlanner:
             return plan
 
         _ = (last_score, best_score, budget_remaining, lineage_summary)
-        prompt = build_nucleus_prompt(
+        prompt = build_nucleus_prompt_with_catalog(
             scenario_description=self._scenario_description(scenario),
             current_genome=genome.model_dump(mode="json"),
             mutation_history=mutation_history,
@@ -254,7 +254,7 @@ class MutationPlanner:
         signal_policy: SignalPolicy,
     ) -> None:
         _ = operator
-        prompt = build_nucleus_prompt(
+        prompt = build_nucleus_prompt_with_catalog(
             scenario_description=self._scenario_description(scenario),
             current_genome=genome.model_dump(mode="json"),
             mutation_history=mutation_history,
