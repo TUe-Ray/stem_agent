@@ -145,6 +145,29 @@ IMPORTANT RULES for generated tool code:
     return prompt
 
 
+def build_nucleus_prompt_with_catalog(
+    scenario_description: str,
+    current_genome: dict,
+    mutation_history: list[NucleusSignal],
+    signal_policy: SignalPolicy,
+    failure_patterns: list[Any] | None = None,
+    max_mutations: int = 1,
+) -> str:
+    """Variant of build_nucleus_prompt that appends the tool catalog."""
+    base = build_nucleus_prompt(
+        scenario_description, current_genome, mutation_history,
+        signal_policy, failure_patterns, max_mutations,
+    )
+    try:
+        from stem_agent.tools.catalog import get_catalog
+        catalog_text = get_catalog().render_for_nucleus(max_per_category=4)
+        if catalog_text:
+            base += "\n\n" + catalog_text
+    except ImportError:
+        pass
+    return base
+
+
 def format_genome_for_nucleus(current_genome: dict[str, Any]) -> str:
     structure = {
         "name": current_genome.get("name"),
