@@ -16,7 +16,12 @@ FORBIDDEN_IMPORTS = {
     "requests",
     "httpx",
     "shutil",
-    "pathlib",
+}
+
+# pathlib is allowed, but specific write/destructive methods are blocked at AST level
+FORBIDDEN_PATHLIB_METHODS = {
+    "write_text", "write_bytes", "unlink", "rmdir", "mkdir",
+    "rename", "replace", "touch", "chmod", "symlink_to", "hardlink_to",
 }
 
 
@@ -39,7 +44,27 @@ class Sandbox:
                 root_name = (node.module or "").split(".")[0]
                 if root_name in FORBIDDEN_IMPORTS:
                     return ValidationResult.reject(f"Forbidden import: {root_name}")
+            if isinstance(node, ast.Attribute) and node.attr in FORBIDDEN_PATHLIB_METHODS:
+                if isinstance(node.value, ast.Call) and getattr(node.value.func, 'id', '') == 'Path':
+                    return ValidationResult.reject(
+                        f"Forbidden pathlib method on Path object: {node.attr}"
+                    )
+                if isinstance(node.value, ast.Name) and self._is_pathlib_path(node.value, tree):
+                    return ValidationResult.reject(
+                        f"Forbidden pathlib method on Path variable: {node.attr}"
+                    )
         return ValidationResult.allow("generated tool passed static import checks")
+
+    def _is_pathlib_path(self, name_node: ast.Name, tree: ast.AST) -> bool:
+        """Heuristic: check if a variable was assigned from Path()."""
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == name_node.id:
+                        if isinstance(node.value, ast.Call):
+                            if isinstance(node.value.func, ast.Name) and node.value.func.id == 'Path':
+                                return True
+        return False
 
     def validate_shell_command(self, command_spec: dict) -> ValidationResult:
         if command_spec.get("command") and not command_spec.get("timeout_seconds"):
