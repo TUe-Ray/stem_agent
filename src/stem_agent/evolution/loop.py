@@ -1910,7 +1910,8 @@ class EvolutionLoop:
                 },
             }
         )
-def _swebench_baseline_genome(self, scenario_name: str) -> Genome:
+
+    def _swebench_baseline_genome(self, scenario_name: str) -> Genome:
         """SWE-bench seed genome with code-search + patch-propose + verify workflow."""
         return Genome.model_validate(
             {
@@ -1920,13 +1921,13 @@ def _swebench_baseline_genome(self, scenario_name: str) -> Genome:
                 "task_diagnosis": {},
                 "roles": [
                     {"name": "locator", "description": "Searches source tree for relevant code locations.", "instructions": "Search the codebase for files and functions related to the problem statement. Report exact file paths and line numbers.", "allowed_tools": ["call_model", "search_code", "read_file"]},
-                    {"name": "patcher", "description": "Reads source files and produces a unified diff patch.", "instructions": "Read the relevant source files, understand the bug, and produce a minimal unified diff that fixes the problem without changing tests.", "allowed_tools": ["call_model", "read_file", "write_patch"]},
-                    {"name": "verifier", "description": "Validates the patch applies cleanly.", "instructions": "Apply the patch in dry-run mode and confirm no conflicts. Report any issues.", "allowed_tools": ["call_model", "apply_patch_dry_run"]},
+                    {"name": "patcher", "description": "Reads source files and produces a unified diff patch.", "instructions": "Read the relevant source files, understand the bug, and produce a minimal unified diff. Output ONLY the unified diff — no markdown fences, no explanatory text, no summary. Start with '--- a/filepath' or 'diff --git a/filepath'. The diff must include hunks with @@ line markers.", "allowed_tools": ["call_model", "read_file", "write_patch"]},
+                    {"name": "verifier", "description": "Validates the patch applies cleanly.", "instructions": "Apply the patch in dry-run mode and confirm no conflicts. Simply report 'Patch applies cleanly' or list any issues found.", "allowed_tools": ["call_model", "apply_patch_dry_run"]},
                 ],
                 "workflow": [
                     {"id": "locate", "role": "locator", "action": "Search the codebase for files relevant to the problem statement. Return file paths and line numbers.", "input_from": [], "output_key": "code_locations"},
-                    {"id": "read_and_patch", "role": "patcher", "action": "Read the relevant source files and produce a unified diff patch that fixes the issue. Do not modify test files.", "input_from": ["code_locations"], "output_key": "patch"},
-                    {"id": "verify", "role": "verifier", "action": "Check that the patch applies cleanly with --dry-run. Report success or failure.", "input_from": ["patch"], "output_key": "final_output"},
+                    {"id": "read_and_patch", "role": "patcher", "action": "Read the relevant source files and produce a unified diff patch. Output ONLY the raw unified diff — no markdown fences, no explanation.", "input_from": ["code_locations"], "output_key": "final_output"},
+                    {"id": "verify", "role": "verifier", "action": "Check that the patch applies cleanly with --dry-run. Report success or failure.", "input_from": ["final_output"], "output_key": "verification_result"},
                 ],
                 "tools": {"builtin": ["call_model", "search_code", "read_file", "write_patch", "apply_patch_dry_run"], "generated": []},
                 "memory": {},

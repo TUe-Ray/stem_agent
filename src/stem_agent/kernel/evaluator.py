@@ -302,7 +302,7 @@ class GuardianFitnessEvaluator:
             return exact_match_after_extraction(output, run.expected_output or "")
         if method == "regex_check":
             expression = pattern or r"\d+.*[\+\-\*\/].*\d+"
-            return 1.0 if re.search(expression, output, re.DOTALL | re.IGNORECASE) else 0.0
+            return 1.0 if re.search(expression, output, re.DOTALL | re.MULTILINE | re.IGNORECASE) else 0.0
         if method == "section_check":
             requirements = [pattern] if pattern else scenario.expected_output.requirements
             coverage, _ = self._requirement_coverage(requirements, output)
@@ -833,6 +833,37 @@ class GuardianFitnessEvaluator:
                 return 1.0
         return 0.0
 
+    @staticmethod
+    def _extract_diff(output: str) -> str:
+        """Extract a unified diff from prose output.
+
+        Handles markdown-fenced diff blocks and prose-wrapped diffs.
+        Returns the cleaned diff text, or original output if no diff found.
+        """
+        import re
+
+        # Case 1: Markdown-fenced diff block: ```diff ... ```
+        m = re.search(
+            r"```(?:diff)?\s*\n(.*?)```", output, re.DOTALL | re.IGNORECASE
+        )
+        if m:
+            return m.group(1).strip()
+
+        # Case 2: Find diff header anywhere in output (handles prose-wrapped)
+        for header in ("diff --git", "--- a/", "--- "):
+            idx = output.find(header)
+            if idx >= 0:
+                return output[idx:].strip()
+
+        # Case 3: Plain unified diff with +++ / @@ markers (weaker signal)
+        m = re.search(
+            r"(\+\+\+\s.+\n@@\s.+)", output, re.DOTALL
+        )
+        if m:
+            return output[m.start():].strip()
+
+        return output.strip()
+
     def _patch_applies_score(
         self, scenario: Scenario, output: str, run: HarnessRunResult
     ) -> float:
@@ -840,11 +871,20 @@ class GuardianFitnessEvaluator:
         import os
         # Check for mock mode
         if os.environ.get("STEM_AGENT_SWEBENCH_MOCK") == "1":
-            return 1.0 if output.strip().startswith(("diff", "---", "+++")) else 0.0
-        # In real mode, delegate to patch --dry-run via _apply_patch_dry_run logic
-        if not output.strip().startswith(("diff", "---", "+++")):
+            diff = self._extract_diff(output)
+            if not diff:
+                return 0.0
+            has_hunks = diff.count("@@") >= 1
+            if diff.startswith(("diff", "---", "+++")) and has_hunks:
+                return 1.0
+            if diff.startswith(("diff", "---", "+++")):
+                return 0.5
             return 0.0
-        has_hunks = output.count("@@") >= 1
+        # In real mode, delegate to patch --dry-run via _apply_patch_dry_run logic
+        diff = self._extract_diff(output)
+        if not diff or not diff.startswith(("diff", "---", "+++")):
+            return 0.0
+        has_hunks = diff.count("@@") >= 1
         return 0.5 if has_hunks else 0.0  # Conservative: real apply needs workspace setup
 
     def _swebench_docker_eval_score(
@@ -859,11 +899,11 @@ class GuardianFitnessEvaluator:
         import os
         if os.environ.get("STEM_AGENT_SWEBENCH_MOCK") == "1" or self.model_client.test_mode:
             # Mock: give credit if patch looks like a unified diff with hunks
-            output_stripped = output.strip()
-            if not output_stripped:
+            diff = self._extract_diff(output)
+            if not diff:
                 return 0.0
-            has_header = output_stripped.startswith(("diff", "---", "+++"))
-            has_hunks = "@@" in output_stripped
+            has_header = diff.startswith(("diff", "---", "+++"))
+            has_hunks = "@@" in diff
             return 0.8 if (has_header and has_hunks) else (0.4 if has_header else 0.0)
         # Real Docker eval — requires swebench package + Docker
         try:
