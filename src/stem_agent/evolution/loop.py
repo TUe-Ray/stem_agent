@@ -86,6 +86,8 @@ class EvolutionLoop:
         "diagnosis_quality", "architecture_fit",
         "safeguard_effectiveness", "minimality_score",
         "task_performance", "cost_penalty", "complexity_penalty",
+        # LLM judge quality metrics (Layer-1 safe: aggregate, no case data)
+        "requirement_match", "content_quality", "structure",
     }
 
     def _visible_metric_breakdown(self, result: EvaluationResult) -> dict[str, float]:
