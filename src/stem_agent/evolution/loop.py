@@ -77,6 +77,31 @@ class EvolutionLoop:
             "cost_estimate": float(result.cost_estimate),
         }
 
+    _VISIBLE_METRICS = {
+        "requirement_coverage", "format_validity", "constraint_adherence",
+        "actionability", "workflow_completion", "quality_gate_usage",
+        "self_review_usage", "generated_tool_usage", "artifact_presence",
+        "reference_alignment", "input_specificity",
+        "diagnosis_quality", "architecture_fit",
+        "safeguard_effectiveness", "minimality_score",
+        "task_performance", "cost_penalty", "complexity_penalty",
+    }
+
+    def _visible_metric_breakdown(self, result: EvaluationResult) -> dict[str, float]:
+        """Extract Layer-1-safe aggregate metrics from evaluation result (no case IDs)."""
+        return {
+            k: round(float(v), 3)
+            for k, v in result.metrics.items()
+            if k in self._VISIBLE_METRICS
+        }
+
+    def _weakest_visible_metrics(self, result: EvaluationResult) -> list[str]:
+        """Return up to 3 lowest-scoring visible metrics (below 0.5)."""
+        visible = self._visible_metric_breakdown(result)
+        below_threshold = [(k, v) for k, v in visible.items() if v < 0.5]
+        below_threshold.sort(key=lambda x: x[1])
+        return [k for k, _ in below_threshold[:3]]
+
     def __init__(
         self,
         *,
@@ -404,6 +429,8 @@ class EvolutionLoop:
                 mutation_type="evaluation",
                 current_score=current_result.promotion_score,
                 previous_score=previous_eval_score,
+                metric_breakdown=self._visible_metric_breakdown(current_result),
+                weakest_metrics=self._weakest_visible_metrics(current_result),
             )
             signal_history.append(evaluation_signal)
             lineage.record_evaluation(

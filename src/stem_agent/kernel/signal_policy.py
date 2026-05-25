@@ -23,6 +23,9 @@ class NucleusSignal:
     aggregate_score: float | None = None
     previous_aggregate_score: float | None = None
     score_delta: float | None = None
+    metric_breakdown: dict[str, float] | None = None
+    weakest_metrics: list[str] | None = None
+    last_rejection_summary: str | None = None
 
 
 @dataclass
@@ -42,7 +45,19 @@ class SignalPolicy:
         mutation_type: str,
         current_score: float,
         previous_score: float,
+        *,
+        metric_breakdown: dict[str, float] | None = None,
+        weakest_metrics: list[str] | None = None,
+        last_rejection_summary: str | None = None,
     ) -> NucleusSignal:
+        # Strip any case-ID-like keys from metric_breakdown (Layer-2 guard)
+        safe_breakdown: dict[str, float] | None = None
+        if metric_breakdown:
+            import re
+            safe_breakdown = {
+                k: v for k, v in metric_breakdown.items()
+                if not re.match(r'^(?:train|val|hidden|case|external)_\d+', k)
+            }
         direction: Literal["improved", "degraded", "neutral", "unknown"] = (
             "improved"
             if current_score > previous_score + 0.01
@@ -69,6 +84,9 @@ class SignalPolicy:
                 if self.layer_1_enabled and self.expose_score_delta
                 else None
             ),
+            metric_breakdown=safe_breakdown,
+            weakest_metrics=weakest_metrics,
+            last_rejection_summary=last_rejection_summary,
         )
 
     def assert_no_layer2_leak(self, nucleus_prompt: str) -> None:

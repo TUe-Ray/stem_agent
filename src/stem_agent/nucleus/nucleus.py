@@ -47,6 +47,15 @@ def build_nucleus_prompt(
             )
         else:
             line = f"Generation {sig.generation}: {sig.mutation_type} -> {sig.direction}"
+
+        if sig.weakest_metrics:
+            line += f"\n    weakest metrics: {', '.join(sig.weakest_metrics)}"
+        if sig.metric_breakdown:
+            mini = {k: v for k, v in sig.metric_breakdown.items() if v < 0.5}
+            if mini:
+                line += f"\n    low metrics: {mini}"
+        if sig.last_rejection_summary:
+            line += f"\n    last rejection: {sig.last_rejection_summary[:200]}"
         history_lines.append(line)
 
     prompt = f"""You are Nucleus, a genome mutation proposer for a stem agent framework.
@@ -88,11 +97,49 @@ Output JSON only as a MutationPlan:
   ]
 }}
 
-Patch requirements:
-- Mutations must not create duplicate workflow step ids, role names, quality gate names, or generated tool names.
-- add_quality_gate patch: {{"name": "...", "description": "...", "check_type": "schema", "required": true}}
-- add_workflow_step patch: {{"id": "...", "role": "<existing role>", "action": "...", "input_from": ["..."], "output_key": "..."}}
-- modify_self_evaluation patch: {{"enabled": true, "rubric": ["..."]}}
+Important: create_tool mutations are a powerful way to add custom validation logic
+that earns generated_tool_usage and quality_gate_usage scores.
+Here is a WORKING EXAMPLE of a create_tool patch that passes all sandbox checks:
+
+  mutation_type: create_tool
+  target: tools.generated
+  patch:
+    name: requirement_sections_checker
+    description: Check whether output covers scenario requirements.
+    code: |
+      from typing import Any, Dict
+      def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
+          output = str(input_data.get("output", "")).lower()
+          requirements = input_data.get("requirements", [])
+          missing = []
+          for req in requirements:
+              req_text = str(req).lower()
+              important_words = [
+                  word.strip(".,:;!?()[]{{}}")
+                  for word in req_text.split()
+                  if len(word.strip(".,:;!?()[]{{}}")) >= 5
+              ]
+              if important_words and not any(word in output for word in important_words):
+                  missing.append(req)
+          total = max(len(requirements), 1)
+          score = 1.0 - (len(missing) / total)
+          return {{"passed": len(missing) == 0, "missing": missing, "score": score}}
+    test_code: |
+      from requirement_sections_checker import run
+      def test_detects_missing():
+          result = run({{"output": "Summary: hello", "requirements": ["Must include a short summary", "Must include concrete steps"]}})
+          assert not result["passed"] and "Must include concrete steps" in result["missing"]
+      def test_accepts_covered():
+          result = run({{"output": "Summary with concrete steps and final answer", "requirements": ["Must include summary", "Must include concrete steps"]}})
+          assert result["score"] >= 0.5
+
+IMPORTANT RULES for generated tool code:
+- Functions must be named `run(input_data) -> dict` and return a dict.
+- Name must be a valid Python identifier matching `^[A-Za-z_][A-Za-z0-9_]*$`.
+- Must NOT import: os, subprocess, socket, requests, httpx, shutil (FORBIDDEN).
+- May import from `typing`, `pathlib` (read-only), `json`, `re`, `math`.
+- test_code must `from <tool_name> import run` (the tool file is <tool_name>.py).
+- code AND test_code are BOTH required — no test_code means automatic rejection.
 """
     signal_policy.assert_no_layer2_leak(prompt)
     return prompt
