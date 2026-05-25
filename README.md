@@ -452,4 +452,40 @@ Forbidden imports for generated tools include:
 - `requests`
 - `httpx`
 - `shutil`
-- `pathlib`
+
+`pathlib` is allowed for read-only operations. Write methods (`write_text`,
+`unlink`, `mkdir`, etc.) are blocked at the AST level.
+
+## 🐛 SWE-bench Code-Patch Scenario
+
+`stem_agent` includes a code-patch-generation scenario based on SWE-bench Lite:
+
+```bash
+# View available benchmarks (includes swebench_lite_demo)
+stem_agent list-benchmarks
+
+# Run the code-patch scenario
+stem_agent evolve scenarios/swebench_lite_demo --run-id sweb_demo_001
+```
+
+The SWE-bench scenario uses:
+- **3 roles**: locator (code search), patcher (diff generation), verifier (dry-run)
+- **New built-in tools**: `search_code`, `write_patch`, `apply_patch_dry_run`
+- **Mock evaluation mode**: `STEM_AGENT_SWEBENCH_MOCK=1` for offline development
+- **Real evaluation**: requires Docker + the `swebench` package
+
+## ⚠️ Limitations
+
+This project is a research prototype. Known limitations:
+
+- **Evaluator is heuristic-based**: Most scoring uses keyword matching, not semantic
+  understanding. Scores can be noisy for open-ended tasks.
+- **Single LLM provider**: Currently OpenAI-only. Provider abstraction exists but
+  only OpenAI is implemented.
+- **Sequential evaluation**: Cases run one at a time. No parallelism.
+- **No Docker sandbox**: Generated tools pass static AST checks but may run in-process.
+- **Budget tracking**: Virtual cost estimates in test mode can be inaccurate.
+- **max_generations**: Default 5-7 may not be enough for complex scenarios to
+  reach stagnation-based operator escalation (ZeroOrder at gen 5, Hyper at gen 8).
+
+For the latest experimental results, see `baseline_runs/BEFORE_AFTER_REPORT.md`.
