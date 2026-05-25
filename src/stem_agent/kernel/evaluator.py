@@ -831,12 +831,15 @@ class GuardianFitnessEvaluator:
 
     def _complexity_penalty(self, genome: Genome) -> float:
         generated_tools = genome.tools.get("generated", []) or []
+        # First generated tool / first quality gate / first role addition are
+        # exactly the mutations we want — don't penalize the first of each class.
+        # Only penalize when structure grows beyond reasonable scale.
         size = (
-            max(len(genome.roles) - 1, 0) * 0.12
-            + max(len(genome.workflow) - 2, 0) * 0.08
-            + len(generated_tools) * 0.15
-            + len(genome.quality_gates) * 0.08
-            + len(genome.environment.required_artifacts) * 0.03
+            max(len(genome.roles) - 1, 0) * 0.08
+            + max(len(genome.workflow) - 2, 0) * 0.05
+            + max(len(generated_tools) - 1, 0) * 0.08
+            + max(len(genome.quality_gates) - 1, 0) * 0.05
+            + len(genome.environment.required_artifacts) * 0.02
         )
         return self._clamp(size)
 

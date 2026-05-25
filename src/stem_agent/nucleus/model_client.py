@@ -214,29 +214,60 @@ class ModelClient:
             kwargs["temperature"] = temperature
         if response_schema:
             if self._has_freeform_object(response_schema):
-                kwargs["messages"] = ([{"role": "system", "content": system_prompt}] if system_prompt else []) + [
-                    {
-                        "role": "user",
-                        "content": "Return only valid JSON matching the requested schema.\n"
-                        + prompt,
-                    }
-                ]
-                kwargs["response_format"] = {"type": "json_object"}
-            else:
-                normalized_schema = self._normalize_strict_json_schema(response_schema)
-                kwargs["response_format"] = {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "stem_agent_structured_output",
-                        "schema": normalized_schema,
-                        "strict": True,
-                    },
-                }
+                return self._try_json_object_chat_completion(
+                    client, prompt, system_prompt, kwargs
+                )
+            try:
+                return self._try_structured_chat_completion(
+                    client, prompt, response_schema, system_prompt, kwargs
+                )
+            except Exception:
+                # Provider doesn't support json_schema — fall back to json_object
+                self.record_structured_output_repair()
+                return self._try_json_object_chat_completion(
+                    client, prompt, system_prompt, kwargs
+                )
         response = client.chat.completions.create(**kwargs)
         content = response.choices[0].message.content or ""
         if response_schema:
             return json.loads(content), self._tokens_from_response(response)
         return content, self._tokens_from_response(response)
+
+    def _try_structured_chat_completion(
+        self,
+        client: Any,
+        prompt: str,
+        response_schema: dict[str, Any],
+        system_prompt: str | None,
+        kwargs: dict[str, Any],
+    ) -> tuple[str | dict[str, Any], int | None]:
+        normalized_schema = self._normalize_strict_json_schema(response_schema)
+        kwargs["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "stem_agent_structured_output",
+                "schema": normalized_schema,
+                "strict": True,
+            },
+        }
+        response = client.chat.completions.create(**kwargs)
+        content = response.choices[0].message.content or ""
+        return json.loads(content), self._tokens_from_response(response)
+
+    def _try_json_object_chat_completion(
+        self,
+        client: Any,
+        prompt: str,
+        system_prompt: str | None,
+        kwargs: dict[str, Any],
+    ) -> tuple[str | dict[str, Any], int | None]:
+        kwargs["messages"] = (
+            [{"role": "system", "content": system_prompt}] if system_prompt else []
+        ) + [{"role": "user", "content": "Return only valid JSON.\n" + prompt}]
+        kwargs["response_format"] = {"type": "json_object"}
+        response = client.chat.completions.create(**kwargs)
+        content = response.choices[0].message.content or ""
+        return json.loads(content), self._tokens_from_response(response)
 
     def _full_prompt(self, system_prompt: str | None, prompt: str) -> str:
         if not system_prompt:

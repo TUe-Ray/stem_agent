@@ -1,0 +1,41 @@
+# Baseline Run Diagnostics — Complete Summary
+
+## 1. toy_structured_answer (baseline_toy)
+- Baseline: 0.7715, Final: 0.7975, **Delta: 0.0260**
+- 15 proposed, 1 promoted (add_quality_gate), 4 rejected, 9 rolled back
+- 0 create_tool proposed
+- Only first_order operator
+- Generated tool dirs: NONE
+
+## 2. security_review_demo (baseline_security — partial, 4/7 gens)
+- Baseline: 0.9419, Latest: 0.9501, **Delta: 0.0082**
+- 16 proposed, 0 promoted, 1 rejected, 15 rolled back
+- 0 create_tool proposed
+- Only first_order operator
+- Generated tool dirs: NONE
+- **Note:** Already scoring 0.94 at baseline — heuristic evaluator saturates
+
+## 3. gsm8k_demo (baseline_gsm8k)
+- Baseline: 0.8596, Final: 0.8807, **Delta: 0.0211**
+- 12 proposed, 0 promoted, 2 rejected, 10 rolled back
+- **3 create_tool proposed!** (gens 1, 2, 3)
+- **3 generated_tools directories CREATED on disk!**
+  - gen_001: requirements_checker.py + test
+  - gen_002: output_verifier.py + test
+  - gen_003: verification_tool.py + test
+- crossover operator used at gen 4
+- Frozen genome: 1 role (solver), 2 workflow steps
+- **All 3 create_tool mutations rolled back — fitness delta too small**
+
+## Plan Predictions Validated
+✅ Delta < 0.05 on ALL 3 scenarios
+✅ create_tool proposed 0 times on non-math tasks, 3 times on math task
+✅ create_tool promoted ZERO times
+✅ Only first_order used unless stagnation triggers crossover
+✅ Rollback reasons: "fitness did not improve enough"
+✅ Rejection reasons: duplicate names, rubric removal
+
+## Key Insight
+The create_tool pipeline WORKS end-to-end (code is written, tests pass, tools are loaded).
+The problem is the complexity_penalty + min_delta bar prevents promotion.
+The Phase D fix (reduced complexity penalty + first-tool grace) should fix this.
