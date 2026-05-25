@@ -1021,17 +1021,15 @@ def _swb_ensure_workspace(repo: str, base_commit: str, instance_id: str) -> "Pat
     workspace.parent.mkdir(parents=True, exist_ok=True)
     clone_url = f"https://github.com/{repo}.git"
     try:
+        # Clone with full commit history (no --depth=1) so we can checkout any base_commit.
+        # Use --filter=blob:none for a blobless partial clone (small download, full history).
         subprocess.run(
-            ["git", "clone", "--depth=1", clone_url, str(workspace)],
-            capture_output=True, text=True, timeout=120, check=True,
-        )
-        subprocess.run(
-            ["git", "-C", str(workspace), "fetch", "--depth=1", "origin", base_commit],
-            capture_output=True, text=True, timeout=60, check=True,
+            ["git", "clone", "--filter=blob:none", "--no-tags", clone_url, str(workspace)],
+            capture_output=True, text=True, timeout=300, check=True,
         )
         subprocess.run(
             ["git", "-C", str(workspace), "checkout", base_commit],
-            capture_output=True, text=True, timeout=30, check=True,
+            capture_output=True, text=True, timeout=120, check=True,
         )
     except subprocess.CalledProcessError:
         # Clean up partial clone

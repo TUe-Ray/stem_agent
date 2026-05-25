@@ -110,11 +110,10 @@ def evaluate_patch_light(
     repo_dir = base_dir / f"repo_{_safe_id(instance_id)}"
 
     try:
-        # 1. Clone and checkout
+        # 1. Clone with full commit history (blobless partial clone for speed)
         clone_url = f"https://github.com/{repo}.git"
-        _run(["git", "clone", "--depth=1", clone_url, str(repo_dir)], timeout=120)
-        _run(["git", "-C", str(repo_dir), "fetch", "--depth=1", "origin", base_commit], timeout=60)
-        _run(["git", "-C", str(repo_dir), "checkout", base_commit], timeout=30)
+        _run(["git", "clone", "--filter=blob:none", "--no-tags", clone_url, str(repo_dir)], timeout=300)
+        _run(["git", "-C", str(repo_dir), "checkout", base_commit], timeout=120)
 
         # 2. Apply test patch (adds failing tests)
         test_patch_clean = _clean_patch(test_patch)
