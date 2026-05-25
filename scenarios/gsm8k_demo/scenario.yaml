@@ -1,53 +1,54 @@
 scenario:
   name: gsm8k_demo
-  description: Small GSM8K smoke scenario for checking that math-reasoning evolution runs end to end
+  description: Small GSM8K smoke scenario for checking that math-reasoning evolution
+    runs end to end
   task_class: structured_reasoning
 input_format:
   type: text
   fields:
-    - name: problem
-      required: true
+  - name: problem
+    required: true
 expected_output:
   type: markdown
   requirements:
-    - Must show arithmetic reasoning steps
-    - Must include the final numeric answer
+  - Must show arithmetic reasoning steps
+  - Must include the final numeric answer
 evaluation_criteria:
-  - name: correct_answer
-    weight: 0.7
-    method: exact_match_after_extraction
-  - name: reasoning_steps_present
-    weight: 0.2
-    method: regex_check
-    pattern: '\d+.*[\+\-\*\/].*\d+'
-  - name: no_hallucinated_numbers
-    weight: 0.1
-    method: llm_judge
+- name: correct_answer
+  weight: 0.7
+  method: exact_match_after_extraction
+- name: reasoning_steps_present
+  weight: 0.2
+  method: regex_check
+  pattern: \d+.*[\+\-\*\/].*\d+
+- name: no_hallucinated_numbers
+  weight: 0.1
+  method: llm_judge
 signal_policy:
   layer_1_enabled: true
   expose_aggregate_score: true
   expose_score_delta: true
   expose_direction: true
 constraints:
-  - Show concise work before the final answer.
+- Show concise work before the final answer.
 available_builtin_tools:
-  - call_model
+- call_model
 success_criteria:
-  - name: correct_answer
-    weight: 0.7
-    description: Extracted final answer matches the gold answer.
-  - name: reasoning_steps_present
-    weight: 0.2
-    description: Output includes visible arithmetic reasoning.
-  - name: no_hallucinated_numbers
-    weight: 0.1
-    description: Reasoning does not introduce unsupported numbers.
+- name: correct_answer
+  weight: 0.7
+  description: Extracted final answer matches the gold answer.
+- name: reasoning_steps_present
+  weight: 0.2
+  description: Output includes visible arithmetic reasoning.
+- name: no_hallucinated_numbers
+  weight: 0.1
+  description: Reasoning does not introduce unsupported numbers.
 evolution:
   max_generations: 5
   patience: 2
   min_delta: 0.02
   max_mutations_per_generation: 4
-  max_cost_usd: 2.0
+  max_cost_usd: 10.0
   max_workflow_steps: 8
   max_roles: 6
   max_environment_artifacts: 8
