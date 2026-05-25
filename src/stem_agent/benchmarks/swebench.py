@@ -176,7 +176,7 @@ def evaluate_patch_light(
         # 8. Run PASS_TO_PASS tests after patch
         after_ptp = _run_tests(python, repo_dir, pass_to_pass, timeout=timeout)
 
-        # 9. Score: all FAIL_TO_PASS must pass, all PASS_TO_PASS must still pass
+        # 9. Score
         all_ftp_pass = all(s == "PASSED" for s in after_ftp.values()) if after_ftp else True
         all_ptp_pass = all(s == "PASSED" for s in after_ptp.values()) if after_ptp else True
         resolved = all_ftp_pass and all_ptp_pass
@@ -194,6 +194,11 @@ def evaluate_patch_light(
         return _error_result(f"Timeout: {e}")
     except Exception as e:
         return _error_result(f"Unexpected error: {e}")
+    finally:
+        # Clean up temp workspace if we created it (not if user provided work_dir)
+        if work_dir is None:
+            import shutil
+            shutil.rmtree(base_dir, ignore_errors=True)
 
 
 # ── Docker-mode evaluation ──────────────────────────────────────────────────
