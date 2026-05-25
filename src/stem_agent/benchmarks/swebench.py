@@ -110,10 +110,16 @@ def evaluate_patch_light(
     repo_dir = base_dir / f"repo_{_safe_id(instance_id)}"
 
     try:
-        # 1. Clone with full commit history (blobless partial clone for speed)
-        clone_url = f"https://github.com/{repo}.git"
-        _run(["git", "clone", "--filter=blob:none", "--no-tags", clone_url, str(repo_dir)], timeout=300)
-        _run(["git", "-C", str(repo_dir), "checkout", base_commit], timeout=120)
+        # 1. Clone from cached workspace instead of from GitHub (avoids re-downloading 164MB+)
+        cached = _ensure_cached_workspace(repo, base_commit)
+        if cached and cached.exists():
+            # Lightweight copy of cached git repo (blobless — only metadata, no file blobs)
+            _run(["cp", "-r", str(cached), str(repo_dir)], timeout=60)
+        else:
+            # Fallback: clone from GitHub
+            clone_url = f"https://github.com/{repo}.git"
+            _run(["git", "clone", "--filter=blob:none", "--no-tags", clone_url, str(repo_dir)], timeout=300)
+            _run(["git", "-C", str(repo_dir), "checkout", base_commit], timeout=120)
 
         # 2. Apply test patch (adds failing tests)
         test_patch_clean = _clean_patch(test_patch)
@@ -350,6 +356,37 @@ def _load_real_instances(n: int = 3) -> list[dict[str, Any]]:
         return items
     except Exception:
         return []
+
+
+def _ensure_cached_workspace(repo: str, base_commit: str) -> "Path | None":
+    """Ensure the persistent cached workspace exists at the given base_commit.
+    
+    Returns the cached workspace path, or None if clone failed.
+    """
+    import subprocess
+    from pathlib import Path
+
+    cache_dir = Path.home() / ".cache" / "stem_agent" / "swebench_workspaces"
+    workspace = cache_dir / f"{_safe_slug(repo)}_{base_commit[:8]}"
+    if workspace.exists() and (workspace / ".git").exists():
+        return workspace
+
+    workspace.parent.mkdir(parents=True, exist_ok=True)
+    clone_url = f"https://github.com/{repo}.git"
+    try:
+        subprocess.run(
+            ["git", "clone", "--filter=blob:none", "--no-tags", clone_url, str(workspace)],
+            capture_output=True, text=True, timeout=300, check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(workspace), "checkout", base_commit],
+            capture_output=True, text=True, timeout=120, check=True,
+        )
+    except subprocess.CalledProcessError:
+        import shutil
+        shutil.rmtree(workspace, ignore_errors=True)
+        return None
+    return workspace
 
 
 def _safe_id(instance_id: str) -> str:
