@@ -58,22 +58,22 @@ class TestLLMJudgeEvaluator:
         assert judge.name() == "llm_judge"
 
     def test_parse_valid_json(self):
-        response = '{"correctness": 0.9, "completeness": 0.8, "clarity": 0.7, "actionability": 0.6, "summary": "good"}'
+        response = '{"requirement_match": 0.7, "content_quality": 0.6, "structure": 0.8, "weaknesses": ["vague"], "summary": "ok"}'
         result = LLMJudgeEvaluator._parse_judge_response(response)
-        assert result["correctness"] == 0.9
-        assert result["completeness"] == 0.8
+        assert result["requirement_match"] == 0.7
+        assert result["content_quality"] == 0.6
 
     def test_parse_markdown_wrapped_json(self):
-        response = '```json\n{"correctness": 0.5, "completeness": 0.6, "clarity": 0.7, "actionability": 0.8, "summary": "ok"}\n```'
+        response = '```json\n{"requirement_match": 0.6, "content_quality": 0.7, "structure": 0.9, "weaknesses": [], "summary": "decent"}\n```'
         result = LLMJudgeEvaluator._parse_judge_response(response)
-        assert result["correctness"] == 0.5
+        assert result["requirement_match"] == 0.6
 
     def test_evaluate_case_with_mock_client(self):
         """Test evaluate_case with a mocked model client."""
         judge = LLMJudgeEvaluator()
         mock_client = MagicMock()
         mock_client.call.return_value = (
-            '{"correctness": 0.85, "completeness": 0.75, "clarity": 0.9, "actionability": 0.8, "summary": "solid"}'
+            '{"requirement_match": 0.85, "content_quality": 0.75, "structure": 0.9, "weaknesses": ["vague step 2"], "summary": "solid"}'
         )
         judge.model_client = mock_client
 
@@ -83,8 +83,8 @@ class TestLLMJudgeEvaluator:
 
         metrics = judge.evaluate_case(genome, scenario, run, 0.0)
         assert 0.0 <= metrics.score <= 1.0
-        assert "correctness" in metrics.metrics
-        assert metrics.metrics["correctness"] == 0.85
+        assert "requirement_match" in metrics.metrics
+        assert metrics.metrics["requirement_match"] == 0.85
         mock_client.call.assert_called_once()
 
     def test_evaluate_case_fallback_on_error(self):
@@ -101,7 +101,7 @@ class TestLLMJudgeEvaluator:
         metrics = judge.evaluate_case(genome, scenario, run, 0.0)
         # Fallback should produce a reasonable score
         assert 0.4 <= metrics.score <= 0.6
-        assert "correctness" in metrics.metrics
+        assert "requirement_match" in metrics.metrics
 
 
 class TestEvaluatorWithStrategy:
@@ -121,7 +121,7 @@ class TestEvaluatorWithStrategy:
         judge = LLMJudgeEvaluator()
         mock_client = MagicMock()
         mock_client.call.return_value = (
-            '{"correctness": 0.9, "completeness": 0.9, "clarity": 0.85, "actionability": 0.8, "summary": "great"}'
+            '{"requirement_match": 0.9, "content_quality": 0.9, "structure": 0.85, "weaknesses": [], "summary": "great"}'
         )
         judge.model_client = mock_client
 
@@ -132,5 +132,5 @@ class TestEvaluatorWithStrategy:
 
         result = e._evaluate_case(genome, scenario, run, 0.0)
         assert 0.0 <= result.score <= 1.0
-        assert "correctness" in result.metrics
+        assert "requirement_match" in result.metrics
         mock_client.call.assert_called_once()

@@ -50,16 +50,34 @@ class LLMJudgeEvaluator(EvaluatorStrategy):
     output quality on correctness, completeness, clarity, and actionability.
     """
 
-    RUBRIC_PROMPT = """You are an expert evaluator judging the quality of an AI agent's output.
-Rate the output on these criteria from 0.0 (terrible) to 1.0 (perfect):
+    RUBRIC_PROMPT = """You are a strict evaluator. Your job is to find weaknesses in AI agent outputs, not to be nice.
+Be critical. Most outputs should score between 0.4 and 0.8. Reserve 0.9+ for truly exceptional answers.
 
-1. **correctness** (0-1): Did the output correctly address the task? Are facts/answers accurate?
-2. **completeness** (0-1): Did it cover all requirements? Any missing sections or steps?
-3. **clarity** (0-1): Is the output well-structured, readable, and free of confusion?
-4. **actionability** (0-1): Can a human follow this output to take action? Are steps concrete?
+Score the output against the REFERENCE/EXPECTED answer on these criteria:
+
+1. **requirement_match** (0-1): How many of the explicit requirements does the output satisfy?
+   Compare against the EXPECTED OUTPUT requirements one by one.
+   - 1.0: ALL requirements met with specific, accurate content
+   - 0.7: Most requirements met, minor gaps
+   - 0.4: Several requirements missing or wrong
+   - 0.1: Barely addresses the task
+
+2. **content_quality** (0-1): Is the content accurate, specific, and non-generic?
+   - 1.0: Specific, accurate, domain-appropriate detail
+   - 0.7: Mostly correct but somewhat generic
+   - 0.4: Vague, generic advice that could apply to any task
+   - 0.1: Factually wrong or nonsensical
+
+3. **structure** (0-1): Is the output well-organized with clear sections?
+   - 1.0: Excellent structure with logical flow and appropriate formatting
+   - 0.5: Adequate structure but could be better organized
+   - 0.1: Wall of text, no organization
+
+4. **weaknesses** (list): List 1-3 specific weaknesses or missing elements.
+   If you cannot find any weaknesses, you are not looking hard enough.
 
 Return ONLY a JSON object:
-{"correctness": 0.X, "completeness": 0.X, "clarity": 0.X, "actionability": 0.X, "summary": "one-line verdict"}"""
+{"requirement_match": 0.X, "content_quality": 0.X, "structure": 0.X, "weaknesses": ["specific weakness 1", "..."], "summary": "one-line verdict"}"""
 
     def __init__(self, model_client=None):
         from stem_agent.nucleus.model_client import ModelClient
@@ -94,31 +112,33 @@ Return ONLY a JSON object:
             )
             result = self._parse_judge_response(str(response))
         except Exception:
-            # Fallback: if judge call fails, score conservatively
-            result = {"correctness": 0.5, "completeness": 0.5, "clarity": 0.5, "actionability": 0.5}
+            result = {"requirement_match": 0.5, "content_quality": 0.5, "structure": 0.5}
 
-        # Weighted blend → final score
+        # Weighted blend → final score (requirement_match is most important)
         score = (
-            0.35 * result.get("correctness", 0.5)
-            + 0.25 * result.get("completeness", 0.5)
-            + 0.20 * result.get("clarity", 0.5)
-            + 0.20 * result.get("actionability", 0.5)
+            0.40 * result.get("requirement_match", 0.5)
+            + 0.35 * result.get("content_quality", 0.5)
+            + 0.25 * result.get("structure", 0.5)
         )
         score = max(0.0, min(1.0, score))
 
         metrics = {
-            "correctness": result.get("correctness", 0.5),
-            "completeness": result.get("completeness", 0.5),
-            "clarity": result.get("clarity", 0.5),
-            "actionability": result.get("actionability", 0.5),
+            "requirement_match": result.get("requirement_match", 0.5),
+            "content_quality": result.get("content_quality", 0.5),
+            "structure": result.get("structure", 0.5),
             "judge_summary": result.get("summary", ""),
+            "judge_weaknesses": result.get("weaknesses", []),
         }
 
         failures = []
-        if result.get("correctness", 1.0) < 0.4:
-            failures.append("Low correctness (judge)")
-        if result.get("completeness", 1.0) < 0.4:
-            failures.append("Low completeness (judge)")
+        if result.get("requirement_match", 1.0) < 0.4:
+            failures.append("Low requirement match (judge)")
+        if result.get("content_quality", 1.0) < 0.4:
+            failures.append("Low content quality (judge)")
+        # Include judge's own weaknesses as failure signals
+        weaknesses = result.get("weaknesses", [])
+        if isinstance(weaknesses, list):
+            failures.extend(weaknesses[:3])
 
         return EvalMetrics(
             score=score,
@@ -131,10 +151,21 @@ Return ONLY a JSON object:
     def _parse_judge_response(response: str) -> dict:
         """Extract JSON from judge response (may be wrapped in markdown or prose)."""
         import re
-        # Try to find JSON block
-        m = re.search(r'\{[^{}]*"correctness"[^{}]*\}', response, re.DOTALL)
-        if m:
-            return json.loads(m.group(0))
+        # Try to find JSON block: match { ... } with balanced braces
+        # Simple approach: find the outermost { } pair
+        start = response.find("{")
+        if start >= 0:
+            depth = 0
+            for i in range(start, len(response)):
+                if response[i] == "{":
+                    depth += 1
+                elif response[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            return json.loads(response[start:i + 1])
+                        except json.JSONDecodeError:
+                            break
         # Fallback: try parsing whole response
         try:
             return json.loads(response)
