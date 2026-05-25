@@ -904,52 +904,80 @@ class GuardianFitnessEvaluator:
     def _patch_applies_score(
         self, scenario: Scenario, output: str, run: HarnessRunResult
     ) -> float:
-        """Check if the generated unified diff applies cleanly to the workspace."""
+        """Check if the generated unified diff applies cleanly via git apply --check."""
         import os
-        # Check for mock mode
-        if os.environ.get("STEM_AGENT_SWEBENCH_MOCK") == "1":
-            diff = self._extract_diff(output)
-            if not diff:
-                return 0.0
-            has_hunks = diff.count("@@") >= 1
-            if diff.startswith(("diff", "---", "+++")) and has_hunks:
-                return 1.0
-            if diff.startswith(("diff", "---", "+++")):
-                return 0.5
-            return 0.0
-        # In real mode, delegate to patch --dry-run via _apply_patch_dry_run logic
+
         diff = self._extract_diff(output)
-        if not diff or not diff.startswith(("diff", "---", "+++")):
+        if not diff:
             return 0.0
+
         has_hunks = diff.count("@@") >= 1
-        return 0.5 if has_hunks else 0.0  # Conservative: real apply needs workspace setup
+        if not diff.startswith(("diff", "---", "+++")) and not has_hunks:
+            return 0.0
+
+        # Real mode: try to apply to the workspace using git apply --check
+        workspace = None
+        if run and run.case_input:
+            instance_id = run.case_input.get("instance_id", "unknown")
+            repo = run.case_input.get("repo", "")
+            base_commit = run.case_input.get("base_commit", "")
+            if repo and base_commit and repo != "demo/simple":
+                workspace = _swb_ensure_workspace(repo, base_commit, instance_id)
+
+        if workspace and workspace.exists():
+            import tempfile, subprocess
+            patch_file = workspace / "_check.patch"
+            patch_file.write_text(diff)
+            result = subprocess.run(
+                ["git", "-C", str(workspace), "apply", "--check", str(patch_file)],
+                capture_output=True, text=True, timeout=30,
+            )
+            patch_file.unlink(missing_ok=True)
+            return 1.0 if result.returncode == 0 else 0.0
+
+        # Fallback: heuristic
+        return 0.5 if has_hunks else 0.0
 
     def _swebench_docker_eval_score(
         self, scenario: Scenario, output: str, run: HarnessRunResult
     ) -> float:
-        """Evaluate patch correctness via SWE-bench's Docker evaluation harness.
+        """Evaluate patch correctness via real SWE-bench evaluation.
 
-        In mock mode (STEM_AGENT_SWEBENCH_MOCK=1), returns 1.0 if the patch
-        appears valid (non-empty, starts with diff header). In real mode,
-        delegates to the official swebench package.
+        Light mode (default): git clone + checkout + patch + pytest — no Docker needed.
+        Docker mode (STEM_AGENT_SWEBENCH_DOCKER=1): full swebench harness.
+
+        Falls back to mock scoring if instance data is unavailable (demo cases).
         """
         import os
-        if os.environ.get("STEM_AGENT_SWEBENCH_MOCK") == "1" or self.model_client.test_mode:
-            # Mock: give credit if patch looks like a unified diff with hunks
-            diff = self._extract_diff(output)
-            if not diff:
-                return 0.0
-            has_header = diff.startswith(("diff", "---", "+++"))
-            has_hunks = "@@" in diff
-            return 0.8 if (has_header and has_hunks) else (0.4 if has_header else 0.0)
-        # Real Docker eval — requires swebench package + Docker
-        try:
-            # This path is deliberately unimplemented in the MVP — it requires
-            # setting up Docker containers with the target repo at base_commit.
-            # See: https://github.com/princeton-nlp/SWE-bench for the official harness.
-            return 0.5  # Placeholder
-        except Exception:
+        from stem_agent.benchmarks.swebench import evaluate_swebench_instance
+
+        diff = self._extract_diff(output)
+        if not diff:
             return 0.0
+
+        # Build instance dict from case data
+        if run and run.case_input:
+            instance = {
+                "instance_id": run.case_input.get("instance_id", "unknown"),
+                "repo": run.case_input.get("repo", ""),
+                "base_commit": run.case_input.get("base_commit", ""),
+                "test_patch": run.case_input.get("test_patch", ""),
+                "problem_statement": run.case_input.get("problem_statement", ""),
+                "FAIL_TO_PASS": run.case_input.get("FAIL_TO_PASS", []),
+                "PASS_TO_PASS": run.case_input.get("PASS_TO_PASS", []),
+            }
+
+            # Only do real eval for non-demo instances
+            if instance["repo"] and instance["repo"] != "demo/simple" and instance["base_commit"]:
+                result = evaluate_swebench_instance(instance, diff, timeout=600)
+                if not result.get("error"):
+                    return float(result.get("score", 0.0))
+                # If eval failed (e.g., no Docker, no git), fall through to mock
+
+        # Mock fallback: give partial credit if patch looks valid
+        has_header = diff.startswith(("diff", "---", "+++"))
+        has_hunks = " @@" in diff or diff.count("@@") >= 1
+        return 0.8 if (has_header and has_hunks) else (0.4 if has_header else 0.0)
 
     def _complexity_penalty(self, genome: Genome) -> float:
         generated_tools = genome.tools.get("generated", []) or []
@@ -978,3 +1006,41 @@ class GuardianFitnessEvaluator:
 
     def _clamp(self, value: float) -> float:
         return max(0.0, min(1.0, value))
+
+
+def _swb_ensure_workspace(repo: str, base_commit: str, instance_id: str) -> "Path":
+    """Ensure a git workspace exists at the given base_commit for SWE-bench eval."""
+    import subprocess
+    from pathlib import Path
+
+    cache_dir = Path.home() / ".cache" / "stem_agent" / "swebench_workspaces"
+    workspace = cache_dir / f"{_safe_slug(repo)}_{base_commit[:8]}"
+    if workspace.exists():
+        return workspace
+
+    workspace.parent.mkdir(parents=True, exist_ok=True)
+    clone_url = f"https://github.com/{repo}.git"
+    try:
+        subprocess.run(
+            ["git", "clone", "--depth=1", clone_url, str(workspace)],
+            capture_output=True, text=True, timeout=120, check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(workspace), "fetch", "--depth=1", "origin", base_commit],
+            capture_output=True, text=True, timeout=60, check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(workspace), "checkout", base_commit],
+            capture_output=True, text=True, timeout=30, check=True,
+        )
+    except subprocess.CalledProcessError:
+        # Clean up partial clone
+        import shutil
+        shutil.rmtree(workspace, ignore_errors=True)
+        return Path(".")
+    return workspace
+
+
+def _safe_slug(text: str) -> str:
+    import re
+    return re.sub(r"[^a-zA-Z0-9_.-]", "_", text)

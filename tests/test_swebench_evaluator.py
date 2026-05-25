@@ -69,9 +69,8 @@ class TestExtractDiff:
 
 
 class TestMockPatchAppliesScore:
-    def test_mock_mode_with_diff(self, evaluator, monkeypatch):
-        """In mock mode, prose-wrapped diff gets a good score."""
-        monkeypatch.setenv("STEM_AGENT_SWEBENCH_MOCK", "1")
+    def test_real_mode_with_diff(self, evaluator, monkeypatch):
+        """In real mode (no workspace), prose-wrapped diff gets heuristic 0.5."""
         output = (
             "Here's the fix:\n"
             "```diff\n"
@@ -83,21 +82,19 @@ class TestMockPatchAppliesScore:
             "```\n"
         )
         score = evaluator._patch_applies_score(None, output, None)
-        assert score == 1.0, f"Expected 1.0, got {score}"
+        assert score == 0.5, f"Expected 0.5 (heuristic fallback), got {score}"
 
-    def test_mock_mode_no_diff(self, evaluator, monkeypatch):
-        """In mock mode, prose without diff header scores 0."""
-        monkeypatch.setenv("STEM_AGENT_SWEBENCH_MOCK", "1")
+    def test_real_mode_no_diff(self, evaluator, monkeypatch):
+        """Prose without diff header scores 0."""
         output = "I looked at the code and everything seems fine."
         score = evaluator._patch_applies_score(None, output, None)
         assert score == 0.0, f"Expected 0.0, got {score}"
 
-    def test_mock_mode_partial_diff(self, evaluator, monkeypatch):
-        """Diff header without hunks gets partial score."""
-        monkeypatch.setenv("STEM_AGENT_SWEBENCH_MOCK", "1")
+    def test_real_mode_partial_diff(self, evaluator, monkeypatch):
+        """Diff header without hunks gets 0.0 (no hunks)."""
         output = "--- a/file.py\n+++ b/file.py\n"
         score = evaluator._patch_applies_score(None, output, None)
-        assert score == 0.5, f"Expected 0.5, got {score}"
+        assert score == 0.0, f"Expected 0.0 (no hunks), got {score}"
 
 
 class TestMockSwebenchDockerEvalScore:
