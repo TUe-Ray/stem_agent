@@ -218,6 +218,15 @@ def list_benchmarks() -> None:
         )
         for benchmark in ROBUSTNESS_BENCHMARKS
     )
+    rows.append(
+        (
+            "swebench_lite_demo",
+            "code_patch_generation",
+            "scenarios/swebench_lite_demo",
+            "Small code-patch scenario based on SWE-bench Lite. Use init-benchmark first.",
+            "stem_agent init-benchmark swebench_lite_demo",
+        )
+    )
     typer.echo("| Name | Task class | Path | Focus | Command |")
     typer.echo("|---|---|---|---|---|")
     for name, task_class, path, focus, command in rows:

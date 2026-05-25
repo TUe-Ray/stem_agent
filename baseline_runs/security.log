@@ -1,0 +1,472 @@
+🧬 Training [----------------------------] 0/6 | starting | score n/a | best n/a
+=== stem_agent evolution ===
+Scenario: security_review_demo (security_review_triage)
+Scenario path: scenarios/security_review_demo
+Run id: baseline_security (new run)
+Run directory: runs/baseline_security
+Model: gpt-4o-mini
+Endpoint: chat_completions
+
+Configuration overview:
+  train cases: 2
+  validation cases: 2
+  hidden evaluation: 2 cases
+  max generations: 6
+  max mutations/generation: 4
+  patience: 2
+  min promotion delta: 0.015
+  max cost: $4.00
+Nucleus diagnosis complete
+  Initial hypothesis: A comprehensive review will identify key security risks and areas for improvement, enabling the formulation of effective remediation strategies.
+  Requirements: 6
+  Constraints: 4
+=== Generation 0 ===
+Genome version: 0
+Evaluation starting: current
+  generation: 0
+  genome version: 0
+  workspace: runs/baseline_security/generation_000/current_workspace
+  train cases: 2
+  validation cases: 2
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: # Security Review of Password Reset Design ## Summary This document reviews the password reset design for potential security risks. The d...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: # Security Review of the Admin CSV Upload Flow ## Summary This security review assesses the risks associated with the admin CSV upload fl...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: # Security Review of OAuth Callback Design ## Summary This review assesses the security implications of the mobile OAuth callback design,...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: # Security Review of CI/CD Deployment Workflow ## Summary This document provides a security review of the CI/CD deployment workflow, focu...
+💾 Artifacts     | label=current
+   outputs: runs/baseline_security/generation_000/outputs
+   traces:  runs/baseline_security/generation_000/current_traces.jsonl
+▶ Case started  | label=current | split=external_benchmark | case=external_001
+✅ Case complete | label=current | split=external_benchmark | case=external_001
+   preview: # Security Review of Webhook Receiver ## Summary This document assesses the security risks associated with a webhook receiver that verifi...
+▶ Case started  | label=current | split=external_benchmark | case=external_002
+✅ Case complete | label=current | split=external_benchmark | case=external_002
+   preview: # Security Review of Customer Data Export Feature ## Summary This review assesses the security implications of the customer data export f...
+Evaluation complete: current
+  promotion score: 0.9419
+  train score: 0.9452
+  validation score: 0.9387
+Hidden evaluation starting
+  generation: 0
+  genome id: a902623a-26ae-4502-a724-0f9c3bc12d6a
+  workspace: runs/baseline_security/generation_000/hidden_baseline_workspace
+  label: baseline
+Hidden evaluation complete
+  generation: 0
+  hidden score: 0.9412
+  label: baseline
+Nucleus mutation plan
+  operator: first_order
+  summary: Enhance security review capabilities by adding a quality gate and a self-evaluation step.
+  proposed mutations: 2
+  observed failure patterns: safeguard_gap
+💡 Mutation proposed: #0
+  type: add_quality_gate -> quality_gate_names
+  operator: first_order
+  expected improvement: Increase in safeguard effectiveness and overall security review quality.
+  risk: Potential complexity in integrating quality checks.
+Evaluation starting: candidate
+  generation: 0
+  genome version: 1
+  workspace: runs/baseline_security/generation_000/mutation_00/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 0
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: # Security Review of Password Reset Design ## Summary This document reviews the password reset design for potential security risks. The d...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: # Security Review of the Admin CSV Upload Flow ## Summary This security review assesses the risks associated with the admin CSV upload fl...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: # Security Review of OAuth Callback Design ## Summary This review assesses the security implications of the mobile OAuth callback design,...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: # Security Review of CI/CD Deployment Workflow ## Summary This document provides a security review of the CI/CD deployment workflow, focu...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_security/generation_000/mutation_00/outputs
+   traces:  runs/baseline_security/generation_000/mutation_00/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: # Security Review of Webhook Receiver ## Summary This document assesses the security risks associated with a webhook receiver that verifi...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002
+✅ Case complete | label=candidate | split=external_benchmark | case=external_002
+   preview: # Security Review of Customer Data Export Feature ## Summary This review assesses the security implications of the customer data export f...
+↩️  Mutation rolled back: #0
+  type: add_quality_gate -> quality_gate_names
+  score: 0.9419 -> 0.9513
+  reason: fitness did not improve enough for promotion
+💡 Mutation proposed: #1
+  type: add_workflow_step -> workflow
+  operator: first_order
+  expected improvement: Enhanced task understanding and prioritization of security risks.
+  risk: May introduce additional time for the review process.
+Evaluation starting: candidate
+  generation: 0
+  genome version: 2
+  workspace: runs/baseline_security/generation_000/mutation_01/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 1
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: # Security Review of Password Reset Design ## Summary This document reviews the password reset design for potential security risks. The d...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: # Security Review of the Admin CSV Upload Flow ## Summary This security review assesses the CSV upload flow used by support staff in an a...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: # Security Review of OAuth Callback Design ## Summary This review assesses the security implications of the mobile OAuth callback design,...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: # Security Review of CI/CD Deployment Workflow ## Summary This document provides a security review of the CI/CD deployment workflow, focu...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_security/generation_000/mutation_01/outputs
+   traces:  runs/baseline_security/generation_000/mutation_01/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: # Security Review of Webhook Receiver ## Summary This document assesses the security risks associated with a webhook receiver that verifi...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002
+✅ Case complete | label=candidate | split=external_benchmark | case=external_002
+   preview: # Security Review of Customer Data Export Feature ## Summary This review assesses the security implications of the customer data export f...
+↩️  Mutation rolled back: #1
+  type: add_workflow_step -> workflow
+  score: 0.9513 -> 0.9447
+  reason: fitness did not improve enough for promotion
+⚖️  Convergence decision
+  action: continue
+  stop: False
+  reason: convergence criteria not met
+  plateau detected: False
+Generation 0 complete
+  best score: 0.9419
+  patience left: 2
+  tokens used this generation: 25441
+=== Generation 1 ===
+Genome version: 2
+Evaluation starting: current
+  generation: 1
+  genome version: 2
+  workspace: runs/baseline_security/generation_001/current_workspace
+  train cases: 2
+  validation cases: 2
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: # Security Review of Password Reset Design ## Summary This review evaluates the password reset design, focusing on potential security ris...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: # Security Review of the Admin CSV Upload Flow ## Summary This security review assesses the risks associated with the admin CSV upload fl...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: # Security Review of OAuth Callback Design ## Summary This review assesses the security implications of the mobile OAuth callback design,...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: # Security Review of CI/CD Deployment Workflow ## Summary This document provides a security review of the CI/CD deployment workflow, focu...
+💾 Artifacts     | label=current
+   outputs: runs/baseline_security/generation_001/outputs
+   traces:  runs/baseline_security/generation_001/current_traces.jsonl
+▶ Case started  | label=current | split=external_benchmark | case=external_001
+✅ Case complete | label=current | split=external_benchmark | case=external_001
+   preview: # Security Review of Webhook Receiver ## Summary This document assesses the security risks associated with a webhook receiver that verifi...
+▶ Case started  | label=current | split=external_benchmark | case=external_002
+✅ Case complete | label=current | split=external_benchmark | case=external_002
+   preview: # Security Review of Customer Data Export Feature ## Summary This review assesses the security implications of the customer data export f...
+Evaluation complete: current
+  promotion score: 0.9461
+  train score: 0.9489
+  validation score: 0.9440
+Nucleus mutation plan
+  operator: first_order
+  summary: Propose mutations to enhance security review performance through improved quality gates and workflow steps.
+  proposed mutations: 2
+  observed failure patterns: safeguard_gap
+💡 Mutation proposed: #0
+  type: add_quality_gate -> quality_gate_names
+  operator: first_order
+  expected improvement: safeguard effectiveness
+  risk: Moderate, as it may require adjustment and testing.
+Evaluation starting: candidate
+  generation: 1
+  genome version: 3
+  workspace: runs/baseline_security/generation_001/mutation_00/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 0
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: # Security Review of Password Reset Design ## Summary This document reviews the password reset design for potential security risks. The d...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: # Security Review of the Admin CSV Upload Flow ## Summary This security review assesses the risks associated with the admin CSV upload fl...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: # Security Review of OAuth Callback Design ## Summary This review assesses the security implications of the mobile OAuth callback design,...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: # Security Review of CI/CD Deployment Workflow ## Summary This document provides a security review of the CI/CD deployment workflow, focu...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_security/generation_001/mutation_00/outputs
+   traces:  runs/baseline_security/generation_001/mutation_00/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: # Security Review of Webhook Receiver ## Summary This document assesses the security risks associated with a webhook receiver that verifi...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002
+✅ Case complete | label=candidate | split=external_benchmark | case=external_002
+   preview: # Security Review of Customer Data Export Feature ## Summary This review assesses the security implications of the customer data export f...
+↩️  Mutation rolled back: #0
+  type: add_quality_gate -> quality_gate_names
+  score: 0.9461 -> 0.9409
+  reason: fitness did not improve enough for promotion
+💡 Mutation proposed: #1
+  type: add_workflow_step -> workflow
+  operator: first_order
+  expected improvement: overall task understanding
+  risk: Low, as it builds on existing workflow.
+Evaluation starting: candidate
+  generation: 1
+  genome version: 3
+  workspace: runs/baseline_security/generation_001/mutation_01/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 1
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: # Security Review of Password Reset Design ## Summary This document reviews the password reset design for potential security risks. The d...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: # Security Review of the Admin CSV Upload Flow ## Summary This security review assesses the risks associated with the admin CSV upload fl...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: # Security Review of OAuth Callback Design ## Summary This document reviews the security implications of the mobile OAuth callback design...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: # Security Review of CI/CD Deployment Workflow ## Summary This document provides a security review of the CI/CD deployment workflow, focu...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_security/generation_001/mutation_01/outputs
+   traces:  runs/baseline_security/generation_001/mutation_01/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: # Security Review of Webhook Receiver ## Summary This document assesses the security risks associated with a webhook receiver that verifi...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002
+✅ Case complete | label=candidate | split=external_benchmark | case=external_002
+   preview: # Security Review of Customer Data Export Feature ## Summary This review assesses the security implications of the customer data export f...
+↩️  Mutation rolled back: #1
+  type: add_workflow_step -> workflow
+  score: 0.9447 -> 0.9394
+  reason: fitness did not improve enough for promotion
+⚖️  Convergence decision
+  action: continue
+  stop: False
+  reason: convergence criteria not met
+  plateau detected: False
+Generation 1 complete
+  best score: 0.9419
+  patience left: 1
+  tokens used this generation: 33249
+=== Generation 2 ===
+Genome version: 0
+Evaluation starting: current
+  generation: 2
+  genome version: 0
+  workspace: runs/baseline_security/generation_002/current_workspace
+  train cases: 2
+  validation cases: 2
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: # Security Review of Password Reset Design ## Summary This review evaluates the password reset design, focusing on potential security ris...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: # Security Review of the Admin CSV Upload Flow ## Summary This security review assesses the risks associated with the admin CSV upload fl...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: # Security Review of OAuth Callback Design ## Summary This document reviews the OAuth callback design for a mobile application, focusing ...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: # Security Review of CI/CD Deployment Workflow ## Summary This document provides a security review of the CI/CD deployment workflow, focu...
+💾 Artifacts     | label=current
+   outputs: runs/baseline_security/generation_002/outputs
+   traces:  runs/baseline_security/generation_002/current_traces.jsonl
+▶ Case started  | label=current | split=external_benchmark | case=external_001
+✅ Case complete | label=current | split=external_benchmark | case=external_001
+   preview: # Security Review of Webhook Receiver ## Summary This document assesses the security risks associated with a webhook receiver that verifi...
+▶ Case started  | label=current | split=external_benchmark | case=external_002
+✅ Case complete | label=current | split=external_benchmark | case=external_002
+   preview: # Security Review of Customer Data Export Feature ## Summary This document reviews the security implications of the customer data export ...
+Evaluation complete: current
+  promotion score: 0.9436
+  train score: 0.9451
+  validation score: 0.9424
+Nucleus mutation plan
+  operator: first_order
+  summary: Propose mutations to enhance security review effectiveness by adding workflow steps and quality gates.
+  proposed mutations: 3
+  observed failure patterns: safeguard_gap
+💡 Mutation proposed: #0
+  type: add_workflow_step -> workflow
+  operator: first_order
+  expected improvement: safeguard effectiveness should improve
+  risk: Potential redundancy in workflow if not well integrated
+Evaluation starting: candidate
+  generation: 2
+  genome version: 1
+  workspace: runs/baseline_security/generation_002/mutation_00/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 0
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: # Security Review of Password Reset Design ## Summary This document reviews the password reset design for potential security risks. The d...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: # Security Review of the Admin CSV Upload Flow ## Summary This security review assesses the risks associated with the admin CSV upload fl...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: # Security Review of OAuth Callback Design ## Summary This document reviews the security implications of the mobile OAuth callback design...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: # Security Review of CI/CD Deployment Workflow ## Summary This document provides a security review of the CI/CD deployment workflow, focu...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_security/generation_002/mutation_00/outputs
+   traces:  runs/baseline_security/generation_002/mutation_00/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: # Security Review of Webhook Receiver ## Summary This security review assesses the risks associated with a webhook receiver that verifies...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002
+✅ Case complete | label=candidate | split=external_benchmark | case=external_002
+   preview: # Security Review of Customer Data Export Feature ## Summary This review assesses the security implications of the customer data export f...
+↩️  Mutation rolled back: #0
+  type: add_workflow_step -> workflow
+  score: 0.9436 -> 0.9397
+  reason: fitness did not improve enough for promotion
+💡 Mutation proposed: #1
+  type: add_workflow_step -> workflow
+  operator: first_order
+  expected improvement: enhanced identification of security risks and remediation proposals
+  risk: Increased complexity in workflow management
+Evaluation starting: candidate
+  generation: 2
+  genome version: 2
+  workspace: runs/baseline_security/generation_002/mutation_01/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 1
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: # Security Review of Password Reset Design ## Summary This review assesses the security implications of the proposed password reset desig...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: # Security Review of the Admin CSV Upload Flow ## Summary This security review assesses the risks associated with the admin CSV upload fl...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: # Security Review of OAuth Callback Design ## Summary This document reviews the security implications of the mobile OAuth callback design...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: # Security Review of CI/CD Deployment Workflow ## Summary This document provides a security review of the CI/CD deployment workflow, focu...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_security/generation_002/mutation_01/outputs
+   traces:  runs/baseline_security/generation_002/mutation_01/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: # Security Review of Webhook Receiver ## Summary This document assesses the security risks associated with a webhook receiver that verifi...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002
+✅ Case complete | label=candidate | split=external_benchmark | case=external_002
+   preview: # Security Review of Customer Data Export Feature ## Summary This review assesses the security implications of the customer data export f...
+↩️  Mutation rolled back: #1
+  type: add_workflow_step -> workflow
+  score: 0.9513 -> 0.9481
+  reason: fitness did not improve enough for promotion
+💡 Mutation proposed: #2
+  type: add_quality_gate -> quality_gate_names
+  operator: first_order
+  expected improvement: overall safeguard effectiveness should increase
+  risk: May require additional resources to maintain the quality gate checks
+❌ Mutation rejected: #2
+  type: add_quality_gate -> quality_gate_names
+  reviewer: guardian
+  reason: Invalid add_quality_gate patch: duplicate quality gate name security_review_quality_gate
+⚖️  Convergence decision
+  action: continue
+  stop: False
+  reason: convergence criteria not met
+  plateau detected: False
+Generation 2 complete
+  best score: 0.9419
+  patience left: 0
+  tokens used this generation: 27094
+=== Generation 3 ===
+Genome version: 2
+Evaluation starting: current
+  generation: 3
+  genome version: 2
+  workspace: runs/baseline_security/generation_003/current_workspace
+  train cases: 2
+  validation cases: 2
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: # Security Review of Password Reset Design ## Summary This review evaluates the password reset design, focusing on potential security ris...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: # Security Review of the Admin CSV Upload Flow ## Summary This security review assesses the risks associated with the admin CSV upload fl...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: # Security Review of OAuth Callback Design ## Summary This review assesses the security implications of the mobile OAuth callback design,...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: # Security Review of CI/CD Deployment Workflow ## Summary This security review assesses the CI/CD deployment workflow, focusing on potent...
+💾 Artifacts     | label=current
+   outputs: runs/baseline_security/generation_003/outputs
+   traces:  runs/baseline_security/generation_003/current_traces.jsonl
+▶ Case started  | label=current | split=external_benchmark | case=external_001
+✅ Case complete | label=current | split=external_benchmark | case=external_001
+   preview: # Security Review of Webhook Receiver ## Summary This document assesses the security risks associated with a webhook receiver that verifi...
+▶ Case started  | label=current | split=external_benchmark | case=external_002
+✅ Case complete | label=current | split=external_benchmark | case=external_002
+   preview: # Security Review of Customer Data Export Feature ## Summary This review assesses the security implications of the customer data export f...
+Evaluation complete: current
+  promotion score: 0.9454
+  train score: 0.9487
+  validation score: 0.9426
+Nucleus mutation plan
+  operator: first_order
+  summary: Propose mutations to enhance security review effectiveness by adding a lightweight quality gate and revising the evaluation process.
+  proposed mutations: 3
+  observed failure patterns: safeguard_gap
+💡 Mutation proposed: #0
+  type: add_quality_gate -> quality_gate_names
+  operator: first_order
+  expected improvement: safeguard_effectiveness
+  risk: Potential for increased complexity without guaranteed improvement.
+Evaluation starting: candidate
+  generation: 3
+  genome version: 3
+  workspace: runs/baseline_security/generation_003/mutation_00/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 0
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: # Security Review of Password Reset Design ## Summary This document reviews the password reset design for potential security risks. The d...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: # Security Review of the Admin CSV Upload Flow ## Summary This security review assesses the risks associated with the admin CSV upload fl...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: # Security Review of OAuth Callback Design ## Summary This review assesses the security implications of the mobile OAuth callback design,...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: # Security Review of CI/CD Deployment Workflow ## Summary This document provides a security review of the CI/CD deployment workflow, focu...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_security/generation_003/mutation_00/outputs
+   traces:  runs/baseline_security/generation_003/mutation_00/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: # Security Review of Webhook Receiver ## Summary This document assesses the security risks associated with a webhook receiver that verifi...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002

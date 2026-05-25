@@ -1,0 +1,38 @@
+# baseline_toy diagnostic — empirical validation of plan predictions
+
+## Scores
+- Baseline (gen 0): 0.7715
+- Final gen (gen 4): 0.7975
+- **Delta: 0.0260** ← < 0.05 → PREDICTION CONFIRMED
+
+## Lineage event breakdown
+| Event | Count |
+|---|---|
+| evaluation | 5 |
+| mutation_plan | 5 |
+| mutation_proposed | 15 |
+| mutation_promoted | 1 |
+| mutation_rejected | 4 |
+| mutation_rolled_back | 9 |
+| convergence_decision | 4 |
+| archive_parent_sampled | 10 |
+| stagnation | 1 |
+
+## Mutation outcomes
+- **Promoted (1/15):** add_quality_gate → quality_gate_names (gen 1, score: 0.7715 → 0.7990)
+- **Rolled back (9/15):** all "fitness did not improve enough for promotion"
+  - add_workflow_step (×4), add_quality_gate (×3), modify_environment (×1)
+- **Rejected (4/15):** all "Self-evaluation rubric removed scenario criteria"
+  - modify_self_evaluation (×4) — LLM kept proposing to remove the rubric!
+
+## Key findings matching plan predictions
+1. ✅ Delta < 0.05 — PREDICTION CONFIRMED
+2. ✅ ONLY first_order operator used — PREDICTION CONFIRMED  
+3. ✅ 14/15 mutations rejected or rolled back — PREDICTION CONFIRMED
+4. ✅ No create_tool even PROPOSED — WORSE THAN PREDICTED (plan predicted 0-3 attempts; actual = 0)
+5. ✅ No generated_tools directories created — PREDICTION CONFIRMED
+6. ✅ Rollback reasons: "fitness did not improve enough for promotion" — PREDICTION CONFIRMED
+7. ✅ LLM proposed modify_self_evaluation but kept removing the rubric — VALIDATES PLAN §3.1 (no exemplars, LLM guesses wrong)
+
+## Note
+The `final_evaluation/eval_result.json` does not exist — the run was interrupted before the freeze stage. The final generation's eval_result.json was used instead.

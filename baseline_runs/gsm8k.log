@@ -1,0 +1,880 @@
+🧬 Training [----------------------------] 0/5 | starting | score n/a | best n/a
+=== stem_agent evolution ===
+Scenario: gsm8k_demo (structured_reasoning)
+Scenario path: scenarios/gsm8k_demo
+Run id: baseline_gsm8k (new run)
+Run directory: runs/baseline_gsm8k
+Model: gpt-4o-mini
+Endpoint: chat_completions
+
+Configuration overview:
+  train cases: 5
+  validation cases: 5
+  hidden evaluation: 10 cases
+  max generations: 5
+  max mutations/generation: 4
+  patience: 2
+  min promotion delta: 0.02
+  max cost: $10.00
+Nucleus diagnosis complete
+  Initial hypothesis: The evaluation will focus on the accuracy and clarity of the structured reasoning output in the TaskDiagnosis JSON format.
+  Requirements: 2
+  Constraints: 1
+=== Generation 0 ===
+Genome version: 0
+Evaluation starting: current
+  generation: 0
+  genome version: 0
+  workspace: runs/baseline_gsm8k/generation_000/current_workspace
+  train cases: 5
+  validation cases: 5
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements: 1. **Initial speed**: 47 WPM 2. **After ...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=current | split=train | case=train_003
+✅ Case complete | label=current | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=current | split=train | case=train_004
+✅ Case complete | label=current | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoeboxes Tim has left after he uses some of them for fishing. 1. **Init...
+▶ Case started  | label=current | split=train | case=train_005
+✅ Case complete | label=current | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=current | split=validation | case=val_003
+✅ Case complete | label=current | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=current | split=validation | case=val_004
+✅ Case complete | label=current | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after buying a shirt and a pair of shorts, taking into accou...
+▶ Case started  | label=current | split=validation | case=val_005
+✅ Case complete | label=current | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=current
+   outputs: runs/baseline_gsm8k/generation_000/outputs
+   traces:  runs/baseline_gsm8k/generation_000/current_traces.jsonl
+Evaluation complete: current
+  promotion score: 0.8596
+  train score: 0.8056
+  validation score: 0.8956
+Hidden evaluation starting
+  generation: 0
+  genome id: b9b85d21-1e05-430d-a82e-b54169167b7f
+  workspace: runs/baseline_gsm8k/generation_000/hidden_baseline_workspace
+  label: baseline
+Hidden evaluation complete
+  generation: 0
+  hidden score: 0.9046
+  label: baseline
+Nucleus mutation plan
+  operator: first_order
+  summary: Propose mutations to enhance reasoning accuracy and safeguard effectiveness in the GSM8K framework.
+  proposed mutations: 3
+  observed failure patterns: reasoning_or_calculation_error, safeguard_gap, architecture_mismatch
+💡 Mutation proposed: #0
+  type: add_quality_gate -> quality_gate_names
+  operator: first_order
+  expected improvement: safeguard_effectiveness
+  risk: Potential overhead in processing time.
+Evaluation starting: candidate
+  generation: 0
+  genome version: 1
+  workspace: runs/baseline_gsm8k/generation_000/mutation_00/candidate_workspace
+  train cases: 5
+  validation cases: 5
+  Mutation candidate: 0
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements: 1. **Initial speed**: 47 WPM 2. **After ...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=candidate | split=train | case=train_003
+✅ Case complete | label=candidate | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=candidate | split=train | case=train_004
+✅ Case complete | label=candidate | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoe boxes Tim has left after he uses some of them for fishing. 1. **Ini...
+▶ Case started  | label=candidate | split=train | case=train_005
+✅ Case complete | label=candidate | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=candidate | split=validation | case=val_003
+✅ Case complete | label=candidate | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=candidate | split=validation | case=val_004
+✅ Case complete | label=candidate | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after purchasing a shirt and a pair of shorts, taking into a...
+▶ Case started  | label=candidate | split=validation | case=val_005
+✅ Case complete | label=candidate | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_gsm8k/generation_000/mutation_00/outputs
+   traces:  runs/baseline_gsm8k/generation_000/mutation_00/candidate_traces.jsonl
+↩️  Mutation rolled back: #0
+  type: add_quality_gate -> quality_gate_names
+  score: 0.8596 -> 0.8601
+  reason: fitness did not improve enough for promotion
+💡 Mutation proposed: #1
+  type: add_workflow_step -> workflow
+  operator: first_order
+  expected improvement: architecture_fit
+  risk: Increasing complexity may impact performance.
+Evaluation starting: candidate
+  generation: 0
+  genome version: 2
+  workspace: runs/baseline_gsm8k/generation_000/mutation_01/candidate_workspace
+  train cases: 5
+  validation cases: 5
+  Mutation candidate: 1
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements of his typing speed: 1. Initial speed: 47...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=candidate | split=train | case=train_003
+✅ Case complete | label=candidate | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=candidate | split=train | case=train_004
+✅ Case complete | label=candidate | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoe boxes Tim has left after he uses some of them for fishing. 1. **Ini...
+▶ Case started  | label=candidate | split=train | case=train_005
+✅ Case complete | label=candidate | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=candidate | split=validation | case=val_003
+✅ Case complete | label=candidate | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=candidate | split=validation | case=val_004
+✅ Case complete | label=candidate | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after buying a shirt and a pair of shorts, taking into accou...
+▶ Case started  | label=candidate | split=validation | case=val_005
+✅ Case complete | label=candidate | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_gsm8k/generation_000/mutation_01/outputs
+   traces:  runs/baseline_gsm8k/generation_000/mutation_01/candidate_traces.jsonl
+↩️  Mutation rolled back: #1
+  type: add_workflow_step -> workflow
+  score: 0.8601 -> 0.8725
+  reason: fitness did not improve enough for promotion
+💡 Mutation proposed: #2
+  type: modify_self_evaluation -> retry_policy
+  operator: first_order
+  expected improvement: cost_penalty
+  risk: Increased resource usage for retries.
+Evaluation starting: candidate
+  generation: 0
+  genome version: 2
+  workspace: runs/baseline_gsm8k/generation_000/mutation_02/candidate_workspace
+  train cases: 5
+  validation cases: 5
+  Mutation candidate: 2
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements of his typing speed: 1. Initial speed: 47...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=candidate | split=train | case=train_003
+✅ Case complete | label=candidate | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=candidate | split=train | case=train_004
+✅ Case complete | label=candidate | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoeboxes Tim has left after he uses some of them for fishing. 1. **Init...
+▶ Case started  | label=candidate | split=train | case=train_005
+✅ Case complete | label=candidate | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=candidate | split=validation | case=val_003
+✅ Case complete | label=candidate | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=candidate | split=validation | case=val_004
+✅ Case complete | label=candidate | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after purchasing a shirt and a pair of shorts, taking into a...
+▶ Case started  | label=candidate | split=validation | case=val_005
+✅ Case complete | label=candidate | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_gsm8k/generation_000/mutation_02/outputs
+   traces:  runs/baseline_gsm8k/generation_000/mutation_02/candidate_traces.jsonl
+↩️  Mutation rolled back: #2
+  type: modify_self_evaluation -> retry_policy
+  score: 0.8601 -> 0.8673
+  reason: fitness did not improve enough for promotion
+⚖️  Convergence decision
+  action: continue
+  stop: False
+  reason: convergence criteria not met
+  plateau detected: False
+Generation 0 complete
+  best score: 0.8596
+  patience left: 2
+  tokens used this generation: 14508
+=== Generation 1 ===
+Genome version: 1
+Evaluation starting: current
+  generation: 1
+  genome version: 1
+  workspace: runs/baseline_gsm8k/generation_001/current_workspace
+  train cases: 5
+  validation cases: 5
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements of his typing speed: 1. Initial speed: 47...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=current | split=train | case=train_003
+✅ Case complete | label=current | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=current | split=train | case=train_004
+✅ Case complete | label=current | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoeboxes Tim has left after he uses some of them for fishing. 1. **Init...
+▶ Case started  | label=current | split=train | case=train_005
+✅ Case complete | label=current | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=current | split=validation | case=val_003
+✅ Case complete | label=current | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=current | split=validation | case=val_004
+✅ Case complete | label=current | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after purchasing a shirt and a pair of shorts, taking into a...
+▶ Case started  | label=current | split=validation | case=val_005
+✅ Case complete | label=current | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=current
+   outputs: runs/baseline_gsm8k/generation_001/outputs
+   traces:  runs/baseline_gsm8k/generation_001/current_traces.jsonl
+Evaluation complete: current
+  promotion score: 0.8673
+  train score: 0.8143
+  validation score: 0.9026
+Nucleus mutation plan
+  operator: first_order
+  summary: Proposing mutations to enhance reasoning accuracy and safeguard effectiveness.
+  proposed mutations: 2
+  observed failure patterns: reasoning_or_calculation_error; safeguard_gap
+💡 Mutation proposed: #0
+  type: add_workflow_step -> workflow
+  operator: first_order
+  expected improvement: reduction in reasoning_or_calculation_error
+  risk: additional complexity may introduce new errors
+Evaluation starting: candidate
+  generation: 1
+  genome version: 2
+  workspace: runs/baseline_gsm8k/generation_001/mutation_00/candidate_workspace
+  train cases: 5
+  validation cases: 5
+  Mutation candidate: 0
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements: 1. **Initial speed**: 47 WPM 2. **After ...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=candidate | split=train | case=train_003
+✅ Case complete | label=candidate | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=candidate | split=train | case=train_004
+✅ Case complete | label=candidate | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoeboxes Tim has left after he uses some of them for fishing. 1. **Init...
+▶ Case started  | label=candidate | split=train | case=train_005
+✅ Case complete | label=candidate | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, given the relationships between t...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=candidate | split=validation | case=val_003
+✅ Case complete | label=candidate | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=candidate | split=validation | case=val_004
+✅ Case complete | label=candidate | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after buying a shirt and a pair of shorts, taking into accou...
+▶ Case started  | label=candidate | split=validation | case=val_005
+✅ Case complete | label=candidate | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_gsm8k/generation_001/mutation_00/outputs
+   traces:  runs/baseline_gsm8k/generation_001/mutation_00/candidate_traces.jsonl
+↩️  Mutation rolled back: #0
+  type: add_workflow_step -> workflow
+  score: 0.8673 -> 0.8807
+  reason: fitness did not improve enough for promotion
+💡 Mutation proposed: #1
+  type: create_tool -> tools.generated
+  operator: first_order
+  expected improvement: increase in safeguard_effectiveness
+  risk: tool logic may not cover all scenarios
+Evaluation starting: candidate
+  generation: 1
+  genome version: 1
+  workspace: runs/baseline_gsm8k/generation_001/mutation_01/candidate_workspace
+  train cases: 5
+  validation cases: 5
+  Mutation candidate: 1
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements: 1. **Initial speed**: 47 WPM 2. **After ...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=candidate | split=train | case=train_003
+✅ Case complete | label=candidate | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=candidate | split=train | case=train_004
+✅ Case complete | label=candidate | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoeboxes Tim has left after he uses some of them for fishing. 1. **Init...
+▶ Case started  | label=candidate | split=train | case=train_005
+✅ Case complete | label=candidate | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=candidate | split=validation | case=val_003
+✅ Case complete | label=candidate | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=candidate | split=validation | case=val_004
+✅ Case complete | label=candidate | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after purchasing a shirt and a pair of shorts, taking into a...
+▶ Case started  | label=candidate | split=validation | case=val_005
+✅ Case complete | label=candidate | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_gsm8k/generation_001/mutation_01/outputs
+   traces:  runs/baseline_gsm8k/generation_001/mutation_01/candidate_traces.jsonl
+↩️  Mutation rolled back: #1
+  type: create_tool -> tools.generated
+  score: 0.8596 -> 0.8533
+  reason: fitness did not improve enough for promotion
+⚖️  Convergence decision
+  action: continue
+  stop: False
+  reason: convergence criteria not met
+  plateau detected: False
+Generation 1 complete
+  best score: 0.8596
+  patience left: 1
+  tokens used this generation: 11543
+=== Generation 2 ===
+Genome version: 2
+Evaluation starting: current
+  generation: 2
+  genome version: 2
+  workspace: runs/baseline_gsm8k/generation_002/current_workspace
+  train cases: 5
+  validation cases: 5
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements of his typing speed: 1. Initial speed: 47...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=current | split=train | case=train_003
+✅ Case complete | label=current | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=current | split=train | case=train_004
+✅ Case complete | label=current | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoeboxes Tim has left after he uses some of them for fishing. 1. **Init...
+▶ Case started  | label=current | split=train | case=train_005
+✅ Case complete | label=current | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** 2. **Determine how many s...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=current | split=validation | case=val_003
+✅ Case complete | label=current | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=current | split=validation | case=val_004
+✅ Case complete | label=current | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after purchasing a shirt and a pair of shorts, taking into a...
+▶ Case started  | label=current | split=validation | case=val_005
+✅ Case complete | label=current | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=current
+   outputs: runs/baseline_gsm8k/generation_002/outputs
+   traces:  runs/baseline_gsm8k/generation_002/current_traces.jsonl
+Evaluation complete: current
+  promotion score: 0.8673
+  train score: 0.8143
+  validation score: 0.9026
+Nucleus mutation plan
+  operator: first_order
+  summary: Propose mutations to enhance reasoning accuracy and safeguard effectiveness.
+  proposed mutations: 3
+  observed failure patterns: Low architecture fit: architecture_fit=0.430; Low safeguard effectiveness: safeguard_effectiveness=0.315
+💡 Mutation proposed: #0
+  type: add_quality_gate -> quality_gate_names
+  operator: first_order
+  expected improvement: safeguard_effectiveness
+  risk: Low risk of complexity increase.
+❌ Mutation rejected: #0
+  type: add_quality_gate -> quality_gate_names
+  reviewer: guardian
+  reason: Invalid add_quality_gate patch: duplicate quality gate name required_sections_gate
+💡 Mutation proposed: #1
+  type: create_tool -> tools.generated
+  operator: first_order
+  expected improvement: reasoning_or_calculation_error
+  risk: Medium risk of integration complexity.
+Evaluation starting: candidate
+  generation: 2
+  genome version: 3
+  workspace: runs/baseline_gsm8k/generation_002/mutation_01/candidate_workspace
+  train cases: 5
+  validation cases: 5
+  Mutation candidate: 1
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements of his typing speed: 1. Initial speed: 47...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=candidate | split=train | case=train_003
+✅ Case complete | label=candidate | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=candidate | split=train | case=train_004
+✅ Case complete | label=candidate | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoeboxes Tim has left after he uses some of them for fishing. 1. **Init...
+▶ Case started  | label=candidate | split=train | case=train_005
+✅ Case complete | label=candidate | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=candidate | split=validation | case=val_003
+✅ Case complete | label=candidate | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=candidate | split=validation | case=val_004
+✅ Case complete | label=candidate | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after purchasing a shirt and a pair of shorts, taking into a...
+▶ Case started  | label=candidate | split=validation | case=val_005
+✅ Case complete | label=candidate | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_gsm8k/generation_002/mutation_01/outputs
+   traces:  runs/baseline_gsm8k/generation_002/mutation_01/candidate_traces.jsonl
+↩️  Mutation rolled back: #1
+  type: create_tool -> tools.generated
+  score: 0.8673 -> 0.8682
+  reason: fitness did not improve enough for promotion
+💡 Mutation proposed: #2
+  type: add_workflow_step -> workflow
+  operator: first_order
+  expected improvement: reasoning_or_calculation_error
+  risk: Low risk of complicating the workflow.
+Evaluation starting: candidate
+  generation: 2
+  genome version: 1
+  workspace: runs/baseline_gsm8k/generation_002/mutation_02/candidate_workspace
+  train cases: 5
+  validation cases: 5
+  Mutation candidate: 2
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements of his typing speed: 1. Initial speed: 47...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=candidate | split=train | case=train_003
+✅ Case complete | label=candidate | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=candidate | split=train | case=train_004
+✅ Case complete | label=candidate | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoeboxes Tim has left after he uses some of them for fishing. 1. **Init...
+▶ Case started  | label=candidate | split=train | case=train_005
+✅ Case complete | label=candidate | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=candidate | split=validation | case=val_003
+✅ Case complete | label=candidate | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=candidate | split=validation | case=val_004
+✅ Case complete | label=candidate | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after buying a shirt and a pair of shorts, taking into accou...
+▶ Case started  | label=candidate | split=validation | case=val_005
+✅ Case complete | label=candidate | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_gsm8k/generation_002/mutation_02/outputs
+   traces:  runs/baseline_gsm8k/generation_002/mutation_02/candidate_traces.jsonl
+↩️  Mutation rolled back: #2
+  type: add_workflow_step -> workflow
+  score: 0.8596 -> 0.8735
+  reason: fitness did not improve enough for promotion
+⚖️  Convergence decision
+  action: continue
+  stop: False
+  reason: convergence criteria not met
+  plateau detected: False
+Generation 2 complete
+  best score: 0.8596
+  patience left: 0
+  tokens used this generation: 11516
+=== Generation 3 ===
+Genome version: 2
+Evaluation starting: current
+  generation: 3
+  genome version: 2
+  workspace: runs/baseline_gsm8k/generation_003/current_workspace
+  train cases: 5
+  validation cases: 5
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements: 1. **Initial speed**: 47 WPM 2. **After ...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=current | split=train | case=train_003
+✅ Case complete | label=current | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=current | split=train | case=train_004
+✅ Case complete | label=current | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoeboxes Tim has left after he uses some of them for fishing. 1. **Init...
+▶ Case started  | label=current | split=train | case=train_005
+✅ Case complete | label=current | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=current | split=validation | case=val_003
+✅ Case complete | label=current | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=current | split=validation | case=val_004
+✅ Case complete | label=current | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after buying a shirt and a pair of shorts during a sale. Her...
+▶ Case started  | label=current | split=validation | case=val_005
+✅ Case complete | label=current | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=current
+   outputs: runs/baseline_gsm8k/generation_003/outputs
+   traces:  runs/baseline_gsm8k/generation_003/current_traces.jsonl
+Evaluation complete: current
+  promotion score: 0.8673
+  train score: 0.8143
+  validation score: 0.9026
+Nucleus mutation plan
+  operator: first_order
+  summary: Proposed mutations to improve reasoning accuracy and safeguard effectiveness.
+  proposed mutations: 3
+  observed failure patterns: reasoning_or_calculation_error; safeguard_gap; architecture_mismatch
+💡 Mutation proposed: #0
+  type: create_tool -> tools.generated
+  operator: first_order
+  expected improvement: reasoning accuracy and reduction in hallucinated outputs.
+  risk: Additional complexity in the workflow.
+Evaluation starting: candidate
+  generation: 3
+  genome version: 3
+  workspace: runs/baseline_gsm8k/generation_003/mutation_00/candidate_workspace
+  train cases: 5
+  validation cases: 5
+  Mutation candidate: 0
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements: 1. Initial typing speed: 47 WPM 2. After...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=candidate | split=train | case=train_003
+✅ Case complete | label=candidate | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=candidate | split=train | case=train_004
+✅ Case complete | label=candidate | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoe boxes Tim has left after he uses some of them for fishing. 1. **Ini...
+▶ Case started  | label=candidate | split=train | case=train_005
+✅ Case complete | label=candidate | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, given the relationships between t...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=candidate | split=validation | case=val_003
+✅ Case complete | label=candidate | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=candidate | split=validation | case=val_004
+✅ Case complete | label=candidate | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after buying a shirt and a pair of shorts during a sale. Her...
+▶ Case started  | label=candidate | split=validation | case=val_005
+✅ Case complete | label=candidate | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_gsm8k/generation_003/mutation_00/outputs
+   traces:  runs/baseline_gsm8k/generation_003/mutation_00/candidate_traces.jsonl
+↩️  Mutation rolled back: #0
+  type: create_tool -> tools.generated
+  score: 0.8673 -> 0.8675
+  reason: fitness did not improve enough for promotion
+💡 Mutation proposed: #1
+  type: add_quality_gate -> quality_gate_names
+  operator: first_order
+  expected improvement: safeguard effectiveness.
+  risk: May introduce additional checks that could block valid outputs.
+❌ Mutation rejected: #1
+  type: add_quality_gate -> quality_gate_names
+  reviewer: guardian
+  reason: Invalid add_quality_gate patch: duplicate quality gate name required_sections_gate
+💡 Mutation proposed: #2
+  type: add_workflow_step -> workflow
+  operator: first_order
+  expected improvement: architecture fit and final output quality.
+  risk: Increased complexity in workflow management.
+Evaluation starting: candidate
+  generation: 3
+  genome version: 4
+  workspace: runs/baseline_gsm8k/generation_003/mutation_02/candidate_workspace
+  train cases: 5
+  validation cases: 5
+  Mutation candidate: 2
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements: 1. **Initial speed**: 47 WPM 2. **After ...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=candidate | split=train | case=train_003
+✅ Case complete | label=candidate | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=candidate | split=train | case=train_004
+✅ Case complete | label=candidate | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoeboxes Tim has left after he uses some of them for fishing. 1. **Init...
+▶ Case started  | label=candidate | split=train | case=train_005
+✅ Case complete | label=candidate | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=candidate | split=validation | case=val_003
+✅ Case complete | label=candidate | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=candidate | split=validation | case=val_004
+✅ Case complete | label=candidate | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after purchasing a shirt and a pair of shorts, taking into a...
+▶ Case started  | label=candidate | split=validation | case=val_005
+✅ Case complete | label=candidate | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_gsm8k/generation_003/mutation_02/outputs
+   traces:  runs/baseline_gsm8k/generation_003/mutation_02/candidate_traces.jsonl
+↩️  Mutation rolled back: #2
+  type: add_workflow_step -> workflow
+  score: 0.8675 -> 0.8744
+  reason: fitness did not improve enough for promotion
+⚖️  Convergence decision
+  action: continue
+  stop: False
+  reason: convergence criteria not met
+  plateau detected: False
+Generation 3 complete
+  best score: 0.8596
+  patience left: -1
+  tokens used this generation: 11530
+=== Generation 4 ===
+Genome version: 2
+Evaluation starting: current
+  generation: 4
+  genome version: 2
+  workspace: runs/baseline_gsm8k/generation_004/current_workspace
+  train cases: 5
+  validation cases: 5
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements: 1. **Initial speed**: 47 WPM 2. **After ...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=current | split=train | case=train_003
+✅ Case complete | label=current | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=current | split=train | case=train_004
+✅ Case complete | label=current | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoeboxes Tim has left after he uses some of them for fishing. 1. **Init...
+▶ Case started  | label=current | split=train | case=train_005
+✅ Case complete | label=current | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=current | split=validation | case=val_003
+✅ Case complete | label=current | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=current | split=validation | case=val_004
+✅ Case complete | label=current | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after buying a shirt and a pair of shorts, taking into accou...
+▶ Case started  | label=current | split=validation | case=val_005
+✅ Case complete | label=current | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=current
+   outputs: runs/baseline_gsm8k/generation_004/outputs
+   traces:  runs/baseline_gsm8k/generation_004/current_traces.jsonl
+Evaluation complete: current
+  promotion score: 0.8807
+  train score: 0.8282
+  validation score: 0.9157
+Nucleus mutation plan
+  operator: crossover
+  summary: crossover operator proposed a whole-genome candidate.
+  proposed mutations: 1
+  observed failure patterns: Failed criterion: no_hallucinated_numbers; Failed criterion: correct_answer; Low safeguard effectiveness: safeguard_effectiveness=0.450
+💡 Mutation proposed: #0
+  type: replace_genome -> genome
+  operator: crossover
+  expected improvement: Explore a non-greedy candidate outside the current local hill climb.
+  risk: Whole-genome replacement may remove useful organs and will be safety-checked before evaluation.
+Evaluation starting: candidate
+  generation: 4
+  genome version: 3
+  workspace: runs/baseline_gsm8k/generation_004/mutation_00/candidate_workspace
+  train cases: 5
+  validation cases: 5
+  Mutation candidate: 0
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements of his typing speed: 1. Initial speed: 47...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=candidate | split=train | case=train_003
+✅ Case complete | label=candidate | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=candidate | split=train | case=train_004
+✅ Case complete | label=candidate | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoeboxes Tim has left after he uses some of them for fishing. 1. **Init...
+▶ Case started  | label=candidate | split=train | case=train_005
+✅ Case complete | label=candidate | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=candidate | split=validation | case=val_003
+✅ Case complete | label=candidate | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=candidate | split=validation | case=val_004
+✅ Case complete | label=candidate | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after buying a shirt and a pair of shorts, taking into accou...
+▶ Case started  | label=candidate | split=validation | case=val_005
+✅ Case complete | label=candidate | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=candidate
+   outputs: runs/baseline_gsm8k/generation_004/mutation_00/outputs
+   traces:  runs/baseline_gsm8k/generation_004/mutation_00/candidate_traces.jsonl
+↩️  Mutation rolled back: #0
+  type: replace_genome -> genome
+  score: 0.8807 -> 0.8807
+  reason: fitness did not improve enough for promotion
+⚖️  Convergence decision
+  action: stop_max_generations
+  stop: True
+  reason: maximum generation hard cap reached
+  plateau detected: False
+Evaluation starting: frozen
+  generation: 4
+  genome version: 2
+  workspace: runs/baseline_gsm8k/final_evaluation/frozen_workspace
+  train cases: 5
+  validation cases: 5
+▶ Case started  | label=frozen | split=train | case=train_001
+✅ Case complete | label=frozen | split=train | case=train_001
+   preview: To find the average of Jared's typing speeds, we first need to determine the three measurements: 1. **Initial speed**: 47 WPM 2. **After ...
+▶ Case started  | label=frozen | split=train | case=train_002
+✅ Case complete | label=frozen | split=train | case=train_002
+   preview: To solve the problem, we need to determine how many diapers Jordan changes per day based on the information provided. 1. **Identify the n...
+▶ Case started  | label=frozen | split=train | case=train_003
+✅ Case complete | label=frozen | split=train | case=train_003
+   preview: To solve the problem, we need to determine how many boxes can be loaded onto the truck without exceeding the weight limit of the bridge. ...
+▶ Case started  | label=frozen | split=train | case=train_004
+✅ Case complete | label=frozen | split=train | case=train_004
+   preview: To solve the problem, we need to determine how many blue and red shoe boxes Tim has left after he uses some of them for fishing. 1. **Ini...
+▶ Case started  | label=frozen | split=train | case=train_005
+✅ Case complete | label=frozen | split=train | case=train_005
+   preview: To solve the problem, we need to determine the total number of items Dominick saw in the changing room, which includes robots, helmets, a...
+▶ Case started  | label=frozen | split=validation | case=val_001
+✅ Case complete | label=frozen | split=validation | case=val_001
+   preview: To solve the problem, we will follow these steps: 1. **Calculate the total number of seats in the auditorium.** - There are 4 rows of sea...
+▶ Case started  | label=frozen | split=validation | case=val_002
+✅ Case complete | label=frozen | split=validation | case=val_002
+   preview: To find the total number of legs in the pet store, we need to calculate the number of legs contributed by each type of pet and then sum t...
+▶ Case started  | label=frozen | split=validation | case=val_003
+✅ Case complete | label=frozen | split=validation | case=val_003
+   preview: To solve the problem, we need to determine the time it takes for the car in the slow lane to cover the same distance of 480 miles, given ...
+▶ Case started  | label=frozen | split=validation | case=val_004
+✅ Case complete | label=frozen | split=validation | case=val_004
+   preview: To solve the problem, we need to calculate how much money Joe will have left after purchasing a shirt and a pair of shorts, taking into a...
+▶ Case started  | label=frozen | split=validation | case=val_005
+✅ Case complete | label=frozen | split=validation | case=val_005
+   preview: To solve the problem, we need to calculate the total calories John consumed from drinking 2 glasses of milk. Here are the steps: 1. **Det...
+💾 Artifacts     | label=frozen
+   outputs: runs/baseline_gsm8k/final_evaluation/outputs
+   traces:  runs/baseline_gsm8k/final_evaluation/frozen_traces.jsonl
+❄️  Final freeze complete
+  generation: 4
+  frozen score: 0.8807
+  reason: maximum generation hard cap reached
+🧬 Training [############################] 5/5 | frozen | score 0.8807 | best 0.8807
+📁 Run directory: runs/baseline_gsm8k
+🏷️  Status: FROZEN
+📉 Baseline score: 0.8596
+🏆 Final score: 0.8807
+❄️  Frozen genome: runs/baseline_gsm8k/frozen_genome.yaml
+📄 Report: runs/baseline_gsm8k/report.md

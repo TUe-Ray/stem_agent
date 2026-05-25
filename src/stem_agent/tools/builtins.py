@@ -36,6 +36,63 @@ def _inspect_workspace(input_data: dict[str, Any]) -> dict[str, Any]:
     return {"files": sorted(str(path.relative_to(root)) for path in root.rglob("*") if path.is_file())}
 
 
+def _search_code(input_data: dict[str, Any]) -> dict[str, Any]:
+    """Search workspace files for regex matches. Input: {pattern, path?}."""
+    import re
+    root = Path(input_data.get("path", "."))
+    pattern = input_data.get("pattern", "")
+    if not pattern:
+        return {"matches": []}
+    matches: list[dict[str, Any]] = []
+    for file_path in sorted(root.rglob("*")):
+        if not file_path.is_file() or file_path.suffix not in {".py", ".c", ".h", ".rs", ".java", ".js", ".ts"}:
+            continue
+        try:
+            content = file_path.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+        for lineno, line in enumerate(content.split("\n"), 1):
+            if re.search(pattern, line):
+                matches.append({"file": str(file_path.relative_to(root)), "line": lineno, "text": line.strip()[:200]})
+                if len(matches) >= 50:
+                    break
+        if len(matches) >= 50:
+            break
+    return {"matches": matches, "pattern": pattern}
+
+
+def _write_patch(input_data: dict[str, Any]) -> dict[str, Any]:
+    """Write a unified-diff patch to workspace/predicted.patch."""
+    patch_dir = Path("artifacts")
+    patch_dir.mkdir(parents=True, exist_ok=True)
+    patch_path = patch_dir / "predicted.patch"
+    patch_path.write_text(input_data.get("patch_text", ""), encoding="utf-8")
+    return {"path": str(patch_path), "size": patch_path.stat().st_size}
+
+
+def _apply_patch_dry_run(input_data: dict[str, Any]) -> dict[str, Any]:
+    """Check if a unified diff applies cleanly via patch --dry-run."""
+    import subprocess
+    import tempfile
+    patch_text = input_data.get("patch_text", "")
+    if not patch_text.strip():
+        return {"applies": False, "error": "Empty patch"}
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".patch", delete=False) as tmp:
+        tmp.write(patch_text)
+        tmp_path = tmp.name
+    try:
+        result = subprocess.run(
+            ["patch", "--dry-run", "-p1", "-f", "-i", tmp_path],
+            capture_output=True, text=True, timeout=30,
+        )
+        applies = result.returncode == 0
+        return {"applies": applies, "error": result.stderr.strip()[:500] if not applies else ""}
+    except subprocess.TimeoutExpired:
+        return {"applies": False, "error": "patch --dry-run timed out"}
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+
 def builtin_tools() -> dict[str, Tool]:
     return {
         "call_model": Tool(name="call_model", description="Call the configured model.", run=_call_model),
@@ -46,5 +103,20 @@ def builtin_tools() -> dict[str, Tool]:
             name="inspect_workspace",
             description="Inspect workspace files.",
             run=_inspect_workspace,
+        ),
+        "search_code": Tool(
+            name="search_code",
+            description="Search source code with a regex pattern. Input: {pattern, path?}",
+            run=_search_code,
+        ),
+        "write_patch": Tool(
+            name="write_patch",
+            description="Write a unified-diff patch to the workspace. Input: {patch_text}",
+            run=_write_patch,
+        ),
+        "apply_patch_dry_run": Tool(
+            name="apply_patch_dry_run",
+            description="Check if a unified diff applies cleanly. Input: {patch_text}.",
+            run=_apply_patch_dry_run,
         ),
     }

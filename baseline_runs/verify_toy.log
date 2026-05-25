@@ -1,0 +1,773 @@
+🧬 Training [----------------------------] 0/7 | starting | score n/a | best n/a
+=== stem_agent evolution ===
+Scenario: toy_structured_answer (general structured response generation)
+Scenario path: scenarios/toy_structured_answer
+Run id: verify_toy (new run)
+Run directory: runs/verify_toy
+Model: gpt-4o-mini
+Endpoint: chat_completions
+
+Configuration overview:
+  train cases: 2
+  validation cases: 2
+  hidden evaluation: not configured
+  max generations: 7
+  max mutations/generation: 4
+  patience: 2
+  min promotion delta: 0.005
+  max cost: $5.00
+Nucleus diagnosis complete
+  Initial hypothesis: The effectiveness of the structured response is evaluated based on clarity, adherence to constraints, and usefulness.
+  Requirements: 3
+  Constraints: 2
+=== Generation 0 ===
+Genome version: 0
+Evaluation starting: current
+  generation: 0
+  genome version: 0
+  workspace: runs/verify_toy/generation_000/current_workspace
+  train cases: 2
+  validation cases: 2
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: ## Summary Creating a simple morning routine for a parent with only 20 minutes before school drop-off can significantly reduce stress. Th...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow a s...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager regarding missed deadlines requires a structured approach. You need to tak...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first, we will evaluate each request based on urgen...
+💾 Artifacts     | label=current
+   outputs: runs/verify_toy/generation_000/outputs
+   traces:  runs/verify_toy/generation_000/current_traces.jsonl
+▶ Case started  | label=current | split=external_benchmark | case=external_001
+✅ Case complete | label=current | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up your chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impac...
+▶ Case started  | label=current | split=external_benchmark | case=external_002
+✅ Case complete | label=current | split=external_benchmark | case=external_002
+   preview: ### Summary When you have only 45 minutes and feel exhausted, it's important to choose an activity that best supports your well-being. Th...
+Evaluation complete: current
+  promotion score: 0.7674
+  train score: 0.7745
+  validation score: 0.7699
+Hidden evaluation starting
+  generation: 0
+  genome id: 52de4b99-012d-4705-9313-6325d9aa2bc1
+  workspace: runs/verify_toy/generation_000/hidden_baseline_workspace
+  label: baseline
+Hidden evaluation complete
+  generation: 0
+  hidden score: 0.0000
+  label: baseline
+Nucleus mutation plan
+  operator: first_order
+  summary: Propose mutations to enhance quality gate effectiveness and artifact presence.
+  proposed mutations: 4
+  observed failure patterns: Low safeguard effectiveness: safeguard_effectiveness=0.000; Low self-review usage: self_review_usage=0.000; Low quality-gate usage: quality_gate_usage=0.000; Low artifact presence: artifact_presence=0.000
+💡 Mutation proposed: #0
+  type: add_quality_gate -> quality_gate_names
+  operator: first_order
+  expected improvement: quality_gate_usage
+  risk: Possible increased complexity if not monitored.
+Evaluation starting: candidate
+  generation: 0
+  genome version: 1
+  workspace: runs/verify_toy/generation_000/mutation_00/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 0
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: ## Summary To create a simple and effective morning routine for a parent with only 20 minutes before school drop-off, we will focus on pr...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow a s...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager regarding missed deadlines requires a structured approach. You need to tak...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first, we will evaluate each request based on urgen...
+💾 Artifacts     | label=candidate
+   outputs: runs/verify_toy/generation_000/mutation_00/outputs
+   traces:  runs/verify_toy/generation_000/mutation_00/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up your chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impac...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002
+✅ Case complete | label=candidate | split=external_benchmark | case=external_002
+   preview: ## Summary When you have only 45 minutes and feel exhausted, it's crucial to choose an activity that best supports your well-being. This ...
+Hidden evaluation starting
+  generation: 0
+  genome id: 28dfa132-0d90-4186-b340-e58e68fed011
+  workspace: runs/verify_toy/generation_000/mutation_00/hidden_workspace
+  label: candidate
+Hidden evaluation complete
+  generation: 0
+  hidden score: 0.0000
+  label: candidate
+✅ Mutation promoted: #0
+  type: add_quality_gate -> quality_gate_names
+  score: 0.7674 -> 0.8074
+  hidden regression: no
+  rationale: To improve quality gate usage and address the low safeguard effectiveness.
+💡 Mutation proposed: #1
+  type: add_workflow_step -> workflow
+  operator: first_order
+  expected improvement: self_review_usage
+  risk: Potential delay in processing time.
+Evaluation starting: candidate
+  generation: 0
+  genome version: 2
+  workspace: runs/verify_toy/generation_000/mutation_01/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 1
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: ## Summary To create a simple and effective morning routine for a parent with only 20 minutes before school drop-off, we will focus on pr...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow the...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager regarding missed deadlines requires a structured approach. You need to tak...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first, we will evaluate each request based on urgen...
+💾 Artifacts     | label=candidate
+   outputs: runs/verify_toy/generation_000/mutation_01/outputs
+   traces:  runs/verify_toy/generation_000/mutation_01/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up your chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impac...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002
+✅ Case complete | label=candidate | split=external_benchmark | case=external_002
+   preview: ## Summary When you have only 45 minutes and feel exhausted, it's crucial to choose an activity that best supports your well-being. This ...
+Hidden evaluation starting
+  generation: 0
+  genome id: 6ab64238-5c81-4b34-845e-b20cdf37b24f
+  workspace: runs/verify_toy/generation_000/mutation_01/hidden_workspace
+  label: candidate
+Hidden evaluation complete
+  generation: 0
+  hidden score: 0.0000
+  label: candidate
+✅ Mutation promoted: #1
+  type: add_workflow_step -> workflow
+  score: 0.8074 -> 0.8274
+  hidden regression: no
+  rationale: Inserting a self-review step to enhance self-review usage.
+💡 Mutation proposed: #2
+  type: modify_environment -> environment_artifact_count
+  operator: first_order
+  expected improvement: artifact_presence
+  risk: May require additional resources to manage artifacts.
+Evaluation starting: candidate
+  generation: 0
+  genome version: 3
+  workspace: runs/verify_toy/generation_000/mutation_02/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 2
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: ## Summary Creating a simple morning routine for a parent with only 20 minutes before school drop-off can significantly reduce stress. Th...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow a s...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager regarding missed deadlines requires a structured approach. You need to tak...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first, we will evaluate each request based on urgen...
+💾 Artifacts     | label=candidate
+   outputs: runs/verify_toy/generation_000/mutation_02/outputs
+   traces:  runs/verify_toy/generation_000/mutation_02/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up your chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impac...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002
+✅ Case complete | label=candidate | split=external_benchmark | case=external_002
+   preview: ### Summary When you have only 45 minutes and feel exhausted, it's important to choose an activity that will best support your well-being...
+↩️  Mutation rolled back: #2
+  type: modify_environment -> environment_artifact_count
+  score: 0.8274 -> 0.8266
+  reason: fitness did not improve enough for promotion
+💡 Mutation proposed: #3
+  type: create_tool -> tools.generated
+  operator: first_order
+  expected improvement: generated_tool_usage, quality_gate_usage
+  risk: Requires rigorous testing to ensure reliability.
+❌ Mutation rejected: #3
+  type: create_tool -> tools.generated
+  reviewer: guardian
+  reason: Generated tool tests failed: .F
+=================================== FAILURES ===================================
+_____________________________ test_accepts_covered _____________________________
+
+    def test_accepts_covered():
+        result = run({'output': 'Summary and steps listed.', 'requirements': ['Include a summary', 'List steps']})
+>       assert result['score'] >= 0.5
+E       assert 0.0 >= 0.5
+
+test_required_elements_checker.py:9: AssertionError
+=========================== short test summary info ============================
+FAILED test_required_elements_checker.py::test_accepts_covered - assert 0.0 >...
+1 failed, 1 passed in 0.03s
+⚖️  Convergence decision
+  action: continue
+  stop: False
+  reason: convergence criteria not met
+  plateau detected: False
+Generation 0 complete
+  best score: 0.8274
+  patience left: 2
+  tokens used this generation: 10536
+=== Generation 1 ===
+Genome version: 2
+Evaluation starting: current
+  generation: 1
+  genome version: 2
+  workspace: runs/verify_toy/generation_001/current_workspace
+  train cases: 2
+  validation cases: 2
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: ## Summary Creating a simple morning routine for a parent with only 20 minutes before school drop-off can help reduce stress and ensure a...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow the...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager regarding missed deadlines requires a structured approach. You need to tak...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first when only one can be completed today, follow ...
+💾 Artifacts     | label=current
+   outputs: runs/verify_toy/generation_001/outputs
+   traces:  runs/verify_toy/generation_001/current_traces.jsonl
+▶ Case started  | label=current | split=external_benchmark | case=external_001
+✅ Case complete | label=current | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up your chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impac...
+▶ Case started  | label=current | split=external_benchmark | case=external_002
+✅ Case complete | label=current | split=external_benchmark | case=external_002
+   preview: ### Summary When you have only 45 minutes and feel exhausted, it's important to choose an activity that best supports your well-being. Th...
+Evaluation complete: current
+  promotion score: 0.8332
+  train score: 0.8452
+  validation score: 0.8373
+Nucleus mutation plan
+  operator: first_order
+  summary: Propose mutations to enhance artifact presence and self-review mechanisms.
+  proposed mutations: 3
+  observed failure patterns: Low artifact presence: artifact_presence=0.000; Low self-review usage: self_review_usage=0.500
+💡 Mutation proposed: #0
+  type: create_tool -> tools.generated
+  operator: first_order
+  expected improvement: artifact_presence
+  risk: Moderate complexity in tool development.
+Evaluation starting: candidate
+  generation: 1
+  genome version: 3
+  workspace: runs/verify_toy/generation_001/mutation_00/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 0
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: ## Summary To create a simple and effective morning routine for a parent with only 20 minutes before school drop-off, we will focus on pr...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow the...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager regarding missed deadlines requires a structured approach. You need to tak...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first, we will create a concise plan that evaluates...
+💾 Artifacts     | label=candidate
+   outputs: runs/verify_toy/generation_001/mutation_00/outputs
+   traces:  runs/verify_toy/generation_001/mutation_00/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up your chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impac...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002
+✅ Case complete | label=candidate | split=external_benchmark | case=external_002
+   preview: ### Summary When you have only 45 minutes and feel exhausted, it's crucial to choose an activity that best supports your well-being. This...
+↩️  Mutation rolled back: #0
+  type: create_tool -> tools.generated
+  score: 0.8332 -> 0.8308
+  reason: fitness did not improve enough for promotion
+💡 Mutation proposed: #1
+  type: add_workflow_step -> workflow
+  operator: first_order
+  expected improvement: self_review_usage
+  risk: Low risk of overcomplicating the workflow.
+❌ Mutation rejected: #1
+  type: add_workflow_step -> workflow
+  reviewer: guardian
+  reason: Invalid add_workflow_step patch: duplicate workflow step id review_against_requirements
+💡 Mutation proposed: #2
+  type: add_quality_gate -> quality_gate_names
+  operator: first_order
+  expected improvement: safeguard_effectiveness
+  risk: Potentially increase workflow complexity.
+❌ Mutation rejected: #2
+  type: add_quality_gate -> quality_gate_names
+  reviewer: guardian
+  reason: Invalid add_quality_gate patch: duplicate quality gate name required_sections_gate
+⚖️  Convergence decision
+  action: continue
+  stop: False
+  reason: convergence criteria not met
+  plateau detected: False
+Generation 1 complete
+  best score: 0.8332
+  patience left: 2
+  tokens used this generation: 6422
+=== Generation 2 ===
+Genome version: 3
+Evaluation starting: current
+  generation: 2
+  genome version: 3
+  workspace: runs/verify_toy/generation_002/current_workspace
+  train cases: 2
+  validation cases: 2
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: ## Summary Creating a simple morning routine for a parent with only 20 minutes before school drop-off can significantly reduce stress. Th...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow a s...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager regarding missed deadlines requires a structured approach. You need to tak...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first when only one can be completed today, follow ...
+💾 Artifacts     | label=current
+   outputs: runs/verify_toy/generation_002/outputs
+   traces:  runs/verify_toy/generation_002/current_traces.jsonl
+▶ Case started  | label=current | split=external_benchmark | case=external_001
+✅ Case complete | label=current | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up your chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impac...
+▶ Case started  | label=current | split=external_benchmark | case=external_002
+✅ Case complete | label=current | split=external_benchmark | case=external_002
+   preview: ### Summary When you have only 45 minutes and feel exhausted, it's crucial to choose an activity that best supports your well-being. This...
+Evaluation complete: current
+  promotion score: 0.8311
+  train score: 0.8289
+  validation score: 0.8431
+Nucleus mutation plan
+  operator: first_order
+  summary: Propose mutations to improve artifact presence and review effectiveness.
+  proposed mutations: 2
+  observed failure patterns: Low artifact presence: artifact_presence=0.000; Low self-review usage: self_review_usage=0.500
+💡 Mutation proposed: #0
+  type: create_tool -> tools.generated
+  operator: first_order
+  expected improvement: artifact_presence
+  risk: Moderate complexity from added tool logic.
+❌ Mutation rejected: #0
+  type: create_tool -> tools.generated
+  reviewer: guardian
+  reason: Invalid create_tool patch: duplicate generated tool name artifact_presence_checker
+💡 Mutation proposed: #1
+  type: add_workflow_step -> workflow
+  operator: first_order
+  expected improvement: self_review_usage
+  risk: Increased workflow complexity.
+❌ Mutation rejected: #1
+  type: add_workflow_step -> workflow
+  reviewer: guardian
+  reason: Invalid add_workflow_step patch: duplicate workflow step id review_against_requirements
+⚖️  Convergence decision
+  action: continue
+  stop: False
+  reason: convergence criteria not met
+  plateau detected: False
+Generation 2 complete
+  best score: 0.8332
+  patience left: 1
+  tokens used this generation: 4301
+=== Generation 3 ===
+Genome version: 3
+Evaluation starting: current
+  generation: 3
+  genome version: 3
+  workspace: runs/verify_toy/generation_003/current_workspace
+  train cases: 2
+  validation cases: 2
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: ## Summary Creating a simple morning routine for a parent with only 20 minutes before school drop-off can significantly reduce stress. Th...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow the...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager regarding missed deadlines requires a structured approach. You need to tak...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first, we will evaluate each request based on urgen...
+💾 Artifacts     | label=current
+   outputs: runs/verify_toy/generation_003/outputs
+   traces:  runs/verify_toy/generation_003/current_traces.jsonl
+▶ Case started  | label=current | split=external_benchmark | case=external_001
+✅ Case complete | label=current | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up your chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impac...
+▶ Case started  | label=current | split=external_benchmark | case=external_002
+✅ Case complete | label=current | split=external_benchmark | case=external_002
+   preview: ### Summary When you have only 45 minutes and feel exhausted, it's crucial to choose an activity that maximizes your well-being. This str...
+Evaluation complete: current
+  promotion score: 0.8279
+  train score: 0.8284
+  validation score: 0.8379
+Nucleus mutation plan
+  operator: first_order
+  summary: Propose mutations to improve artifact presence and review processes.
+  proposed mutations: 2
+  observed failure patterns: Low artifact presence: artifact_presence=0.000; Low self-review usage: self_review_usage=0.500
+💡 Mutation proposed: #0
+  type: create_tool -> tool_names
+  operator: first_order
+  expected improvement: artifact_presence
+  risk: Low risk of tool integration issues.
+Evaluation starting: candidate
+  generation: 3
+  genome version: 4
+  workspace: runs/verify_toy/generation_003/mutation_00/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 0
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: ## Summary Creating a simple morning routine for a parent with only 20 minutes before school drop-off can help reduce stress and ensure a...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow the...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager regarding missed deadlines requires a structured approach. You need to tak...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first, we will evaluate each request based on urgen...
+💾 Artifacts     | label=candidate
+   outputs: runs/verify_toy/generation_003/mutation_00/outputs
+   traces:  runs/verify_toy/generation_003/mutation_00/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up your chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impac...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002
+✅ Case complete | label=candidate | split=external_benchmark | case=external_002
+   preview: ### Summary When you have only 45 minutes and feel exhausted, it's important to choose an activity that best supports your well-being. Th...
+Hidden evaluation starting
+  generation: 3
+  genome id: 399ccbdc-ccba-45f6-9f82-4967daf9f0fe
+  workspace: runs/verify_toy/generation_003/mutation_00/hidden_workspace
+  label: candidate
+Hidden evaluation complete
+  generation: 3
+  hidden score: 0.0000
+  label: candidate
+✅ Mutation promoted: #0
+  type: create_tool -> tool_names
+  score: 0.8279 -> 0.8332
+  hidden regression: no
+  rationale: Adding a tool to check for required sections can improve artifact presence and ensure outputs meet scenario requirements.
+💡 Mutation proposed: #1
+  type: add_workflow_step -> workflow
+  operator: first_order
+  expected improvement: self_review_usage
+  risk: Moderate risk of workflow complexity increase.
+❌ Mutation rejected: #1
+  type: add_workflow_step -> workflow
+  reviewer: guardian
+  reason: Invalid add_workflow_step patch: duplicate workflow step id review_against_requirements
+⚖️  Convergence decision
+  action: continue
+  stop: False
+  reason: convergence criteria not met
+  plateau detected: False
+Generation 3 complete
+  best score: 0.8332
+  patience left: 0
+  tokens used this generation: 6401
+=== Generation 4 ===
+Genome version: 4
+Evaluation starting: current
+  generation: 4
+  genome version: 4
+  workspace: runs/verify_toy/generation_004/current_workspace
+  train cases: 2
+  validation cases: 2
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: ## Summary Creating a simple morning routine for a parent with only 20 minutes before school drop-off can significantly reduce stress. Th...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow the...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager regarding missed deadlines requires a structured approach. You need to tak...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first, we will evaluate each request based on urgen...
+💾 Artifacts     | label=current
+   outputs: runs/verify_toy/generation_004/outputs
+   traces:  runs/verify_toy/generation_004/current_traces.jsonl
+▶ Case started  | label=current | split=external_benchmark | case=external_001
+✅ Case complete | label=current | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up your chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impac...
+▶ Case started  | label=current | split=external_benchmark | case=external_002
+✅ Case complete | label=current | split=external_benchmark | case=external_002
+   preview: ### Summary When you have only 45 minutes and feel exhausted, it's crucial to choose an activity that best supports your immediate well-b...
+Evaluation complete: current
+  promotion score: 0.8328
+  train score: 0.8340
+  validation score: 0.8352
+Nucleus mutation plan
+  operator: first_order
+  summary: Propose mutations to enhance artifact presence and reduce complexity penalties.
+  proposed mutations: 2
+  observed failure patterns: Low artifact presence: artifact_presence=0.000; Low self-review usage: self_review_usage=0.500
+💡 Mutation proposed: #0
+  type: create_tool -> tools.generated
+  operator: first_order
+  expected improvement: artifact_presence, generated_tool_usage
+  risk: Moderate risk of complexity increase.
+❌ Mutation rejected: #0
+  type: create_tool -> tools.generated
+  reviewer: guardian
+  reason: Invalid create_tool patch: duplicate generated tool name artifact_presence_checker
+💡 Mutation proposed: #1
+  type: add_workflow_step -> workflow
+  operator: first_order
+  expected improvement: self_review_usage
+  risk: Low risk with potential for enhanced output quality.
+❌ Mutation rejected: #1
+  type: add_workflow_step -> workflow
+  reviewer: guardian
+  reason: Invalid add_workflow_step patch: duplicate workflow step id review_against_requirements
+⚖️  Convergence decision
+  action: force_zero_order
+  stop: False
+  reason: validation score plateau detected; force zero-order mutation next
+  plateau detected: True
+Generation 4 complete
+  best score: 0.8332
+  patience left: -1
+  tokens used this generation: 4196
+=== Generation 5 ===
+Genome version: 4
+Evaluation starting: current
+  generation: 5
+  genome version: 4
+  workspace: runs/verify_toy/generation_005/current_workspace
+  train cases: 2
+  validation cases: 2
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: ## Summary Creating a simple morning routine for a parent with only 20 minutes before school drop-off can significantly reduce stress. Th...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow the...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager regarding missed deadlines requires a structured approach. You need to tak...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first, we will evaluate each request based on urgen...
+💾 Artifacts     | label=current
+   outputs: runs/verify_toy/generation_005/outputs
+   traces:  runs/verify_toy/generation_005/current_traces.jsonl
+▶ Case started  | label=current | split=external_benchmark | case=external_001
+✅ Case complete | label=current | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up your chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impac...
+▶ Case started  | label=current | split=external_benchmark | case=external_002
+✅ Case complete | label=current | split=external_benchmark | case=external_002
+   preview: ### Summary When you have only 45 minutes and feel exhausted, it's crucial to prioritize activities that will best support your well-bein...
+Evaluation complete: current
+  promotion score: 0.8280
+  train score: 0.8309
+  validation score: 0.8352
+Nucleus mutation plan
+  operator: zero_order
+  summary: zero_order operator proposed a whole-genome candidate.
+  proposed mutations: 1
+  observed failure patterns: Low safeguard effectiveness: safeguard_effectiveness=0.500; Low self-review usage: self_review_usage=0.500; Low artifact presence: artifact_presence=0.000
+💡 Mutation proposed: #0
+  type: replace_genome -> genome
+  operator: zero_order
+  expected improvement: Explore a non-greedy candidate outside the current local hill climb.
+  risk: Whole-genome replacement may remove useful organs and will be safety-checked before evaluation.
+Evaluation starting: candidate
+  generation: 5
+  genome version: 5
+  workspace: runs/verify_toy/generation_005/mutation_00/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 0
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: ## Summary To help a parent plan a simple and stress-free morning routine within a 20-minute timeframe before school drop-off, we will ou...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow a s...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager about missed deadlines requires a structured approach. You need to take re...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first when only one can be completed today, a struc...
+💾 Artifacts     | label=candidate
+   outputs: runs/verify_toy/generation_005/mutation_00/outputs
+   traces:  runs/verify_toy/generation_005/mutation_00/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up a chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impact t...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002
+✅ Case complete | label=candidate | split=external_benchmark | case=external_002
+   preview: ### Summary When faced with a limited time of 45 minutes and feelings of exhaustion, it's essential to prioritize activities that will pr...
+↩️  Mutation rolled back: #0
+  type: replace_genome -> genome
+  score: 0.8280 -> 0.7840
+  reason: fitness did not improve enough for promotion
+⚖️  Convergence decision
+  action: continue
+  stop: False
+  reason: plateau persisted but convergence votes are incomplete
+  plateau detected: True
+Generation 5 complete
+  best score: 0.8332
+  patience left: -2
+  tokens used this generation: 6508
+=== Generation 6 ===
+Genome version: 4
+Evaluation starting: current
+  generation: 6
+  genome version: 4
+  workspace: runs/verify_toy/generation_006/current_workspace
+  train cases: 2
+  validation cases: 2
+▶ Case started  | label=current | split=train | case=train_001
+✅ Case complete | label=current | split=train | case=train_001
+   preview: ## Summary Creating a simple morning routine for a parent with only 20 minutes before school drop-off can significantly reduce stress. Th...
+▶ Case started  | label=current | split=train | case=train_002
+✅ Case complete | label=current | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow the...
+▶ Case started  | label=current | split=validation | case=val_001
+✅ Case complete | label=current | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager regarding missed deadlines requires a structured approach. You need to tak...
+▶ Case started  | label=current | split=validation | case=val_002
+✅ Case complete | label=current | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first, we will evaluate each request based on urgen...
+💾 Artifacts     | label=current
+   outputs: runs/verify_toy/generation_006/outputs
+   traces:  runs/verify_toy/generation_006/current_traces.jsonl
+▶ Case started  | label=current | split=external_benchmark | case=external_001
+✅ Case complete | label=current | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up your chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impac...
+▶ Case started  | label=current | split=external_benchmark | case=external_002
+✅ Case complete | label=current | split=external_benchmark | case=external_002
+   preview: ### Summary When you have only 45 minutes and feel exhausted, it's crucial to choose an activity that maximizes your well-being. This str...
+Evaluation complete: current
+  promotion score: 0.8282
+  train score: 0.8309
+  validation score: 0.8326
+Nucleus mutation plan
+  operator: zero_order
+  summary: zero_order operator proposed a whole-genome candidate.
+  proposed mutations: 1
+  observed failure patterns: Low safeguard effectiveness: safeguard_effectiveness=0.500; Low self-review usage: self_review_usage=0.500; Low artifact presence: artifact_presence=0.000
+💡 Mutation proposed: #0
+  type: replace_genome -> genome
+  operator: zero_order
+  expected improvement: Explore a non-greedy candidate outside the current local hill climb.
+  risk: Whole-genome replacement may remove useful organs and will be safety-checked before evaluation.
+Evaluation starting: candidate
+  generation: 6
+  genome version: 5
+  workspace: runs/verify_toy/generation_006/mutation_00/candidate_workspace
+  train cases: 2
+  validation cases: 2
+  Mutation candidate: 0
+▶ Case started  | label=candidate | split=train | case=train_001
+✅ Case complete | label=candidate | split=train | case=train_001
+   preview: ## Summary To help a parent plan a simple and stress-free morning routine within a 20-minute timeframe before school drop-off, we will ou...
+▶ Case started  | label=candidate | split=train | case=train_002
+✅ Case complete | label=candidate | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow a s...
+▶ Case started  | label=candidate | split=validation | case=val_001
+✅ Case complete | label=candidate | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager about missed deadlines requires a structured approach. You need to take re...
+▶ Case started  | label=candidate | split=validation | case=val_002
+✅ Case complete | label=candidate | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of three overdue client requests to handle first when only one can be completed today, a structure...
+💾 Artifacts     | label=candidate
+   outputs: runs/verify_toy/generation_006/mutation_00/outputs
+   traces:  runs/verify_toy/generation_006/mutation_00/candidate_traces.jsonl
+▶ Case started  | label=candidate | split=external_benchmark | case=external_001
+✅ Case complete | label=candidate | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up a chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impact t...
+▶ Case started  | label=candidate | split=external_benchmark | case=external_002
+✅ Case complete | label=candidate | split=external_benchmark | case=external_002
+   preview: ### Summary When faced with a limited time of 45 minutes and feelings of exhaustion, it's essential to prioritize activities that will pr...
+↩️  Mutation rolled back: #0
+  type: replace_genome -> genome
+  score: 0.8282 -> 0.7808
+  reason: fitness did not improve enough for promotion
+⚖️  Convergence decision
+  action: stop_max_generations
+  stop: True
+  reason: maximum generation hard cap reached
+  plateau detected: True
+Evaluation starting: frozen
+  generation: 6
+  genome version: 2
+  workspace: runs/verify_toy/final_evaluation/frozen_workspace
+  train cases: 2
+  validation cases: 2
+▶ Case started  | label=frozen | split=train | case=train_001
+✅ Case complete | label=frozen | split=train | case=train_001
+   preview: ## Summary To help a parent create a simple and stress-free morning routine with only 20 minutes before school drop-off, we will outline ...
+▶ Case started  | label=frozen | split=train | case=train_002
+✅ Case complete | label=frozen | split=train | case=train_002
+   preview: ## Summary To effectively organize your messy project notes, screenshots, and task lists before the Friday stakeholder update, follow the...
+▶ Case started  | label=frozen | split=validation | case=val_001
+✅ Case complete | label=frozen | split=validation | case=val_001
+   preview: ## Summary Preparing for a difficult meeting with your manager regarding missed deadlines requires a structured approach. You need to tak...
+▶ Case started  | label=frozen | split=validation | case=val_002
+✅ Case complete | label=frozen | split=validation | case=val_002
+   preview: ## Summary To effectively decide which of the three overdue client requests to handle first when only one can be completed today, follow ...
+💾 Artifacts     | label=frozen
+   outputs: runs/verify_toy/final_evaluation/outputs
+   traces:  runs/verify_toy/final_evaluation/frozen_traces.jsonl
+▶ Case started  | label=frozen | split=external_benchmark | case=external_001
+✅ Case complete | label=frozen | split=external_benchmark | case=external_001
+   preview: ## Summary To effectively clean up your chaotic inbox in 30 minutes before a client call, focus on prioritizing messages that could impac...
+▶ Case started  | label=frozen | split=external_benchmark | case=external_002
+✅ Case complete | label=frozen | split=external_benchmark | case=external_002
+   preview: ## Summary When you have only 45 minutes and feel exhausted, it's crucial to choose an activity that best supports your well-being. This ...
+▶ Case started  | label=final_holdout | split=final_holdout | case=final_001
+✅ Case complete | label=final_holdout | split=final_holdout | case=final_001
+   preview: ## Summary The objective is to create a structured recovery plan following a failed product launch review. This plan will outline actiona...
+▶ Case started  | label=final_holdout | split=final_holdout | case=final_002
+✅ Case complete | label=final_holdout | split=final_holdout | case=final_002
+   preview: ## Summary When you discover a project risk that impacts budget, timeline, and stakeholder trust, it's essential to act quickly and strat...
+❄️  Final freeze complete
+  generation: 6
+  frozen score: 0.8337
+  reason: maximum generation hard cap reached
+🧬 Training [############################] 7/7 | frozen | score 0.8337 | best 0.8337
+📁 Run directory: runs/verify_toy
+🏷️  Status: FROZEN
+📉 Baseline score: 0.7674
+🏆 Final score: 0.8337
+❄️  Frozen genome: runs/verify_toy/frozen_genome.yaml
+📄 Report: runs/verify_toy/report.md
