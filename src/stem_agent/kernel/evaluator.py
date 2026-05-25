@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from stem_agent.genome.models import Genome
 from stem_agent.harness.runner import HarnessRunResult
+from stem_agent.kernel.evaluator_strategies import EvalMetrics, EvaluatorStrategy, LLMJudgeEvaluator
 from stem_agent.kernel.evaluator_weights import EvaluatorWeights
 from stem_agent.kernel.requirements import requirement_satisfied
 from stem_agent.llm.client import build_guardian_system_prompt
@@ -44,9 +45,15 @@ class EvaluationResult(BaseModel):
 class GuardianFitnessEvaluator:
     """Immutable promotion evaluator. Nucleus is not allowed to mutate this."""
 
-    def __init__(self, model_client: ModelClient | None = None, weights: EvaluatorWeights | None = None):
+    def __init__(
+        self,
+        model_client: ModelClient | None = None,
+        weights: EvaluatorWeights | None = None,
+        strategy: EvaluatorStrategy | None = None,
+    ):
         self.model_client = model_client or ModelClient()
         self.weights = weights or EvaluatorWeights()
+        self._strategy = strategy  # None = use built-in heuristic (default)
 
     def configure_run(self, run_dir: str | Path | None) -> None:
         self.model_client.configure_run(run_dir)
@@ -142,6 +149,36 @@ class GuardianFitnessEvaluator:
         complexity_penalty: float,
     ) -> CaseEvaluation:
         output = run.final_output or ""
+
+        # If an external strategy is set (e.g. LLM judge), delegate to it
+        if self._strategy is not None:
+            em = self._strategy.evaluate_case(genome, scenario, run, complexity_penalty)
+            stem = self._stem_process_components(genome, scenario, run, complexity_penalty)
+            cost_penalty = min(run.cost_estimate / 5.0, 1.0)
+            w = self.weights
+            metrics = {**em.metrics, **stem}
+            task_perf = em.score
+            score = self._clamp(
+                w.output_quality * task_perf
+                + w.stem_process_quality * stem.get("stem_process_quality", 0.5)
+                - w.complexity_penalty * complexity_penalty
+                - w.cost_penalty * cost_penalty
+            )
+            metrics.update({
+                "task_performance": task_perf,
+                "complexity_penalty": complexity_penalty,
+                "cost_penalty": cost_penalty,
+            })
+            # CaseEvaluation.metrics expects dict[str, float] — drop non-float values
+            clean_metrics = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
+            return CaseEvaluation(
+                case_id=run.case_id or "unknown",
+                score=score,
+                failures=em.failures,
+                final_output=em.final_output,
+                metrics=clean_metrics,
+            )
+
         if scenario.evaluation_criteria:
             return self._evaluate_case_with_criteria(
                 genome,

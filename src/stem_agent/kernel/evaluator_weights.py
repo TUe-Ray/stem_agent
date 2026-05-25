@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 
 class EvaluatorWeights(BaseModel):
+    # Output quality metrics (used by heuristic evaluator)
     requirement_coverage: float = 0.20
     format_validity: float = 0.08
     constraint_adherence: float = 0.10
@@ -15,10 +16,15 @@ class EvaluatorWeights(BaseModel):
     workflow_completion: float = 0.08
     quality_gate_usage: float = 0.10
     generated_tool_usage: float = 0.04
+    # STEM process metrics
     diagnosis_quality: float = 0.08
     architecture_fit: float = 0.08
     safeguard_effectiveness: float = 0.06
     minimality_score: float = 0.04
+    # Aggregate weights (used by LLM judge / external strategies)
+    output_quality: float = 0.65
+    stem_process_quality: float = 0.15
+    # Penalties
     cost_penalty: float = 0.03
     complexity_penalty: float = 0.05
 
