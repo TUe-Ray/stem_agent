@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Callable
 
@@ -125,8 +126,13 @@ class EvolutionLoop:
             mutation_planner=MutationPlanner(model_client),
         )
         self.harness_runner = harness_runner or default_harness_runner
+        # Evaluator strategy: set STEM_AGENT_EVALUATOR=llm_judge to use LLM judge
+        _eval_strategy = None
+        if os.environ.get("STEM_AGENT_EVALUATOR") == "llm_judge":
+            from stem_agent.kernel.evaluator_strategies import LLMJudgeEvaluator
+            _eval_strategy = LLMJudgeEvaluator(model_client)
         self.guardian = guardian or Guardian(
-            evaluator=GuardianFitnessEvaluator(model_client),
+            evaluator=GuardianFitnessEvaluator(model_client, strategy=_eval_strategy),
             harness_runner=self.harness_runner,
         )
         self.harness_builder = harness_builder or HarnessBuilder()
