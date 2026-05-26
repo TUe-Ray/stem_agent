@@ -904,7 +904,11 @@ class GuardianFitnessEvaluator:
     def _patch_applies_score(
         self, scenario: Scenario, output: str, run: HarnessRunResult
     ) -> float:
-        """Check if the generated unified diff applies cleanly via git apply --check."""
+        """Check if the generated unified diff applies cleanly via patch --dry-run.
+
+        Uses the same tool (patch --dry-run) as the harness's apply_patch_dry_run tool
+        so the patcher's self-verification matches the evaluator's check.
+        """
         import os
 
         diff = self._extract_diff(output)
@@ -915,7 +919,7 @@ class GuardianFitnessEvaluator:
         if not diff.startswith(("diff", "---", "+++")) and not has_hunks:
             return 0.0
 
-        # Real mode: try to apply to the workspace using git apply --check
+        # Real mode: try to apply using patch --dry-run (same as harness tool)
         workspace = None
         if run and run.case_input:
             instance_id = run.case_input.get("instance_id", "unknown")
@@ -928,8 +932,9 @@ class GuardianFitnessEvaluator:
             import tempfile, subprocess
             patch_file = workspace / "_check.patch"
             patch_file.write_text(diff)
+            # Use patch --dry-run (same as harness tool) for consistency
             result = subprocess.run(
-                ["git", "-C", str(workspace), "apply", "--check", str(patch_file)],
+                ["patch", "--dry-run", "-p1", "-f", "-d", str(workspace), "-i", str(patch_file)],
                 capture_output=True, text=True, timeout=30,
             )
             patch_file.unlink(missing_ok=True)
