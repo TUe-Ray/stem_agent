@@ -396,6 +396,11 @@ def _safe_id(instance_id: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_-]", "_", instance_id)
 
 
+def _safe_slug(name: str) -> str:
+    """Sanitize a string for use in filesystem paths."""
+    return re.sub(r"[^a-zA-Z0-9_.-]", "_", name)
+
+
 def _clean_patch(patch_text: str) -> str:
     """Extract clean unified diff from potentially prose-wrapped output."""
     # Strip markdown fences

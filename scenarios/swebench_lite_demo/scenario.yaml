@@ -61,8 +61,8 @@ signal_policy:
   expose_direction: true
 
 evolution:
-  max_generations: 6
-  patience: 2
+  max_generations: 12
+  patience: 5
   min_delta: 0.03
   max_mutations_per_generation: 3
   max_cost_usd: 10.0
