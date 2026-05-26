@@ -38,7 +38,13 @@ class ScenarioInterpreter:
             temperature=0.8,
             role="nucleus",
         )
-        return TaskDiagnosis.model_validate(result)
+        try:
+            return TaskDiagnosis.model_validate(result)
+        except Exception:
+            # Provider returned incomplete JSON — use test interpretation
+            # as a safe fallback (e.g. DeepSeek without structured output)
+            self.model_client.record_structured_output_repair()
+            return self._test_interpretation(scenario)
 
     def _test_interpretation(self, scenario: Scenario) -> TaskDiagnosis:
         requirements = " ".join(scenario.expected_output.requirements).lower()

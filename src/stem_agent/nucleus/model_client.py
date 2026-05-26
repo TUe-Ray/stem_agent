@@ -234,7 +234,8 @@ class ModelClient:
         if response_schema:
             if self._has_freeform_object(response_schema):
                 return self._try_json_object_chat_completion(
-                    client, prompt, system_prompt, kwargs
+                    client, prompt, system_prompt, kwargs,
+                    response_schema=response_schema,
                 )
             try:
                 return self._try_structured_chat_completion(
@@ -244,7 +245,8 @@ class ModelClient:
                 # Provider doesn't support json_schema — fall back to json_object
                 self.record_structured_output_repair()
                 return self._try_json_object_chat_completion(
-                    client, prompt, system_prompt, kwargs
+                    client, prompt, system_prompt, kwargs,
+                    response_schema=response_schema,
                 )
         response = client.chat.completions.create(**kwargs)
         content = response.choices[0].message.content or ""
@@ -279,14 +281,53 @@ class ModelClient:
         prompt: str,
         system_prompt: str | None,
         kwargs: dict[str, Any],
+        response_schema: dict[str, Any] | None = None,
     ) -> tuple[str | dict[str, Any], int | None]:
-        kwargs["messages"] = (
+        schema_hint = self._format_schema_hint(response_schema) if response_schema else ""
+        messages = (
             [{"role": "system", "content": system_prompt}] if system_prompt else []
-        ) + [{"role": "user", "content": "Return only valid JSON.\n" + prompt}]
+        ) + [{"role": "user", "content": schema_hint + "Return only valid JSON.\n" + prompt}]
+        kwargs["messages"] = messages
         kwargs["response_format"] = {"type": "json_object"}
         response = client.chat.completions.create(**kwargs)
         content = response.choices[0].message.content or ""
         return json.loads(content), self._tokens_from_response(response)
+
+    def _format_schema_hint(self, schema: dict[str, Any]) -> str:
+        """Build a compact prompt hint for the JSON fields the schema requires.
+
+        Used as a fallback when the provider doesn't support strict json_schema
+        (e.g. DeepSeek). Gives the LLM enough context to produce valid output.
+        """
+        required = schema.get("required", [])
+        properties = schema.get("properties", {})
+        if not required and not properties:
+            return ""
+        lines = ["Your response must be a JSON object with these fields:"]
+        for field in required:
+            prop = properties.get(field, {})
+            desc = prop.get("description", prop.get("title", ""))
+            ftype = prop.get("type", "string")
+            items_info = ""
+            if ftype == "array" and "items" in prop:
+                items_type = prop["items"].get("type", "string")
+                items_info = f" of {items_type}"
+            lines.append(f"  - \"{field}\" ({ftype}{items_info}): {desc}")
+        # Also note optional fields
+        optional = [f for f in properties if f not in required]
+        if optional:
+            lines.append("Optional fields:")
+            for field in optional:
+                prop = properties.get(field, {})
+                desc = prop.get("description", prop.get("title", ""))
+                ftype = prop.get("type", "string")
+                items_info = ""
+                if ftype == "array" and "items" in prop:
+                    items_type = prop["items"].get("type", "string")
+                    items_info = f" of {items_type}"
+                lines.append(f"  - \"{field}\" ({ftype}{items_info}): {desc}")
+        lines.append("Respond with ONLY the JSON object, nothing else.\n")
+        return "\n".join(lines) + "\n"
 
     def _full_prompt(self, system_prompt: str | None, prompt: str) -> str:
         if not system_prompt:
