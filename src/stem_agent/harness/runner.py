@@ -461,10 +461,11 @@ def _apply_test_patch_and_run(
         capture_output=True, timeout=30,
     )
 
-    # Apply the test patch
+    # Apply the test patch — use absolute path to avoid CWD issues
     apply_result = subprocess.run(
-        ["git", "-C", str(workspace), "apply", str(patch_file)],
+        ["git", "apply", str(patch_file.resolve())],
         capture_output=True, text=True, timeout=30,
+        cwd=str(workspace),
     )
     patch_file.unlink(missing_ok=True)
 

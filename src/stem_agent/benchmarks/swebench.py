@@ -131,16 +131,13 @@ def evaluate_patch_light(
         if test_result.returncode != 0:
             return _error_result(f"Test patch failed to apply: {test_result.stderr[:500]}")
 
-        # 3. Install deps in a venv (skip if venv already exists or just try pip install -e .)
-        venv_dir = repo_dir / ".venv_swebench"
-        if not (venv_dir / "bin" / "python").exists():
-            _run([sys_executable(), "-m", "venv", str(venv_dir)], timeout=120)
+        # 3. Install deps in a venv (persistent cache per repo+base_commit)
+        venv_dir = _ensure_persistent_venv(repo, base_commit, repo_dir)
         pip = str(venv_dir / "bin" / "pip")
         python = str(venv_dir / "bin" / "python")
-        # Install the package in editable mode
-        _run([pip, "install", "-q", "-e", str(repo_dir)], timeout=300)
-        # Also install pytest if not present
-        _run([pip, "install", "-q", "pytest"], timeout=120)
+
+        # Quick pip install check — if editable install is stale, refresh
+        _ensure_editable_install(pip, repo_dir)
 
         # 4. Verify FAIL_TO_PASS tests actually fail before patch
         baseline = _run_tests(python, repo_dir, fail_to_pass, timeout=timeout)
@@ -426,6 +423,44 @@ def _run(
         text=True,
         timeout=timeout,
     )
+
+
+def _ensure_persistent_venv(repo: str, base_commit: str, repo_dir: Path) -> Path:
+    """Return a persistent venv for this repo+base_commit, creating it if needed.
+
+    Uses a shared cache so the same repo version's venv is reused across
+    evaluations — avoids 300s pip install on every eval.
+    """
+    slug = _safe_slug(f"{repo}_{base_commit[:8]}")
+    venv_cache = Path.home() / ".cache" / "stem_agent" / "swebench_venvs" / slug
+    python_exe = venv_cache / "bin" / "python"
+
+    if not python_exe.exists():
+        venv_cache.parent.mkdir(parents=True, exist_ok=True)
+        _run([sys_executable(), "-m", "venv", str(venv_cache)], timeout=120)
+        pip = str(venv_cache / "bin" / "pip")
+        _run([pip, "install", "-q", "pytest", "pytest-timeout"], timeout=120)
+
+    # Symlink the cached venv into the repo_dir
+    target_venv = repo_dir / ".venv_swebench"
+    if not target_venv.exists():
+        try:
+            target_venv.symlink_to(venv_cache)
+        except OSError:
+            _run(["cp", "-r", str(venv_cache), str(target_venv)], timeout=60)
+
+    return target_venv
+
+
+def _ensure_editable_install(pip: str, repo_dir: Path) -> None:
+    """Install the repo in editable mode if not already installed."""
+    # Use a stamp in the venv dir so it persists (repo_dir is temporary)
+    venv_dir = repo_dir / ".venv_swebench"
+    stamp = venv_dir / ".pip_install_stamp"
+    if stamp.exists():
+        return
+    _run([pip, "install", "-q", "-e", str(repo_dir)], timeout=300)
+    stamp.touch()
 
 
 def _run_tests(
