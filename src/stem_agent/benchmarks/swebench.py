@@ -179,17 +179,22 @@ def evaluate_patch_light(
         # 8. Run PASS_TO_PASS tests after patch
         after_ptp = _run_tests(python, repo_dir, pass_to_pass, timeout=timeout)
 
-        # 9. Score
-        all_ftp_pass = all(s == "PASSED" for s in after_ftp.values()) if after_ftp else True
-        all_ptp_pass = all(s == "PASSED" for s in after_ptp.values()) if after_ptp else True
-        resolved = all_ftp_pass and all_ptp_pass
+        # 9. Score with partial credit (not just binary resolved/unresolved)
+        ftp_total = len(after_ftp)
+        ptp_total = len(after_ptp)
+        ftp_pass = sum(1 for s in after_ftp.values() if s == "PASSED")
+        ptp_pass = sum(1 for s in after_ptp.values() if s == "PASSED")
+        ftp_rate = ftp_pass / max(1, ftp_total)
+        ptp_rate = ptp_pass / max(1, ptp_total)
+        score = 0.7 * ftp_rate + 0.3 * ptp_rate
+        resolved = ftp_rate == 1.0 and ptp_rate == 1.0
 
         return {
             "resolved": resolved,
             "patch_applies": True,
             "fail_to_pass": after_ftp,
             "pass_to_pass": after_ptp,
-            "score": 1.0 if resolved else 0.0,
+            "score": round(score, 4),
             "error": None,
         }
 
