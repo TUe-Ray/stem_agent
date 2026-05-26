@@ -380,6 +380,9 @@ def _maybe_populate_swebench_workspace(
     
     The locator/patcher roles use read_file and search_code tools that operate
     from cwd. Without this, they search an empty workspace and produce hallucinated patches.
+    
+    Also applies the test_patch and attempts to run failing tests to provide
+    the locator/patcher with concrete failure output — the strongest signal for fixing bugs.
     """
     case_input = case.input if hasattr(case, "input") else {}
     repo = case_input.get("repo", "")
@@ -392,6 +395,8 @@ def _maybe_populate_swebench_workspace(
     from pathlib import Path
 
     workspace = harness.workspace_dir
+    artifacts_dir = workspace / "artifacts"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
     cache_dir = Path.home() / ".cache" / "stem_agent" / "swebench_workspaces"
     cached = cache_dir / f"{_safe_slug(repo)}_{base_commit[:8]}"
 
@@ -423,6 +428,108 @@ def _maybe_populate_swebench_workspace(
             shutil.copytree(item, dest)
         else:
             shutil.copy2(item, dest)
+
+    # ── Apply test_patch and run failing tests ──
+    test_patch = case_input.get("test_patch", "")
+    fail_to_pass = case_input.get("FAIL_TO_PASS", [])
+    test_output_path = artifacts_dir / "test_failures.txt"
+
+    if test_patch:
+        _apply_test_patch_and_run(workspace, test_patch, fail_to_pass, test_output_path)
+    elif not test_output_path.exists():
+        test_output_path.write_text("(No test patch available for this case.)\n")
+
+
+def _apply_test_patch_and_run(
+    workspace: "Path",
+    test_patch: str,
+    fail_to_pass: list[str],
+    output_path: "Path",
+) -> None:
+    """Apply test_patch to workspace, then run pytest and write failures."""
+    import subprocess
+
+    patch_file = workspace / "_test_patch.diff"
+    patch_file.write_text(test_patch)
+
+    # Quick git reset first in case of leftover changes
+    subprocess.run(
+        ["git", "-C", str(workspace), "checkout", "--", "."],
+        capture_output=True, timeout=30,
+    )
+
+    # Apply the test patch
+    apply_result = subprocess.run(
+        ["git", "-C", str(workspace), "apply", str(patch_file)],
+        capture_output=True, text=True, timeout=30,
+    )
+    patch_file.unlink(missing_ok=True)
+
+    lines = []
+    if apply_result.returncode != 0:
+        lines.append(f"[WARNING] test_patch application FAILED:\n{apply_result.stderr[:2000]}")
+    else:
+        lines.append("[OK] test_patch applied successfully.")
+
+    # Try running pytest with the failing tests
+    if fail_to_pass and apply_result.returncode == 0:
+        lines.append(f"\nRunning failing tests ({len(fail_to_pass)}): {fail_to_pass}")
+        lines.append("-" * 60)
+
+        # Use the cached venv if it exists
+        venv_cache = workspace.parent.parent / ".test_venvs" / _safe_slug(str(workspace.parent.name))
+        python_exe = _ensure_test_venv(workspace, venv_cache)
+
+        if python_exe:
+            pytest_cmd = [
+                str(python_exe), "-m", "pytest", "-x", "--tb=short",
+                "--timeout=60", "-q",
+            ] + fail_to_pass
+            result = subprocess.run(
+                pytest_cmd,
+                capture_output=True, text=True, timeout=120,
+                cwd=str(workspace),
+                env={**__import__("os").environ, "PYTHONPATH": str(workspace)},
+            )
+            lines.append(result.stdout[-3000:] if len(result.stdout) > 3000 else result.stdout)
+            if result.stderr:
+                stderr_short = result.stderr[-1000:] if len(result.stderr) > 1000 else result.stderr
+                lines.append(f"\nSTDERR:\n{stderr_short}")
+            lines.append(f"\nExit code: {result.returncode}")
+        else:
+            lines.append("\n(Test dependencies not installed — see test file in workspace)")
+            lines.append(f"FAIL_TO_PASS: {fail_to_pass}")
+
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _ensure_test_venv(workspace: "Path", venv_cache: "Path") -> str | None:
+    """Ensure a venv with pytest exists for the workspace. Returns python path or None."""
+    import subprocess
+    import venv
+
+    if not venv_cache.exists():
+        try:
+            venv.create(venv_cache, with_pip=True)
+            pip = str(venv_cache / "bin" / "pip")
+            subprocess.run(
+                [pip, "install", "pytest", "pytest-timeout"],
+                capture_output=True, timeout=120,
+            )
+            # Also try to install the repo in editable mode
+            subprocess.run(
+                [pip, "install", "-e", str(workspace)],
+                capture_output=True, timeout=120,
+            )
+        except Exception:
+            import shutil
+            shutil.rmtree(venv_cache, ignore_errors=True)
+            return None
+
+    python_exe = venv_cache / "bin" / "python"
+    if python_exe.exists():
+        return str(python_exe)
+    return None
 
 
 def _safe_slug(text: str) -> str:

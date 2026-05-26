@@ -1920,23 +1920,30 @@ class EvolutionLoop:
         )
 
     def _swebench_baseline_genome(self, scenario_name: str) -> Genome:
-        """SWE-bench seed genome with locate → patch → verify → revise loop."""
+        """SWE-bench seed genome with locate → patch → verify → revise loop.
+
+        V3 improvements over V2:
+        - Pre-step reads test failure output (artifacts/test_failures.txt) so
+          locator and patcher know exactly which tests fail and why.
+        - Locator instructions reference test failures as primary signal.
+        - Revise patcher uses test failures to guide corrections.
+        """
         return Genome.model_validate(
             {
                 "genome_version": 0,
-                "name": "swebench_code_patch_seed_v2",
+                "name": "swebench_code_patch_seed_v3",
                 "scenario_name": scenario_name,
                 "task_diagnosis": {},
                 "roles": [
-                    {"name": "locator", "description": "Searches source tree for relevant code locations.", "instructions": "You have access to the full repo source code in the workspace. Use search_code to find relevant files and functions. Use read_file to read the exact file contents you need to understand the bug. Report exact file paths, line numbers, and the key code snippets you found.", "allowed_tools": ["call_model", "search_code", "read_file", "inspect_workspace"]},
-                    {"name": "patcher", "description": "Reads source files and produces a unified diff patch.", "instructions": "Read the relevant source files the locator identified. Understand the bug. Produce a minimal unified diff that fixes it. The diff MUST use exact line numbers and context from the actual files you read. Output ONLY the raw unified diff — no markdown fences, no explanation. Start with '--- a/filepath' or 'diff --git a/filepath'. Include @@ hunk headers with correct line numbers.", "allowed_tools": ["call_model", "read_file", "write_patch"]},
+                    {"name": "locator", "description": "Searches source tree for relevant code locations using test failures as guide.", "instructions": "You have access to the full repo source code in the workspace.\n\nFIRST: read_file('artifacts/test_failures.txt') to see which tests fail and what the error messages are. This is your primary signal for finding the bug.\n\nTHEN: use search_code to find the files, functions, and classes mentioned in the test failures and error tracebacks. Use read_file to read the exact file contents you need to understand the bug.\n\nReport: (1) the failing test names and what they expect, (2) exact file paths and line numbers where the bug is, (3) the key code snippets showing the bug, (4) your hypothesis for what needs to change and why.", "allowed_tools": ["call_model", "search_code", "read_file", "inspect_workspace"]},
+                    {"name": "patcher", "description": "Reads source files and produces a unified diff patch to fix the bug.", "instructions": "You are fixing a real bug in a Python codebase.\n\nBEFORE writing the patch:\n1. read_file('artifacts/test_failures.txt') to understand what the tests expect\n2. Read the source files the locator found\n3. Understand the root cause — what code path leads to the test failure?\n\nYour patch must:\n- Fix the bug so the failing tests pass\n- Change as few lines as possible (ideally 1-5 lines)\n- Preserve existing code style and conventions\n- Use exact line numbers from the actual files you read\n\nOutput ONLY the raw unified diff — no markdown fences, no explanation.\nStart with '--- a/filepath' or 'diff --git a/filepath'.\nInclude @@ hunk headers with correct line numbers.", "allowed_tools": ["call_model", "read_file", "write_patch"]},
                     {"name": "verifier", "description": "Validates the patch applies cleanly.", "instructions": "Apply the patch via apply_patch_dry_run. Report EXACTLY what failed: which file, which hunk, what the error says. If the patch applies cleanly, just say 'Patch applies cleanly'.", "allowed_tools": ["call_model", "apply_patch_dry_run"]},
                 ],
                 "workflow": [
-                    {"id": "locate", "role": "locator", "action": "Search the codebase for files relevant to the problem statement. Read the key files to understand the code. Report exact file paths, line numbers, and relevant code snippets.", "input_from": [], "output_key": "code_locations"},
-                    {"id": "read_and_patch", "role": "patcher", "action": "Read the files the locator found. Understand the bug. Produce a unified diff patch that fixes it. Output ONLY the raw unified diff.", "input_from": ["code_locations"], "output_key": "final_output"},
+                    {"id": "locate", "role": "locator", "action": "FIRST read artifacts/test_failures.txt to see failing tests and error messages. THEN search the codebase for files mentioned in the tracebacks. Read the key files. Report file paths, line numbers, code snippets, and your hypothesis for the fix.", "input_from": [], "output_key": "code_locations"},
+                    {"id": "read_and_patch", "role": "patcher", "action": "Read artifacts/test_failures.txt and the files the locator found. Understand the bug. Produce a minimal unified diff that makes the tests pass. Output ONLY the raw unified diff.", "input_from": ["code_locations"], "output_key": "final_output"},
                     {"id": "verify", "role": "verifier", "action": "Run apply_patch_dry_run on the patch. Report exactly what succeeded or failed.", "input_from": ["final_output"], "output_key": "verification_result"},
-                    {"id": "revise_patch", "role": "patcher", "action": "The verification found issues with the patch. Read the verification result carefully. If it says 'Patch applies cleanly', output the original patch unchanged. If it reports errors, fix the patch — correct the file paths, line numbers, or context to match the actual files. Output ONLY the corrected unified diff.", "input_from": ["final_output", "verification_result", "code_locations"], "output_key": "final_output"},
+                    {"id": "revise_patch", "role": "patcher", "action": "The verification found issues with the patch. Read the verification result and test_failures.txt carefully. If it says 'Patch applies cleanly', output the original patch unchanged. If it reports errors, fix the patch — correct the file paths, line numbers, or context to match the actual files. Remember what the tests expect. Output ONLY the corrected unified diff.", "input_from": ["final_output", "verification_result", "code_locations"], "output_key": "final_output"},
                     {"id": "verify_final", "role": "verifier", "action": "Run apply_patch_dry_run on the revised patch. Report the result.", "input_from": ["final_output"], "output_key": "verification_result"},
                 ],
                 "tools": {"builtin": ["call_model", "search_code", "read_file", "write_patch", "apply_patch_dry_run", "inspect_workspace"], "generated": []},
