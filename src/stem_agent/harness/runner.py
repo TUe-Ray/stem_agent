@@ -431,7 +431,13 @@ def _maybe_populate_swebench_workspace(
 
     # ── Apply test_patch and run failing tests ──
     test_patch = case_input.get("test_patch", "")
-    fail_to_pass = case_input.get("FAIL_TO_PASS", [])
+    fail_to_pass_raw = case_input.get("FAIL_TO_PASS", [])
+    # HF dataset sometimes stores FAIL_TO_PASS as a JSON-encoded string
+    if isinstance(fail_to_pass_raw, str):
+        import json as _json
+        fail_to_pass = _json.loads(fail_to_pass_raw) if fail_to_pass_raw.strip() else []
+    else:
+        fail_to_pass = list(fail_to_pass_raw) if fail_to_pass_raw else []
     test_output_path = artifacts_dir / "test_failures.txt"
 
     if test_patch:
