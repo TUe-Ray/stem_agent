@@ -23,6 +23,7 @@ class CaseEvaluation(BaseModel):
     metrics: dict[str, float]
     failures: list[str] = Field(default_factory=list)
     final_output: str = ""
+    eval_detail: dict[str, Any] = Field(default_factory=dict)  # raw SWE-bench eval result
 
 
 class EvaluationResult(BaseModel):
