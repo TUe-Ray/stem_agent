@@ -87,6 +87,15 @@ class ModelClient:
                 "then run: set -a; source .env; set +a"
             )
         self.model_calls += 1
+
+        # ── Tool execution loop (Chat Completions mode only) ──
+        if tools and self.endpoint == "chat_completions":
+            response = self._call_with_tool_loop(
+                prompt, tools, system_prompt=system_prompt, temperature=temperature
+            )
+            self._record_call(role, full_prompt, response)
+            return response
+
         response, tokens_used = self._openai_response(
             prompt,
             response_schema,
@@ -97,6 +106,29 @@ class ModelClient:
         )
         self._record_call(role, full_prompt, response, tokens_used=tokens_used)
         return response
+
+    def _call_with_tool_loop(
+        self,
+        prompt: str,
+        tools: list[Any],
+        *,
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+    ) -> str:
+        """Execute the tool-calling loop for agent turns."""
+        from stem_agent.harness.tool_executor import ToolExecutor
+
+        if OpenAI is None:
+            raise RuntimeError("OpenAI mode requires installing stem_agent[openai].")
+
+        client = OpenAI()
+        tools_map = {t.name: t for t in tools}
+        executor = ToolExecutor(client, self.model, tools_map)
+        return executor.run(
+            system_prompt=system_prompt or "",
+            user_prompt=prompt,
+            temperature=temperature,
+        )
 
     def audit_call(
         self,

@@ -96,27 +96,97 @@ def _apply_patch_dry_run(input_data: dict[str, Any]) -> dict[str, Any]:
 def builtin_tools() -> dict[str, Tool]:
     return {
         "call_model": Tool(name="call_model", description="Call the configured model.", run=_call_model),
-        "read_file": Tool(name="read_file", description="Read a file.", run=_read_file),
-        "write_file": Tool(name="write_file", description="Write a file.", run=_write_file),
-        "run_python": Tool(name="run_python", description="Run bounded Python code.", run=_run_python),
+        "read_file": Tool(
+            name="read_file",
+            description="Read a file from the workspace. Returns the file contents as text.",
+            run=_read_file,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Path to the file to read (relative to workspace root)"},
+                },
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+        ),
+        "write_file": Tool(
+            name="write_file",
+            description="Write text content to a file in the workspace. Creates parent directories.",
+            run=_write_file,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Path to write the file to"},
+                    "text": {"type": "string", "description": "Text content to write"},
+                },
+                "required": ["path", "text"],
+                "additionalProperties": False,
+            },
+        ),
+        "run_python": Tool(
+            name="run_python",
+            description="Run bounded Python code. Input: {code}. Returns namespace dict.",
+            run=_run_python,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string", "description": "Python code to execute"},
+                },
+                "required": ["code"],
+                "additionalProperties": False,
+            },
+        ),
         "inspect_workspace": Tool(
             name="inspect_workspace",
-            description="Inspect workspace files.",
+            description="List all files in the workspace directory.",
             run=_inspect_workspace,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Root directory to inspect (default: '.')"},
+                },
+                "required": [],
+                "additionalProperties": False,
+            },
         ),
         "search_code": Tool(
             name="search_code",
-            description="Search source code with a regex pattern. Input: {pattern, path?}",
+            description="Search source code files for a regex pattern. Returns file, line number, and matched text.",
             run=_search_code,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Regex pattern to search for in source files"},
+                    "path": {"type": "string", "description": "Directory to search in (default: '.')"},
+                },
+                "required": ["pattern"],
+                "additionalProperties": False,
+            },
         ),
         "write_patch": Tool(
             name="write_patch",
-            description="Write a unified-diff patch to the workspace. Input: {patch_text}",
+            description="Write a unified-diff patch to artifacts/predicted.patch. Call this when you have a complete fix.",
             run=_write_patch,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "patch_text": {"type": "string", "description": "The complete unified diff patch text, starting with '--- a/' or 'diff --git'"},
+                },
+                "required": ["patch_text"],
+                "additionalProperties": False,
+            },
         ),
         "apply_patch_dry_run": Tool(
             name="apply_patch_dry_run",
-            description="Check if a unified diff applies cleanly. Input: {patch_text}.",
+            description="Test if a unified diff applies cleanly before writing it. Use this to verify your patch.",
             run=_apply_patch_dry_run,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "patch_text": {"type": "string", "description": "The unified diff to test"},
+                },
+                "required": ["patch_text"],
+                "additionalProperties": False,
+            },
         ),
     }
