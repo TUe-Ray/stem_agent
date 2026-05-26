@@ -439,6 +439,9 @@ def _maybe_populate_swebench_workspace(
     elif not test_output_path.exists():
         test_output_path.write_text("(No test patch available for this case.)\n")
 
+    # ── Write test file hints for the locator ──
+    _write_test_file_hints(artifacts_dir, test_patch, fail_to_pass)
+
 
 def _apply_test_patch_and_run(
     workspace: "Path",
@@ -535,3 +538,43 @@ def _ensure_test_venv(workspace: "Path", venv_cache: "Path") -> str | None:
 def _safe_slug(text: str) -> str:
     import re
     return re.sub(r"[^a-zA-Z0-9_.-]", "_", text)
+
+
+def _write_test_file_hints(
+    artifacts_dir: "Path", test_patch: str, fail_to_pass: list[str]
+) -> None:
+    """Write a hint file telling the locator which source files the failing tests touch.
+
+    Parses the test_patch to find the test file paths, then uses heuristics to
+    guess which production source files are likely involved.
+    """
+    import re
+
+    test_files = re.findall(r"\+{3} b/(.+)", test_patch)
+    if not test_files:
+        return
+
+    hints_path = artifacts_dir / "test_file_hints.txt"
+    lines = ["# Test File Hints for Locator", ""]
+    lines.append(f"FAIL_TO_PASS: {fail_to_pass}")
+    lines.append("")
+    lines.append("These test files were modified by the test patch — the bug is likely in")
+    lines.append("the production code that these tests exercise:")
+    lines.append("")
+
+    for tf in test_files:
+        lines.append(f"  - {tf}")
+        # Guess the source dir from the test file path
+        # e.g. sympy/integrals/tests/test_intpoly.py → sympy/integrals/
+        source_hint = re.sub(r"/tests?/", "/", tf)
+        source_hint = re.sub(r"/?test_", "/", source_hint)
+        source_hint = re.sub(r"\.py$", ".py", source_hint)
+        if source_hint != tf:
+            lines.append(f"    → likely source: {source_hint}")
+        # Module path hint
+        mod_path = tf.replace("/", ".").replace(".py", "")
+        mod_path = re.sub(r"\.tests?\.test_", ".", mod_path)
+        if mod_path != tf.replace("/", ".").replace(".py", ""):
+            lines.append(f"    → module: {mod_path}")
+
+    hints_path.write_text("\n".join(lines))
