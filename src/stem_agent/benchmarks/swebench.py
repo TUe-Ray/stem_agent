@@ -113,7 +113,7 @@ def evaluate_patch_light(
         # 1. Clone from cached workspace instead of from GitHub (avoids re-downloading 164MB+)
         cached = _ensure_cached_workspace(repo, base_commit)
         if cached and cached.exists():
-            # Lightweight copy of cached git repo (blobless — only metadata, no file blobs)
+            # Lightweight copy of cached git repo
             _run(["cp", "-r", str(cached), str(repo_dir)], timeout=60)
         else:
             # Fallback: clone from GitHub

@@ -316,6 +316,9 @@ class EvolutionLoop:
             seed_genome = (
                 self._gsm8k_baseline_genome(bundle.scenario.name)
                 if bundle.scenario.name in {"gsm8k_demo", "gsm8k_full", "gsm8k_mini"}
+                else self._swebench_single_agent_genome(bundle.scenario.name)
+                if bundle.scenario.name in {"swebench_lite_demo", "swebench_lite_full"}
+                and os.environ.get("STEM_AGENT_SINGLE_AGENT") == "1"
                 else self._swebench_baseline_genome(bundle.scenario.name)
                 if bundle.scenario.name in {"swebench_lite_demo", "swebench_lite_full"}
                 else load_default_genome()
@@ -1949,6 +1952,30 @@ class EvolutionLoop:
                 "quality_gates": [],
                 "self_evaluation": {"rubric": ""},
                 "retry_policy": {"max_attempts": 3, "revise_on_failure": True},
+                "stop_rule": {},
+                "environment": {"workspace_layout": ["artifacts"], "required_artifacts": ["artifacts/predicted.patch"], "artifact_purpose": {"artifacts/predicted.patch": "The final unified diff patch."}, "file_templates": {"artifacts/predicted.patch": "# Unified diff patch will be written here\n"}, "cleanup_policy": "keep_run_artifacts"},
+            }
+        )
+
+    def _swebench_single_agent_genome(self, scenario_name: str) -> Genome:
+        """Single-agent genome: one role does everything in one LLM call."""
+        return Genome.model_validate(
+            {
+                "genome_version": 0,
+                "name": "swebench_single_agent_seed_v1",
+                "scenario_name": scenario_name,
+                "task_diagnosis": {},
+                "roles": [
+                    {"name": "solver", "description": "Single agent that reads, searches, patches, and verifies — all in one turn.", "instructions": "You are fixing a bug in a Python codebase. You have access to the full source code in the workspace.\n\nWORKFLOW (do ALL of this in one response using tools):\n1. read_file('artifacts/test_failures.txt') — see failing tests and errors\n2. read_file('artifacts/test_file_hints.txt') — see which files are involved\n3. search_code to find the buggy code — focus on the hinted directories\n4. read_file to understand the exact code causing the failure\n5. Read the problem_statement from the case input\n6. Write the patch using write_patch\n7. Verify with apply_patch_dry_run\n8. If verification fails: fix line numbers/context, re-verify (up to 2 retries)\n9. Output ONLY the final raw unified diff — no markdown fences, no explanation\n\nRULES:\n- Change as few lines as possible (ideally 1-5)\n- Preserve existing code style\n- Use exact line numbers from the files you actually read\n\n=== PATCH FORMAT EXAMPLES ===\n\nExample 1 — fixing a missing import:\n--- a/module/file.py\n+++ b/module/file.py\n@@ -1,5 +1,6 @@\n import os\n+from collections import OrderedDict\n import sys\n\nExample 2 — fixing wrong comparison:\n--- a/src/utils.py\n+++ b/src/utils.py\n@@ -15,7 +15,7 @@\n def validate(value):\n-    if value > 0:\n+    if value >= 0:\n         return True\n\n=== END EXAMPLES ===\n\nOutput ONLY the raw unified diff. Start with '--- a/filepath' or 'diff --git a/filepath'.", "allowed_tools": ["call_model", "read_file", "search_code", "write_patch", "apply_patch_dry_run", "inspect_workspace"]},
+                ],
+                "workflow": [
+                    {"id": "solve", "role": "solver", "action": "Read test failures and hints, search the codebase, read source files, understand the bug, write a patch, verify it, fix if needed, and output ONLY the final corrected unified diff.", "input_from": [], "output_key": "final_output"},
+                ],
+                "tools": {"builtin": ["call_model", "search_code", "read_file", "write_patch", "apply_patch_dry_run", "inspect_workspace"], "generated": []},
+                "memory": {},
+                "quality_gates": [],
+                "self_evaluation": {"rubric": ""},
+                "retry_policy": {"max_attempts": 1},
                 "stop_rule": {},
                 "environment": {"workspace_layout": ["artifacts"], "required_artifacts": ["artifacts/predicted.patch"], "artifact_purpose": {"artifacts/predicted.patch": "The final unified diff patch."}, "file_templates": {"artifacts/predicted.patch": "# Unified diff patch will be written here\n"}, "cleanup_policy": "keep_run_artifacts"},
             }
