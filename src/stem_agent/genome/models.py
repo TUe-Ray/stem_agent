@@ -10,6 +10,7 @@ class RoleSpec(BaseModel):
     description: str
     instructions: str
     allowed_tools: list[str] = Field(default_factory=list)
+    temperature: float | None = None  # None = use default (0.0)
 
 
 class WorkflowStep(BaseModel):
