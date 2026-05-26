@@ -487,7 +487,7 @@ def _apply_test_patch_and_run(
         lines.append("-" * 60)
 
         # Use the cached venv if it exists
-        venv_cache = workspace.parent.parent / ".test_venvs" / _safe_slug(str(workspace.parent.name))
+        venv_cache = Path.home() / ".cache" / "stem_agent" / "swebench_test_venvs" / _safe_slug(str(workspace.name))
         python_exe = _ensure_test_venv(workspace, venv_cache)
 
         if python_exe:
