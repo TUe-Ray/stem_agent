@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Callable
 
@@ -10,6 +11,7 @@ from stem_agent.harness.builder import MaterializedHarness
 from stem_agent.harness.intra_adapter import IntraTestAdapter
 from stem_agent.harness.memory import MemoryStore
 from stem_agent.harness.role_runner import RoleRunner
+from stem_agent.harness.context_refiner import ContextRefiner
 from stem_agent.kernel.requirements import requirement_section_satisfied
 from stem_agent.scenarios.schema import TaskCase
 
@@ -30,6 +32,7 @@ class HarnessRunResult(BaseModel):
 class HarnessRunner:
     def __init__(self, role_runner: RoleRunner | None = None):
         self.role_runner = role_runner or RoleRunner()
+        self.refiner = ContextRefiner(enabled=True)
 
     def run_case(
         self,
@@ -63,6 +66,12 @@ class HarnessRunner:
             output_key = step.output_key or step.id
             outputs[output_key] = result
             outputs[step.id] = result
+            # ── Context Refinement: extract structured info for next step ──
+            refined = self.refiner.refine(step.id, result)
+            if refined and not refined.get("_error"):
+                refined_key = f"_refined_{output_key}"
+                outputs[refined_key] = json.dumps(refined)
+
             self._record_trace(
                 traces,
                 self._workflow_step_trace(
@@ -134,7 +143,16 @@ class HarnessRunner:
     def collect_inputs(
         self, case: TaskCase, outputs: dict[str, str], input_from: list[str]
     ) -> dict[str, Any]:
-        selected = {key: outputs[key] for key in input_from if key in outputs}
+        selected = {}
+        for key in input_from:
+            if key not in outputs:
+                continue
+            # Prefer refined version for downstream agents
+            refined_key = f"_refined_{key}"
+            if refined_key in outputs:
+                selected[key] = outputs[refined_key]
+            else:
+                selected[key] = outputs[key]
         return {"case_input": case.input, "previous_outputs": selected}
 
     def extract_final(self, outputs: dict[str, str]) -> str:

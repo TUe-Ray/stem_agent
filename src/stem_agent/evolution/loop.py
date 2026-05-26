@@ -122,6 +122,7 @@ class EvolutionLoop:
         )
         self.model_client = model_client
         default_harness_runner = HarnessRunner(RoleRunner(model_client))
+        default_harness_runner.refiner.configure(model_client)
         self.nucleus = NucleusCommander(
             scenario_interpreter=ScenarioInterpreter(model_client),
             failure_analyzer=FailureAnalyzer(),
@@ -437,6 +438,7 @@ class EvolutionLoop:
 
             summary = self._evaluation_summary(current_result)
             previous_eval_score = history[-2].promotion_score if len(history) >= 2 else 0.0
+            eval_details = self._extract_eval_details(current_result)
             evaluation_signal = bundle.scenario.signal_policy.build_nucleus_signal(
                 generation=generation,
                 mutation_type="evaluation",
@@ -444,6 +446,7 @@ class EvolutionLoop:
                 previous_score=previous_eval_score,
                 metric_breakdown=self._visible_metric_breakdown(current_result),
                 weakest_metrics=self._weakest_visible_metrics(current_result),
+                eval_details=eval_details,
             )
             signal_history.append(evaluation_signal)
             lineage.record_evaluation(
@@ -1836,6 +1839,30 @@ class EvolutionLoop:
             return "; ".join(result.failures[:3])
         return "Candidate satisfied visible requirements with acceptable complexity."
 
+    def _extract_eval_details(self, result: EvaluationResult) -> list[dict[str, Any]]:
+        """Extract per-case SWE-bench evaluation results for Nucleus signal.
+
+        Includes which tests passed/failed and how patches applied,
+        so Nucleus can make data-driven mutation decisions.
+        """
+        details = []
+        for case in result.case_results:
+            detail: dict[str, Any] = {
+                "case_id": case.case_id,
+                "score": case.score,
+                "failures": case.failures,
+            }
+            # Include raw SWE-bench eval results if available
+            raw_eval = case.eval_detail
+            if raw_eval:
+                detail["resolved"] = raw_eval.get("resolved", False)
+                detail["patch_applies"] = raw_eval.get("patch_applies", False)
+                detail["fail_to_pass"] = raw_eval.get("fail_to_pass", {})
+                detail["pass_to_pass"] = raw_eval.get("pass_to_pass", {})
+                detail["error"] = raw_eval.get("error")
+            details.append(detail)
+        return details
+
     def _exception_summary(self, exc: Exception) -> str:
         if isinstance(exc, ValidationError):
             details = []
@@ -1938,8 +1965,8 @@ class EvolutionLoop:
                 "scenario_name": scenario_name,
                 "task_diagnosis": {},
                 "roles": [
-                    {"name": "locator", "description": "Searches source tree for relevant SOURCE code locations using test failures as guide.", "instructions": "You have access to the full repo source code in the workspace.\n\nCRITICAL RULE: You are looking for PRODUCTION/SOURCE code, NOT test code.\nDO NOT search in test/, tests/, testing/, or any directory with \"test\" in its name.\n\nFIRST: read_file('artifacts/test_failures.txt') — see which tests fail and error messages.\nSECOND: read_file('artifacts/test_file_hints.txt') — see likely SOURCE modules.\nTHIRD: Read the problem_statement from the case input — this describes the bug in human language.\n\nTHEN: use search_code to find the PRODUCTION source files, functions, and classes from:\n- The error tracebacks (function names, class names, module paths)\n- The problem statement (what's broken — specific function names, modules)\n- The SOURCE directories from hints file (e.g. sympy/integrals/ NOT sympy/integrals/tests/)\n\nUse read_file ONLY on source/production files. Never read test files.\n\nReport: (1) failing test names and expectations, (2) exact SOURCE file paths and line numbers, (3) buggy code snippets, (4) your hypothesis for the fix.", "allowed_tools": ["call_model", "search_code", "read_file", "inspect_workspace"], "temperature": 0.1},
-                    {"name": "patcher", "description": "Reads test code + source files, writes a patch with write_patch, self-verifies, outputs ONLY the diff.", "instructions": "You are fixing a bug. Do ALL of this in ONE turn using tools.\n\n1. read_file('artifacts/test_failures.txt') — test errors\n2. read_file('artifacts/test_file_hints.txt') — test file paths\n3. read_file on the test files — study what they expect\n4. Read the source files the locator found\n5. Read the problem_statement\n6. Write your patch using write_patch({'patch_text': '...'})\n7. Verify with apply_patch_dry_run({'patch_text': '...'})\n8. If it fails: fix and retry (max 2 times)\n\nCRITICAL: Your FINAL output must be ONLY the unified diff text.\nNo analysis. No markdown fences. No explanation.\nStart with '--- a/' or 'diff --git a/'.\n\nPatch rules:\n- Fix SOURCE code, never test code\n- Change as few lines as possible\n- Use exact line numbers from the files you read", "allowed_tools": ["call_model", "read_file", "write_patch", "apply_patch_dry_run"], "temperature": 0.2},
+                    {"name": "locator", "description": "Searches source tree for relevant SOURCE code locations using test failures as guide.", "instructions": "You have access to the full repo source code in the workspace.\n\nCRITICAL RULE: You are looking for PRODUCTION/SOURCE code, NOT test code.\nDO NOT search in test/, tests/, testing/, or any directory with \"test\" in its name.\n\nMANDATORY STEPS — you MUST execute ALL of these using tools:\n\n1. read_file('artifacts/test_failures.txt') — see which tests fail and error messages.\n2. read_file('artifacts/test_file_hints.txt') — see likely SOURCE modules.\n3. Read the problem_statement from the case input — this describes the bug in human language.\n4. search_code to find the PRODUCTION source files, functions, and classes from:\n   - The error tracebacks (function names, class names, module paths)\n   - The problem statement (what's broken — specific function names, modules)\n   - The SOURCE directories from hints file (e.g. sympy/integrals/ NOT sympy/integrals/tests/)\n5. *** MANDATORY *** Use read_file to actually OPEN and READ at least ONE source file.\n   You MUST read the actual source code. DO NOT guess or estimate line numbers.\n   DO NOT invent code snippets from memory.\n\nENFORCEMENT RULES:\n- You MUST call read_file on at least one source file before writing your report.\n- Your report MUST contain EXACT line numbers taken from files you actually read.\n- If you have not read a file, you CANNOT report its contents — say so explicitly.\n- NEVER write placeholder comments like \"# ... some code ...\" or \"# Existing ...\".\n  Those will cause the patch to fail.\n\nReport: (1) failing test names and expectations, (2) exact SOURCE file paths and VERIFIED line numbers, (3) buggy code snippets copy-pasted from files you actually read, (4) your hypothesis for the fix.", "allowed_tools": ["call_model", "search_code", "read_file", "inspect_workspace"], "temperature": 0.1},
+                    {"name": "patcher", "description": "Reads test code + source files, writes a patch with write_patch, self-verifies, outputs ONLY the diff.", "instructions": "You are fixing a bug. Do ALL of this in ONE turn using tools.\n\n1. read_file('artifacts/test_failures.txt') — test errors\n2. read_file('artifacts/test_file_hints.txt') — test file paths\n3. read_file on the test files — study what they expect\n4. *** INDEPENDENTLY read the source files yourself *** — do NOT trust the locator's line numbers.\n   Open the source files with read_file and verify the exact code and line numbers.\n5. Read the problem_statement\n6. Write your patch using write_patch({'patch_text': '...'})\n   Use ONLY line numbers from files you personally read.\n7. Verify with apply_patch_dry_run({'patch_text': '...'})\n8. If it fails: fix line numbers/context and retry (max 2 times)\n\nPATCH QUALITY RULES:\n- NEVER include placeholder comments like \"# ... some code ...\" or \"# Existing ...\" in your diff.\n  The diff must contain ONLY real code lines that actually exist in the source files.\n- Every context line in the hunk header (@@ ... @@) must match the actual file EXACTLY.\n- Fix SOURCE code, never test code.\n- Change as few lines as possible (ideally 1-5 lines).\n\nCRITICAL: Your FINAL output must be ONLY the unified diff text.\nNo analysis. No markdown fences. No explanation.\nStart with '--- a/' or 'diff --git a/'.", "allowed_tools": ["call_model", "read_file", "write_patch", "apply_patch_dry_run"], "temperature": 0.2},
                     {"name": "verifier", "description": "Final verification of patch application.", "instructions": "Apply the patch via apply_patch_dry_run. If it applies cleanly say 'FINAL: Patch applies cleanly'. If it fails, report the EXACT error so it can be fixed.", "allowed_tools": ["call_model", "apply_patch_dry_run"]},
                 ],
                 "workflow": [
