@@ -25,7 +25,11 @@ def _env(key: str, default: str) -> str:
 
 
 class ModelClient:
-    """Small model abstraction for OpenAI API calls, with an internal test double."""
+    """Small model abstraction for OpenAI API calls, with an internal test double.
+    
+    Supports DeepSeek via DEEPSEEK_API_KEY env var. When set, OPENAI_API_KEY
+    and OPENAI_BASE_URL are auto-configured to use DeepSeek's API.
+    """
 
     def __init__(
         self,
@@ -42,6 +46,21 @@ class ModelClient:
         self.responses_api_available: bool | None = None
         self.structured_output_repairs = 0
         self.call_logger = LLMCallLogger(run_dir)
+        self._auto_configure_deepseek()
+
+    def _auto_configure_deepseek(self) -> None:
+        """Auto-detect DeepSeek API key and configure OpenAI client for it."""
+        deepseek_key = os.getenv("DEEPSEEK_API_KEY", "")
+        if not deepseek_key:
+            return
+        # Only auto-switch if model starts with deepseek/ or no OpenAI key is set
+        if self.model.startswith("deepseek/") or not os.getenv("OPENAI_API_KEY"):
+            os.environ.setdefault("OPENAI_API_KEY", deepseek_key)
+            os.environ.setdefault("OPENAI_BASE_URL", os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"))
+            if self.model.startswith("deepseek/"):
+                self.model = self.model.split("/", 1)[1]  # strip "deepseek/" prefix
+            elif not self.model or self.model == "gpt-4.1-mini":
+                self.model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
     def configure_run(self, run_dir: str | Path | None) -> None:
         self.call_logger.configure(run_dir)

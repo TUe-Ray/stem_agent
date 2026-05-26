@@ -44,6 +44,8 @@ class HarnessRunner:
         attempts = int(harness.retry_policy.get("max_attempts", 1))
         attempts = max(attempts, 1)
         intra = IntraTestAdapter(run_dir) if run_dir is not None else None
+        # ── SWE-bench workspace population: copy cached repo files into harness workspace ──
+        _maybe_populate_swebench_workspace(harness, case)
         if harness.environment.required_artifacts:
             self._record_trace(
                 traces,
@@ -369,3 +371,60 @@ class HarnessRunner:
             if not passed:
                 missing.append(requirement)
         return missing
+
+
+def _maybe_populate_swebench_workspace(
+    harness: "MaterializedHarness", case: "TaskCase"
+) -> None:
+    """Populate harness workspace with cached repo files for SWE-bench cases.
+    
+    The locator/patcher roles use read_file and search_code tools that operate
+    from cwd. Without this, they search an empty workspace and produce hallucinated patches.
+    """
+    case_input = case.input if hasattr(case, "input") else {}
+    repo = case_input.get("repo", "")
+    base_commit = case_input.get("base_commit", "")
+    if not repo or not base_commit or repo == "demo/simple":
+        return
+
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    workspace = harness.workspace_dir
+    cache_dir = Path.home() / ".cache" / "stem_agent" / "swebench_workspaces"
+    cached = cache_dir / f"{_safe_slug(repo)}_{base_commit[:8]}"
+
+    if not cached.exists():
+        # First time: clone into cache
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            subprocess.run(
+                ["git", "clone", "--filter=blob:none", "--no-tags",
+                 f"https://github.com/{repo}.git", str(cached)],
+                capture_output=True, timeout=300, check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(cached), "checkout", base_commit],
+                capture_output=True, timeout=120, check=True,
+            )
+        except Exception:
+            shutil.rmtree(cached, ignore_errors=True)
+            return
+
+    # Copy cached repo files into workspace (skip .git to avoid conflicts)
+    for item in cached.iterdir():
+        if item.name == ".git":
+            continue
+        dest = workspace / item.name
+        if item.is_dir():
+            if dest.exists():
+                shutil.rmtree(dest, ignore_errors=True)
+            shutil.copytree(item, dest)
+        else:
+            shutil.copy2(item, dest)
+
+
+def _safe_slug(text: str) -> str:
+    import re
+    return re.sub(r"[^a-zA-Z0-9_.-]", "_", text)
