@@ -27,6 +27,7 @@ class NucleusSignal:
     weakest_metrics: list[str] | None = None
     last_rejection_summary: str | None = None
     eval_details: list[dict[str, Any]] | None = None  # per-case eval results (test pass/fail etc.)
+    case_failure_reasons: list[str] | None = None  # per-case failure diagnosis from FailureDiagnoser
 
 
 @dataclass
@@ -51,6 +52,7 @@ class SignalPolicy:
         weakest_metrics: list[str] | None = None,
         last_rejection_summary: str | None = None,
         eval_details: list[dict[str, Any]] | None = None,
+        case_failure_reasons: list[str] | None = None,
     ) -> NucleusSignal:
         # Strip any case-ID-like keys from metric_breakdown (Layer-2 guard)
         safe_breakdown: dict[str, float] | None = None
@@ -90,6 +92,7 @@ class SignalPolicy:
             weakest_metrics=weakest_metrics,
             last_rejection_summary=last_rejection_summary,
             eval_details=eval_details,
+            case_failure_reasons=case_failure_reasons,
         )
 
     def assert_no_layer2_leak(self, nucleus_prompt: str) -> None:

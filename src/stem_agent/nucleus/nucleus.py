@@ -56,6 +56,11 @@ def build_nucleus_prompt(
                 line += f"\n    low metrics: {mini}"
         if sig.last_rejection_summary:
             line += f"\n    last rejection: {sig.last_rejection_summary[:200]}"
+        if sig.case_failure_reasons:
+            failure_list = [
+                f"      {reason}" for reason in sig.case_failure_reasons[:8]
+            ]
+            line += f"\n    per-case failure diagnosis:\n" + "\n".join(failure_list)
         history_lines.append(line)
 
     existing_gates = _existing_gate_summary(current_genome)

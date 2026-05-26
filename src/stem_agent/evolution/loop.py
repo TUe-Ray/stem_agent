@@ -17,6 +17,7 @@ from stem_agent.genome.loader import load_genome
 from stem_agent.genome.models import Genome
 from stem_agent.genome.serializer import save_genome
 from stem_agent.harness.builder import HarnessBuilder
+from stem_agent.harness.failure_diagnoser import FailureDiagnoser
 from stem_agent.harness.runner import HarnessRunResult, HarnessRunner
 from stem_agent.harness.role_runner import RoleRunner
 from stem_agent.kernel.budget import BudgetTracker
@@ -129,6 +130,15 @@ class EvolutionLoop:
             mutation_planner=MutationPlanner(model_client),
         )
         self.harness_runner = harness_runner or default_harness_runner
+        # Failure diagnoser: cheap LLM (gpt-4o-mini) for per-case failure reasons
+        self.failure_diagnoser = FailureDiagnoser(enabled=True)
+        self.failure_diagnoser.configure(
+            ModelClient(
+                model="gpt-4o-mini",
+                test_mode=self.settings.test_mode,
+                endpoint=self.settings.openai_endpoint,
+            )
+        )
         # Evaluator strategy: set STEM_AGENT_EVALUATOR=llm_judge to use LLM judge
         _eval_strategy = None
         if os.environ.get("STEM_AGENT_EVALUATOR") == "llm_judge":
@@ -234,6 +244,14 @@ class EvolutionLoop:
         self.guardian.configure_signal_policy(bundle.scenario.signal_policy)
         self.guardian.configure_hidden_evaluation(bundle.path)
         self.guardian.configure_validation_cases(bundle.validation_cases)
+
+        # ── Langfuse observability: start trace for this run ──
+        try:
+            from stem_agent.observability.langfuse_tracer import start_run as _lf_start
+            _lf_start(run_id=run_id, scenario=bundle.scenario.name, model=self.settings.model)
+        except Exception:
+            pass
+
         self._emit_event(
             event_sink,
             {
@@ -439,6 +457,11 @@ class EvolutionLoop:
             summary = self._evaluation_summary(current_result)
             previous_eval_score = history[-2].promotion_score if len(history) >= 2 else 0.0
             eval_details = self._extract_eval_details(current_result)
+            # ── Failure diagnosis: cheap LLM per-case failure reasons ──
+            harness_runs_for_signal = self._read_runs(generation_dir, "current")
+            case_failure_reasons = self.failure_diagnoser.diagnose(
+                current_result.case_results, harness_runs_for_signal
+            )
             evaluation_signal = bundle.scenario.signal_policy.build_nucleus_signal(
                 generation=generation,
                 mutation_type="evaluation",
@@ -447,6 +470,7 @@ class EvolutionLoop:
                 metric_breakdown=self._visible_metric_breakdown(current_result),
                 weakest_metrics=self._weakest_visible_metrics(current_result),
                 eval_details=eval_details,
+                case_failure_reasons=case_failure_reasons if case_failure_reasons else None,
             )
             signal_history.append(evaluation_signal)
             lineage.record_evaluation(
@@ -1285,6 +1309,12 @@ class EvolutionLoop:
             lineage=lineage,
             frozen_path=frozen_path,
         )
+        # ── Langfuse: flush all pending traces ──
+        try:
+            from stem_agent.observability.langfuse_tracer import flush as _lf_flush
+            _lf_flush()
+        except Exception:
+            pass
         return EvolutionRunResult(
             run_dir=run_dir,
             baseline_score=baseline_result.promotion_score,
@@ -1787,6 +1817,27 @@ class EvolutionLoop:
                 )
                 traces.write(json.dumps(run.model_dump(mode="json"), sort_keys=True) + "\n")
 
+    def _read_runs(
+        self, generation_dir: Path, label: str
+    ) -> list[HarnessRunResult]:
+        """Read harness runs from the traces file written by _write_runs.
+
+        Used by FailureDiagnoser to reconstruct raw step outputs for diagnosis.
+        """
+        traces_path = generation_dir / f"{label}_traces.jsonl"
+        if not traces_path.exists():
+            return []
+        runs: list[HarnessRunResult] = []
+        for line in traces_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                data = json.loads(line)
+                runs.append(HarnessRunResult.model_validate(data))
+            except Exception:
+                continue
+        return runs
+
     def _short_output_summary(self, output: str, *, limit: int = 140) -> str:
         compact = " ".join(output.split())
         if len(compact) <= limit:
@@ -1966,7 +2017,7 @@ class EvolutionLoop:
                 "task_diagnosis": {},
                 "roles": [
                     {"name": "locator", "description": "Searches source tree for relevant SOURCE code locations using test failures as guide.", "instructions": "You have access to the full repo source code in the workspace.\n\nCRITICAL RULE: You are looking for PRODUCTION/SOURCE code, NOT test code.\nDO NOT search in test/, tests/, testing/, or any directory with \"test\" in its name.\n\nMANDATORY STEPS — you MUST execute ALL of these using tools:\n\n1. read_file('artifacts/test_failures.txt') — see which tests fail and error messages.\n2. read_file('artifacts/test_file_hints.txt') — see likely SOURCE modules.\n3. Read the problem_statement from the case input — this describes the bug in human language.\n4. search_code to find the PRODUCTION source files, functions, and classes from:\n   - The error tracebacks (function names, class names, module paths)\n   - The problem statement (what's broken — specific function names, modules)\n   - The SOURCE directories from hints file (e.g. sympy/integrals/ NOT sympy/integrals/tests/)\n5. *** MANDATORY *** Use read_file to actually OPEN and READ at least ONE source file.\n   You MUST read the actual source code. DO NOT guess or estimate line numbers.\n   DO NOT invent code snippets from memory.\n\nENFORCEMENT RULES:\n- You MUST call read_file on at least one source file before writing your report.\n- Your report MUST contain EXACT line numbers taken from files you actually read.\n- If you have not read a file, you CANNOT report its contents — say so explicitly.\n- NEVER write placeholder comments like \"# ... some code ...\" or \"# Existing ...\".\n  Those will cause the patch to fail.\n\nReport: (1) failing test names and expectations, (2) exact SOURCE file paths and VERIFIED line numbers, (3) buggy code snippets copy-pasted from files you actually read, (4) your hypothesis for the fix.", "allowed_tools": ["call_model", "search_code", "read_file", "inspect_workspace"], "temperature": 0.1},
-                    {"name": "patcher", "description": "Reads test code + source files, writes a patch with write_patch, self-verifies, outputs ONLY the diff.", "instructions": "You are fixing a bug. Do ALL of this in ONE turn using tools.\n\n1. read_file('artifacts/test_failures.txt') — test errors\n2. read_file('artifacts/test_file_hints.txt') — test file paths\n3. read_file on the test files — study what they expect\n4. *** INDEPENDENTLY read the source files yourself *** — do NOT trust the locator's line numbers.\n   Open the source files with read_file and verify the exact code and line numbers.\n5. Read the problem_statement\n6. Write your patch using write_patch({'patch_text': '...'})\n   Use ONLY line numbers from files you personally read.\n7. Verify with apply_patch_dry_run({'patch_text': '...'})\n8. If it fails: fix line numbers/context and retry (max 2 times)\n\nPATCH QUALITY RULES:\n- NEVER include placeholder comments like \"# ... some code ...\" or \"# Existing ...\" in your diff.\n  The diff must contain ONLY real code lines that actually exist in the source files.\n- Every context line in the hunk header (@@ ... @@) must match the actual file EXACTLY.\n- Fix SOURCE code, never test code.\n- Change as few lines as possible (ideally 1-5 lines).\n\nCRITICAL: Your FINAL output must be ONLY the unified diff text.\nNo analysis. No markdown fences. No explanation.\nStart with '--- a/' or 'diff --git a/'.", "allowed_tools": ["call_model", "read_file", "write_patch", "apply_patch_dry_run"], "temperature": 0.2},
+                    {"name": "patcher", "description": "Reads test code + source files, writes a patch with write_patch, self-verifies, outputs ONLY the diff.", "instructions": "You are fixing a bug. Do ALL of this in ONE turn using tools.\n\n=== DEFINITION OF DONE ===\nProduction-ready means VERIFIED working \u2014 your changes must be provably correct.\nYou have tools (read_file, write_patch, apply_patch_dry_run) to get executable\nfeedback. Do NOT rely on assumptions or guesses. Prove correctness through\nverification, iterate until verification passes.\n\nYour patch is DONE only when apply_patch_dry_run succeeds CLEANLY.\nA patch that fails verification is NOT done \u2014 fix it and try again.\n\n\"All verifications pass\" is your definition of done. Nothing less.\n=== END DEFINITION OF DONE ===\n\n1. read_file('artifacts/test_failures.txt') — test errors\n2. read_file('artifacts/test_file_hints.txt') — test file paths\n3. read_file on the test files — study what they expect\n4. *** INDEPENDENTLY read the source files yourself *** — do NOT trust the locator's line numbers.\n   Open the source files with read_file and verify the exact code and line numbers.\n5. Read the problem_statement\n6. Write your patch using write_patch({'patch_text': '...'})\n   Use ONLY line numbers from files you personally read.\n7. Verify with apply_patch_dry_run({'patch_text': '...'})\n8. If it fails: fix line numbers/context and retry (max 2 times)\n\nPATCH QUALITY RULES:\n- NEVER include placeholder comments like \"# ... some code ...\" or \"# Existing ...\" in your diff.\n  The diff must contain ONLY real code lines that actually exist in the source files.\n- Every context line in the hunk header (@@ ... @@) must match the actual file EXACTLY.\n- Fix SOURCE code, never test code.\n- Change as few lines as possible (ideally 1-5 lines).\n\nCRITICAL: Your FINAL output must be ONLY the unified diff text.\nNo analysis. No markdown fences. No explanation.\nStart with '--- a/' or 'diff --git a/'.", "allowed_tools": ["call_model", "read_file", "write_patch", "apply_patch_dry_run"], "temperature": 0.2},
                     {"name": "verifier", "description": "Final verification of patch application.", "instructions": "Apply the patch via apply_patch_dry_run. If it applies cleanly say 'FINAL: Patch applies cleanly'. If it fails, report the EXACT error so it can be fixed.", "allowed_tools": ["call_model", "apply_patch_dry_run"]},
                 ],
                 "workflow": [
