@@ -52,6 +52,11 @@ def _ensure_langfuse():
     if _langfuse_init_done:
         return _langfuse is not None
     _langfuse_init_done = True
+
+    # Kill switch
+    if os.getenv("STEM_AGENT_LANGFUSE_DISABLED", "").strip() in ("1", "true", "yes"):
+        return False
+
     public_key = os.getenv("LANGFUSE_PUBLIC_KEY", "")
     secret_key = os.getenv("LANGFUSE_SECRET_KEY", "")
     if not public_key or not secret_key:
