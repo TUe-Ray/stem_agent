@@ -44,6 +44,19 @@ class ToolExecutor:
         self._client = client
         self._model = model
         self._tools_map = tools  # name → stem_agent Tool object
+        # DeepSeek V4 Flash has thinking mode enabled by default — it doesn't
+        # support tool_choice and requires reasoning_content passthrough.
+        # Disable thinking to get standard tool calling behavior.
+        self._extra_body: dict[str, Any] | None = None
+        if "deepseek" in model.lower():
+            self._extra_body = {"thinking": {"type": "disabled"}}
+
+    def _create_kwargs(self, temperature: float) -> dict[str, Any]:
+        """Build common kwargs for chat.completions.create calls."""
+        kwargs: dict[str, Any] = {"temperature": temperature}
+        if self._extra_body:
+            kwargs["extra_body"] = self._extra_body
+        return kwargs
 
     def run(
         self,
@@ -79,7 +92,7 @@ class ToolExecutor:
                 messages=messages,
                 tools=tool_schemas if step == 0 else tool_schemas,
                 tool_choice="auto" if step == 0 else "auto",
-                temperature=temperature if temperature is not None else 0.0,
+                **self._create_kwargs(temperature if temperature is not None else 0.0),
             )
             choice = response.choices[0]
 
@@ -174,7 +187,7 @@ class ToolExecutor:
             response = self._client.chat.completions.create(
                 model=self._model,
                 messages=messages,
-                temperature=temperature if temperature is not None else 0.0,
+                **self._create_kwargs(temperature if temperature is not None else 0.0),
             )
             text = response.choices[0].message.content or ""
             if all_tool_calls:
@@ -357,7 +370,7 @@ class ToolExecutor:
             messages=messages,
             tools=tool_schemas,
             tool_choice={"type": "function", "function": {"name": tool_name}},
-            temperature=temperature,
+            **self._create_kwargs(temperature),
         )
         choice = response.choices[0]
         assistant_msg = choice.message
@@ -420,7 +433,7 @@ class ToolExecutor:
             messages=messages,
             tools=tool_schemas,
             tool_choice="auto",
-            temperature=temperature,
+            **self._create_kwargs(temperature),
         )
 
     def _process_tool_calls(
