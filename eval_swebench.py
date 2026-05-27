@@ -47,7 +47,7 @@ def eval_run(run_dir: Path) -> dict:
 
         # Run real evaluation
         work_dir = Path(f"/tmp/swebench_eval/{run_dir.name}/{case_id}")
-        work_dir.parent.mkdir(parents=True, exist_ok=True)
+        work_dir.mkdir(parents=True, exist_ok=True)
 
         print(f"   Running pytest eval...")
         eval_result = evaluate_patch_light(

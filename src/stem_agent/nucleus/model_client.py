@@ -7,10 +7,21 @@ from typing import Any
 
 from stem_agent.llm.client import LLMCallLogger
 
-try:
-    from openai import OpenAI
-except ImportError:  # pragma: no cover - exercised through runtime error path.
-    OpenAI = None  # type: ignore[assignment]
+# OpenAI client class — resolved lazily so Langfuse env vars are loaded first
+OpenAI = None  # Use _get_openai_client() instead of accessing directly
+
+def _get_openai_client():
+    """Return the OpenAI client class (Langfuse-wrapped if configured)."""
+    global OpenAI
+    if OpenAI is not None:
+        return OpenAI
+    try:
+        from stem_agent.observability.langfuse_tracer import get_openai
+        OpenAI = get_openai()
+    except Exception:
+        from openai import _OpenAI as Fallback
+        OpenAI = Fallback
+    return OpenAI
 
 
 RESPONSES_SCOPE_HINTS = (
@@ -118,10 +129,10 @@ class ModelClient:
         """Execute the tool-calling loop for agent turns."""
         from stem_agent.harness.tool_executor import ToolExecutor
 
-        if OpenAI is None:
+        if _get_openai_client() is None:
             raise RuntimeError("OpenAI mode requires installing stem_agent[openai].")
 
-        client = OpenAI()
+        client = _get_openai_client()()
         tools_map = {t.name: t for t in tools}
         executor = ToolExecutor(client, self.model, tools_map)
         return executor.run(
@@ -163,12 +174,12 @@ class ModelClient:
         system_prompt: str | None,
         temperature: float | None,
     ) -> tuple[str | dict[str, Any], int | None]:
-        if OpenAI is None:
+        if _get_openai_client() is None:
             raise RuntimeError(
                 "OpenAI mode requires installing stem_agent[openai]."
             )
 
-        client = OpenAI()
+        client = _get_openai_client()()
         if self.endpoint == "chat_completions":
             return self._chat_completions_response(
                 client,

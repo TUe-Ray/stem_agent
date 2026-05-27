@@ -12,7 +12,31 @@ def _call_model(input_data: dict[str, Any]) -> dict[str, Any]:
 
 def _read_file(input_data: dict[str, Any]) -> dict[str, Any]:
     path = Path(input_data["path"])
-    return {"text": path.read_text(encoding="utf-8")}
+    offset = input_data.get("offset", 1)
+    limit = input_data.get("limit")
+
+    content = path.read_text(encoding="utf-8")
+    total_lines = content.count("\n") + 1
+    total_chars = len(content)
+
+    if limit is not None:
+        lines = content.split("\n")
+        start = max(0, offset - 1)
+        end = min(len(lines), start + limit)
+        content = "\n".join(lines[start:end])
+        return {
+            "text": content,
+            "total_lines": total_lines,
+            "total_chars": total_chars,
+            "shown_lines": f"{start+1}-{end}",
+        }
+
+    return {
+        "text": content,
+        "total_lines": total_lines,
+        "total_chars": total_chars,
+        "note": "File is large. Use offset/limit to read specific sections." if total_lines > 200 else None,
+    }
 
 
 def _write_file(input_data: dict[str, Any]) -> dict[str, Any]:
@@ -98,12 +122,14 @@ def builtin_tools() -> dict[str, Tool]:
         "call_model": Tool(name="call_model", description="Call the configured model.", run=_call_model),
         "read_file": Tool(
             name="read_file",
-            description="Read a file from the workspace. Returns the file contents as text.",
+            description="Read a file from the workspace. Use offset/limit for large files. Returns content + total_lines + total_chars.",
             run=_read_file,
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Path to the file to read (relative to workspace root)"},
+                    "path": {"type": "string", "description": "Path to the file (relative to workspace root)"},
+                    "offset": {"type": "integer", "description": "Start line number (1-indexed, default: 1)"},
+                    "limit": {"type": "integer", "description": "Max lines to read (omit to read entire file — DANGEROUS for large files)"},
                 },
                 "required": ["path"],
                 "additionalProperties": False,

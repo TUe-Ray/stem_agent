@@ -18,9 +18,15 @@ Reference: OpenAI function calling guide, Anthropic tool use docs, Koog framewor
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
-MAX_TOOL_STEPS = 10  # bounded loop — never while True (prevents pattern prison + cost runaway)
+MAX_TOOL_STEPS = 5  # bounded loop — more steps = more TPM usage with gpt-4o-mini
+MAX_RESULT_CHARS = 4000  # per-tool-result cap — prevents giant read_file outputs from blowing context
+# gpt-4o-mini has 128K context window. 200K TPM is per-minute, not per-request.
+# SWE-bench locator prompts alone are ~15-20K chars (scenario + case_input + instructions).
+# Set high enough to fit prompt + 4 tool results without triggering aggressive prune.
+MAX_CONTEXT_CHARS = 60000
 
 
 class ToolExecutor:
@@ -44,6 +50,10 @@ class ToolExecutor:
         all_tool_calls: list[dict[str, Any]] = []
 
         for step in range(MAX_TOOL_STEPS):
+            # Rate-limit to stay under gpt-4o-mini 200K TPM
+            if step > 0:
+                time.sleep(2.0)
+
             response = self._client.chat.completions.create(
                 model=self._model,
                 messages=messages,
@@ -56,7 +66,6 @@ class ToolExecutor:
             # ── Model returned text (no tool calls) → done ──
             if choice.finish_reason != "tool_calls" and not choice.message.tool_calls:
                 text = choice.message.content or ""
-                # Prepend tool call summary if tools were used
                 if all_tool_calls:
                     summary = self._tool_usage_summary(all_tool_calls)
                     text = summary + "\n\n" + text
@@ -64,35 +73,73 @@ class ToolExecutor:
 
             # ── Model wants to call tools ──
             assistant_msg = choice.message
-            messages.append(assistant_msg)  # assistant message with tool_calls
+            # Build a clean message dict with only the fields OpenAI needs.
+            # model_dump(exclude_none=False) includes bloat (refusal, audio,
+            # function_call as explicit nulls) that wastes tokens and pushes
+            # context over the prune threshold faster.
+            msg: dict[str, Any] = {"role": "assistant", "content": assistant_msg.content}
+            if assistant_msg.tool_calls:
+                msg["tool_calls"] = [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        },
+                    }
+                    for tc in assistant_msg.tool_calls
+                ]
+            messages.append(msg)
 
             for tool_call in (assistant_msg.tool_calls or []):
                 tool_name = tool_call.function.name
                 tool_call_id = tool_call.id
 
-                # Parse arguments (JSON string → dict)
+                # Parse arguments
                 try:
                     args = json.loads(tool_call.function.arguments)
                 except json.JSONDecodeError:
                     args = {}
 
                 # Execute tool
+                started = time.time()
                 result = self._execute_tool(tool_name, args)
+                elapsed = (time.time() - started) * 1000
+                result_str = json.dumps(result, ensure_ascii=False) if isinstance(result, dict) else str(result)
+
+                # ── Langfuse tracing: log tool call ──
+                from stem_agent.observability.langfuse_tracer import log_tool_call as _log_tool
+                _log_tool(
+                    tool_name=tool_name,
+                    args=args,
+                    result_summary=result_str[:200],
+                    success=not str(result).startswith("Error"),
+                    duration_ms=elapsed,
+                )
+
+                # Truncate huge results
+                if len(result_str) > MAX_RESULT_CHARS:
+                    result_str = result_str[:MAX_RESULT_CHARS] + f"\n... [truncated, original: {len(result_str)} chars]"
 
                 all_tool_calls.append({
                     "name": tool_name,
                     "args": args,
-                    "result_summary": str(result)[:200],
+                    "result_summary": result_str[:200],
                     "success": not str(result).startswith("Error"),
                 })
 
-                # Append tool result
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tool_call_id,
-                    "content": json.dumps(result, ensure_ascii=False)
-                    if isinstance(result, dict) else str(result),
+                    "content": result_str,
                 })
+
+            # ── Prune context AFTER all tool results are appended ──
+            # Doing this inside the for loop (per tool result) causes partial
+            # pruning: assistant gets trimmed but remaining tool results are
+            # appended as orphans → OpenAI 400 BadRequestError.
+            messages = self._prune_context(messages)
 
         # ── Max steps reached ──
         # Ask model to summarize what it has so far
@@ -173,3 +220,59 @@ class ToolExecutor:
                 args_preview = args_preview[:77] + "..."
             lines.append(f"  {status} {c['name']}({args_preview})")
         return "\n".join(lines)
+
+    def _prune_context(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Keep messages under MAX_CONTEXT_CHARS while preserving tool call/result pairing.
+
+        The OpenAI API requires every assistant tool_call to have a matching tool
+        result message. Pruning must keep these as atomic units.
+        """
+        total = sum(len(json.dumps(m, ensure_ascii=False)) for m in messages)
+        if total <= MAX_CONTEXT_CHARS:
+            return messages
+
+        # Always keep system message (index 0) and first user message (index 1)
+        keep = messages[:2]
+        remaining = messages[2:]
+
+        # Build paired units: (assistant_with_tool_calls, tool_results...)
+        # If assistant has tool_calls, it must stay with its tool results
+        units = []
+        i = 0
+        while i < len(remaining):
+            msg = remaining[i]
+            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                # Collect assistant + all following tool results
+                unit = [msg]
+                i += 1
+                while i < len(remaining) and remaining[i].get("role") == "tool":
+                    unit.append(remaining[i])
+                    i += 1
+                units.append(unit)
+            else:
+                units.append([msg])
+                i += 1
+
+        # Keep most recent units that fit in budget
+        current_size = sum(len(json.dumps(m, ensure_ascii=False)) for m in keep)
+        kept_units = []
+        for unit in reversed(units):
+            unit_size = sum(len(json.dumps(m, ensure_ascii=False)) for m in unit)
+            if current_size + unit_size <= MAX_CONTEXT_CHARS:
+                kept_units.insert(0, unit)
+                current_size += unit_size
+            else:
+                break
+
+        trimmed = sum(len(u) for u in units) - sum(len(u) for u in kept_units)
+        if trimmed > 0:
+            note = {
+                "role": "system",
+                "content": f"[{trimmed} earlier tool interactions were trimmed to stay within context limits]"
+            }
+            keep.append(note)
+
+        for unit in kept_units:
+            keep.extend(unit)
+
+        return keep
