@@ -95,11 +95,11 @@ class ToolExecutor:
 
             # ── Model wants to call tools ──
             assistant_msg = choice.message
-            # Build a clean message dict with only the fields OpenAI needs.
-            # model_dump(exclude_none=False) includes bloat (refusal, audio,
-            # function_call as explicit nulls) that wastes tokens and pushes
-            # context over the prune threshold faster.
+            # Build a clean message dict with only the fields OpenAI/DeepSeek needs.
+            # DeepSeek V4 Flash requires reasoning_content to be passed back.
             msg: dict[str, Any] = {"role": "assistant", "content": assistant_msg.content}
+            if hasattr(assistant_msg, "reasoning_content") and assistant_msg.reasoning_content:
+                msg["reasoning_content"] = assistant_msg.reasoning_content
             if assistant_msg.tool_calls:
                 msg["tool_calls"] = [
                     {
@@ -363,6 +363,8 @@ class ToolExecutor:
         assistant_msg = choice.message
 
         msg: dict[str, Any] = {"role": "assistant", "content": assistant_msg.content}
+        if hasattr(assistant_msg, "reasoning_content") and assistant_msg.reasoning_content:
+            msg["reasoning_content"] = assistant_msg.reasoning_content
         if assistant_msg.tool_calls:
             msg["tool_calls"] = [
                 {
@@ -430,6 +432,8 @@ class ToolExecutor:
         """Execute tool calls from a model response and append to messages."""
         assistant_msg = choice.message
         msg: dict[str, Any] = {"role": "assistant", "content": assistant_msg.content}
+        if hasattr(assistant_msg, "reasoning_content") and assistant_msg.reasoning_content:
+            msg["reasoning_content"] = assistant_msg.reasoning_content
         if assistant_msg.tool_calls:
             msg["tool_calls"] = [
                 {
