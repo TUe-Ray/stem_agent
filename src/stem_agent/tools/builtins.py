@@ -94,6 +94,34 @@ def _write_patch(input_data: dict[str, Any]) -> dict[str, Any]:
     return {"path": str(patch_path), "size": patch_path.stat().st_size}
 
 
+def _git_diff(input_data: dict[str, Any]) -> dict[str, Any]:
+    """Run git diff HEAD in the workspace to generate an exact patch.
+
+    After modifying source files with write_file, call this to get the
+    precise unified diff (100% guaranteed to apply because git produced it).
+    This bypasses LLM hallucination of line numbers and context lines.
+    """
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["git", "diff", "HEAD"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0:
+            return {
+                "diff": "",
+                "error": f"git diff HEAD failed (exit {result.returncode}): {result.stderr.strip()[:500]}",
+            }
+        diff_text = result.stdout
+        if not diff_text.strip():
+            return {"diff": "", "note": "No changes detected — workspace is clean."}
+        return {"diff": diff_text, "note": f"Generated via git diff HEAD ({len(diff_text)} chars)"}
+    except FileNotFoundError:
+        return {"diff": "", "error": "git is not installed"}
+    except subprocess.TimeoutExpired:
+        return {"diff": "", "error": "git diff timed out"}
+
+
 def _apply_patch_dry_run(input_data: dict[str, Any]) -> dict[str, Any]:
     """Check if a unified diff applies cleanly via patch --dry-run."""
     import subprocess
@@ -199,6 +227,17 @@ def builtin_tools() -> dict[str, Tool]:
                     "patch_text": {"type": "string", "description": "The complete unified diff patch text, starting with '--- a/' or 'diff --git'"},
                 },
                 "required": ["patch_text"],
+                "additionalProperties": False,
+            },
+        ),
+        "git_diff": Tool(
+            name="git_diff",
+            description="Run git diff HEAD to generate an EXACT unified diff from file modifications. Use this AFTER modifying source files with write_file — the diff is 100% guaranteed correct (git generates it, not the LLM).",
+            run=_git_diff,
+            parameters={
+                "type": "object",
+                "properties": {},
+                "required": [],
                 "additionalProperties": False,
             },
         ),
