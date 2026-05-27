@@ -34,3 +34,6 @@ workspace/*
 runs/*
 !runs/.gitkeep
 openai_002_review_bundle.tar.gz
+artifacts/
+sympy/
+sphinx/
