@@ -101,8 +101,12 @@ class ModelClient:
 
         # ── Tool execution loop (Chat Completions mode only) ──
         if tools and self.endpoint == "chat_completions":
+            # gpt-4o-mini needs phased execution to stay on track with tool calls
+            # Patcher and single-agent solver both produce code patches
+            is_patch_role = (role or "").lower() in ("patcher", "solver")
             response = self._call_with_tool_loop(
-                prompt, tools, system_prompt=system_prompt, temperature=temperature
+                prompt, tools, system_prompt=system_prompt, temperature=temperature,
+                phased=is_patch_role,
             )
             self._record_call(role, full_prompt, response)
             return response
@@ -125,6 +129,7 @@ class ModelClient:
         *,
         system_prompt: str | None = None,
         temperature: float | None = None,
+        phased: bool = False,
     ) -> str:
         """Execute the tool-calling loop for agent turns."""
         from stem_agent.harness.tool_executor import ToolExecutor
@@ -139,6 +144,7 @@ class ModelClient:
             system_prompt=system_prompt or "",
             user_prompt=prompt,
             temperature=temperature,
+            phased=phased,
         )
 
     def audit_call(

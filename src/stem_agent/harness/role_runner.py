@@ -26,7 +26,7 @@ class RoleRunner:
         prompt = self._build_role_prompt(role, step, input_payload, harness)
         tools = harness.tool_registry.get(role.allowed_tools)
         temperature = role.temperature if role.temperature is not None else 0.0
-        response = self.model_client.call(prompt, tools=tools, temperature=temperature)
+        response = self.model_client.call(prompt, tools=tools, temperature=temperature, role=role.name)
         return str(response)
 
     def _build_role_prompt(

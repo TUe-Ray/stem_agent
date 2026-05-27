@@ -45,8 +45,26 @@ class ToolExecutor:
         self._model = model
         self._tools_map = tools  # name → stem_agent Tool object
 
-    def run(self, system_prompt: str, user_prompt: str, temperature: float | None = None) -> str:
-        """Execute the tool-calling loop and return the final text response."""
+    def run(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float | None = None,
+        *,
+        phased: bool = False,
+    ) -> str:
+        """Execute the tool-calling loop and return the final text response.
+
+        When phased=True, uses forced multi-phase execution where each critical
+        step (read artifacts, read source, fix, git_diff, write_patch) is a
+        separate forced tool call. gpt-4o-mini needs this to stay on track.
+        """
+        if phased:
+            return self._run_phased(system_prompt, user_prompt, temperature)
+        return self._run_freeform(system_prompt, user_prompt, temperature)
+
+    def _run_freeform(self, system_prompt: str, user_prompt: str, temperature: float | None = None) -> str:
+        """Standard tool loop — model decides which tools to call when."""
         messages = self._build_initial_messages(system_prompt, user_prompt)
         tool_schemas = self._build_tool_schemas()
         all_tool_calls: list[dict[str, Any]] = []
@@ -215,6 +233,240 @@ class ToolExecutor:
             return tool.run(args)
         except Exception as exc:
             return {"error": f"Tool '{name}' failed: {exc}"}
+
+    # ── Phased execution ──────────────────────────────────────────────
+
+    MAX_PHASED_STEPS = 8  # more generous than freeform since phases guide the model
+
+    def _run_phased(self, system_prompt: str, user_prompt: str, temperature: float | None = None) -> str:
+        """Forced multi-phase execution for gpt-4o-mini.
+
+        The model reliably skips critical steps (read_file → write_file → git_diff →
+        write_patch) when given freeform tool access. This method enforces the
+        sequence through a combination of forced tool_choice and guiding messages.
+
+        Phases:
+          1. READ ARTIFACTS — forced read_file on test_failures.txt + test_file_hints.txt
+          2. ANALYZE — auto mode with guiding prompt to read source files
+          3. FIX — auto mode with guiding prompt to apply the fix via write_file
+          4. GIT DIFF — forced git_diff to generate exact patch
+          5. SAVE — forced write_patch to save the patch
+        """
+        messages = self._build_initial_messages(system_prompt, user_prompt)
+        tool_schemas = self._build_tool_schemas()
+        all_tool_calls: list[dict[str, Any]] = []
+
+        temp = temperature if temperature is not None else 0.0
+
+        # ── Phase 1: Read artifacts ──
+        for artifact_path in ["artifacts/test_failures.txt", "artifacts/test_file_hints.txt"]:
+            result = self._force_tool_call(
+                messages, tool_schemas, "read_file",
+                {"path": artifact_path},
+                all_tool_calls, temp,
+            )
+            messages.append({
+                "role": "tool",
+                "tool_call_id": result["tool_call_id"],
+                "content": json.dumps(result["result"]),
+            })
+
+        # ── Phase 2: Analyze source code ──
+        messages.append({
+            "role": "user",
+            "content": (
+                "You've read the test failures and hints. Now read the SOURCE files "
+                "to understand the bug. Use search_code to find relevant files, then "
+                "read_file to read their FULL content. You NEED the exact code to "
+                "produce a correct fix. Read at least one source file completely."
+            ),
+        })
+        for _ in range(3):  # up to 3 auto-mode iterations for reading source
+            response = self._call_llm(messages, tool_schemas, temp)
+            choice = response.choices[0]
+            if choice.finish_reason != "tool_calls" and not choice.message.tool_calls:
+                break  # Model is done analyzing
+            self._process_tool_calls(messages, choice, all_tool_calls)
+            messages = self._prune_context(messages)
+        else:
+            messages.append({
+                "role": "user",
+                "content": "You must now proceed to fixing the code.",
+            })
+
+        # ── Phase 3: Apply fix ──
+        messages.append({
+            "role": "user",
+            "content": (
+                "Now apply your fix. Use write_file to modify the source files. "
+                "Write the ENTIRE file with your fix applied. Then call git_diff() "
+                "to verify the change. You MUST call write_file NOW."
+            ),
+        })
+        for _ in range(3):
+            response = self._call_llm(messages, tool_schemas, temp)
+            choice = response.choices[0]
+            if choice.finish_reason != "tool_calls" and not choice.message.tool_calls:
+                break
+            self._process_tool_calls(messages, choice, all_tool_calls)
+            messages = self._prune_context(messages)
+            # If git_diff was called, move to next phase
+            if any(tc["name"] == "git_diff" for tc in all_tool_calls[-3:]):
+                break
+
+        # ── Phase 4: Git diff ──
+        if not any(tc["name"] == "git_diff" for tc in all_tool_calls):
+            result = self._force_tool_call(
+                messages, tool_schemas, "git_diff", {}, all_tool_calls, temp,
+            )
+            messages.append({
+                "role": "tool",
+                "tool_call_id": result["tool_call_id"],
+                "content": json.dumps(result["result"]),
+            })
+
+        # ── Phase 5: Save patch ──
+        if not any(tc["name"] == "write_patch" for tc in all_tool_calls):
+            result = self._force_tool_call(
+                messages, tool_schemas, "write_patch",
+                {}, all_tool_calls, temp,
+            )
+            messages.append({
+                "role": "tool",
+                "tool_call_id": result["tool_call_id"],
+                "content": json.dumps(result["result"]),
+            })
+
+        # ── Final summary ──
+        summary = self._tool_usage_summary(all_tool_calls)
+        return summary
+
+    def _force_tool_call(
+        self,
+        messages: list[dict[str, Any]],
+        tool_schemas: list[dict[str, Any]],
+        tool_name: str,
+        args: dict[str, Any],
+        all_tool_calls: list[dict[str, Any]],
+        temperature: float,
+    ) -> dict[str, Any]:
+        """Force the model to call a specific tool using tool_choice."""
+        time.sleep(1.5)  # rate limit
+        response = self._client.chat.completions.create(
+            model=self._model,
+            messages=messages,
+            tools=tool_schemas,
+            tool_choice={"type": "function", "function": {"name": tool_name}},
+            temperature=temperature,
+        )
+        choice = response.choices[0]
+        assistant_msg = choice.message
+
+        msg: dict[str, Any] = {"role": "assistant", "content": assistant_msg.content}
+        if assistant_msg.tool_calls:
+            msg["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                }
+                for tc in assistant_msg.tool_calls
+            ]
+
+        # Execute the forced tool
+        tc = assistant_msg.tool_calls[0] if assistant_msg.tool_calls else None
+        if tc:
+            try:
+                parsed_args = json.loads(tc.function.arguments)
+            except json.JSONDecodeError:
+                parsed_args = {}
+            # Merge with provided args (provided args take priority for path etc.)
+            merged_args = {**parsed_args, **args}
+            result = self._execute_tool(tc.function.name, merged_args)
+        else:
+            # Model refused — try with default args
+            result = self._execute_tool(tool_name, args)
+            msg["tool_calls"] = [{
+                "id": "forced_000",
+                "type": "function",
+                "function": {"name": tool_name, "arguments": json.dumps(args)},
+            }]
+
+        all_tool_calls.append({
+            "name": tool_name,
+            "args": args,
+            "result_summary": str(result)[:200],
+            "success": not str(result).startswith("Error"),
+        })
+
+        messages.append(msg)
+        return {
+            "tool_call_id": msg["tool_calls"][0]["id"] if msg.get("tool_calls") else "forced_000",
+            "result": result,
+        }
+
+    def _call_llm(
+        self,
+        messages: list[dict[str, Any]],
+        tool_schemas: list[dict[str, Any]],
+        temperature: float,
+    ):
+        """Make a single LLM call."""
+        time.sleep(1.5)
+        return self._client.chat.completions.create(
+            model=self._model,
+            messages=messages,
+            tools=tool_schemas,
+            tool_choice="auto",
+            temperature=temperature,
+        )
+
+    def _process_tool_calls(
+        self,
+        messages: list[dict[str, Any]],
+        choice: Any,
+        all_tool_calls: list[dict[str, Any]],
+    ) -> None:
+        """Execute tool calls from a model response and append to messages."""
+        assistant_msg = choice.message
+        msg: dict[str, Any] = {"role": "assistant", "content": assistant_msg.content}
+        if assistant_msg.tool_calls:
+            msg["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                }
+                for tc in assistant_msg.tool_calls
+            ]
+        messages.append(msg)
+
+        for tc in (assistant_msg.tool_calls or []):
+            try:
+                args = json.loads(tc.function.arguments)
+            except json.JSONDecodeError:
+                args = {}
+
+            started = time.time()
+            result = self._execute_tool(tc.function.name, args)
+            elapsed = (time.time() - started) * 1000
+
+            result_str = json.dumps(result, ensure_ascii=False) if isinstance(result, dict) else str(result)
+            if len(result_str) > MAX_RESULT_CHARS:
+                result_str = result_str[:MAX_RESULT_CHARS] + f"\n... [truncated, original: {len(result_str)} chars]"
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": result_str,
+            })
+
+            all_tool_calls.append({
+                "name": tc.function.name,
+                "args": args,
+                "result_summary": result_str[:200],
+                "success": not str(result).startswith("Error"),
+            })
 
     def _tool_usage_summary(self, calls: list[dict[str, Any]]) -> str:
         """Generate a compact summary of tool calls made during this turn."""
