@@ -18,7 +18,9 @@ Reference: OpenAI function calling guide, Anthropic tool use docs, Koog framewor
 from __future__ import annotations
 
 import json
+import re
 import time
+from pathlib import Path
 from typing import Any
 
 MAX_TOOL_STEPS = 5  # bounded loop — more steps = more TPM usage with gpt-4o-mini
@@ -69,6 +71,8 @@ class ToolExecutor:
                 if all_tool_calls:
                     summary = self._tool_usage_summary(all_tool_calls)
                     text = summary + "\n\n" + text
+                # Auto-extract diff if model forgot to call write_patch
+                text = self._auto_save_diff(text)
                 return text
 
             # ── Model wants to call tools ──
@@ -157,6 +161,8 @@ class ToolExecutor:
             text = response.choices[0].message.content or ""
             if all_tool_calls:
                 text = self._tool_usage_summary(all_tool_calls) + "\n\n" + text
+            # Auto-extract diff if model forgot to call write_patch
+            text = self._auto_save_diff(text)
             return text
         except Exception:
             return "Error: Tool execution loop exceeded maximum steps and final summary failed."
@@ -220,6 +226,60 @@ class ToolExecutor:
                 args_preview = args_preview[:77] + "..."
             lines.append(f"  {status} {c['name']}({args_preview})")
         return "\n".join(lines)
+
+    @staticmethod
+    def _extract_diff_from_text(text: str) -> str | None:
+        """Extract a unified diff from model text output.
+
+        gpt-4o-mini often outputs diffs as ```diff blocks or raw --- a/ lines
+        instead of calling write_patch. This extracts them so they can be saved.
+
+        Returns the diff text if found, None otherwise.
+        """
+        # Pattern 1: ```diff ... ``` code block
+        m = re.search(r"```diff\s*\n(.*?)```", text, re.DOTALL)
+        if m:
+            return m.group(1).strip()
+
+        # Pattern 2: --- a/... lines (raw diff without markdown fences)
+        m = re.search(r"(?:^|\n)(--- a/.*?\n(?:\+\+\+ b/.*?\n)?@@.*?(?:\n[ +-].*?)*)", text, re.DOTALL)
+        if m:
+            return m.group(1).strip()
+
+        # Pattern 3: diff --git a/... b/... format
+        m = re.search(r"(diff --git a/.*?)(?:\n\n\n|\n```|\Z)", text, re.DOTALL)
+        if m:
+            return m.group(1).strip()
+
+        return None
+
+    def _auto_save_diff(self, text: str) -> str:
+        """Scan text for diff content and auto-save to predicted.patch if found."""
+        diff_text = self._extract_diff_from_text(text)
+        if not diff_text:
+            return text
+
+        # Try to save using write_patch tool
+        wp_tool = self._tools_map.get("write_patch")
+        if wp_tool:
+            try:
+                result = wp_tool.run({"patch_text": diff_text})
+                if not str(result).startswith("Error"):
+                    return text + "\n\n[⚡ Auto-saved diff to artifacts/predicted.patch]"
+            except Exception:
+                pass
+
+        # Fallback: save directly if we know the workspace
+        # (write_patch writes to artifacts/predicted.patch relative to CWD)
+        try:
+            patch_path = Path("artifacts") / "predicted.patch"
+            patch_path.parent.mkdir(parents=True, exist_ok=True)
+            patch_path.write_text(diff_text)
+            return text + "\n\n[⚡ Auto-saved diff to artifacts/predicted.patch]"
+        except Exception:
+            pass
+
+        return text
 
     def _prune_context(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Keep messages under MAX_CONTEXT_CHARS while preserving tool call/result pairing.
