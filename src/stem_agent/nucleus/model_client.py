@@ -101,12 +101,11 @@ class ModelClient:
 
         # ── Tool execution loop (Chat Completions mode only) ──
         if tools and self.endpoint == "chat_completions":
-            # gpt-4o-mini needs phased execution to stay on track with tool calls
-            # Patcher and single-agent solver both produce code patches
-            is_patch_role = (role or "").lower() in ("patcher", "solver")
+            # Phased execution disabled for now — has message ordering issues with DeepSeek
+            phased = False
             response = self._call_with_tool_loop(
                 prompt, tools, system_prompt=system_prompt, temperature=temperature,
-                phased=is_patch_role,
+                phased=phased,
             )
             self._record_call(role, full_prompt, response)
             return response
