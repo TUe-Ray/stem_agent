@@ -36,8 +36,13 @@ class RoleRunner:
         input_payload: dict[str, Any],
         harness: MaterializedHarness,
     ) -> str:
+        # Compact prompt: scenario name + constraints only (not full JSON)
+        scenario_info = f"Task: {harness.scenario.name}\n"
+        constraints = getattr(harness.scenario, "constraints", [])
+        if constraints:
+            scenario_info += "Constraints: " + ", ".join(str(c) for c in constraints) + "\n"
         return (
-            f"Scenario: {harness.scenario.model_dump(mode='json')}\n"
+            f"{scenario_info}"
             f"Role: {role.name}\nInstructions: {role.instructions}\n"
             f"Step: {step.action}\nInput: {input_payload}\n"
         )
