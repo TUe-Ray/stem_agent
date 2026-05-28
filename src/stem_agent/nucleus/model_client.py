@@ -101,7 +101,7 @@ class ModelClient:
 
         # ── Tool execution loop (Chat Completions mode only) ──
         if tools and self.endpoint == "chat_completions":
-            # Phased execution disabled for now — has message ordering issues with DeepSeek
+            # Freeform execution — v4-pro can follow multi-step instructions
             phased = False
             response = self._call_with_tool_loop(
                 prompt, tools, system_prompt=system_prompt, temperature=temperature,

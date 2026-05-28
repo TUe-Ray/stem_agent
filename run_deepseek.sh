@@ -11,7 +11,7 @@ source .env
 set +a
 
 unset OPENAI_API_KEY
-export STEM_AGENT_MODEL=deepseek/deepseek-v4-flash
+export STEM_AGENT_MODEL=deepseek/deepseek-v4-pro
 export STEM_AGENT_LANGFUSE_DISABLED=1
 
 exec stem_agent "$@"

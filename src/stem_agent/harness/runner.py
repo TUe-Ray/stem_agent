@@ -41,6 +41,8 @@ class HarnessRunner:
         trace_sink: Callable[[dict[str, Any]], None] | None = None,
         run_dir: str | Path | None = None,
     ) -> HarnessRunResult:
+        import os as _os
+        _saved_cwd = _os.getcwd()
         memory = MemoryStore(harness.memory_layout)
         outputs: dict[str, str] = {}
         traces: list[dict[str, Any]] = []
@@ -114,6 +116,7 @@ class HarnessRunner:
             if gate_failure:
                 if intra is not None:
                     intra.flush()
+                _os.chdir(_saved_cwd)
                 return HarnessRunResult(
                     case_id=case.id,
                     final_output=self.extract_final(outputs),
@@ -129,6 +132,7 @@ class HarnessRunner:
 
         if intra is not None:
             intra.flush()
+        _os.chdir(_saved_cwd)
         return HarnessRunResult(
             case_id=case.id,
             final_output=self.extract_final(outputs),

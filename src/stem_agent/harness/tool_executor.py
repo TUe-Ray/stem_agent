@@ -48,14 +48,33 @@ class ToolExecutor:
         # support tool_choice and requires reasoning_content passthrough.
         # Disable thinking to get standard tool calling behavior.
         self._extra_body: dict[str, Any] | None = None
+        self._omit_tool_choice: bool = False
         if "deepseek" in model.lower():
-            self._extra_body = {"thinking": {"type": "disabled"}}
+            self._omit_tool_choice = True
+            # v4-pro: enable thinking for better code reasoning
+            # v4-flash: disable thinking (it interferes with tool calling)
+            if "pro" in model.lower():
+                self._extra_body = {"thinking": {"type": "enabled"}}
+            else:
+                self._extra_body = {"thinking": {"type": "disabled"}}
 
-    def _create_kwargs(self, temperature: float) -> dict[str, Any]:
-        """Build common kwargs for chat.completions.create calls."""
+    def _create_kwargs(self, temperature: float, tool_choice: Any = None) -> dict[str, Any]:
+        """Build common kwargs for chat.completions.create calls.
+
+        When tool_choice is provided, it's included in the kwargs ONLY if the
+        model supports it. DeepSeek models reject tool_choice entirely, so
+        it's silently dropped.
+        """
         kwargs: dict[str, Any] = {"temperature": temperature}
         if self._extra_body:
             kwargs["extra_body"] = self._extra_body
+        if tool_choice is not None and not self._omit_tool_choice:
+            # Double-check: if thinking mode is explicitly disabled, the model
+            # might still not support tool_choice (DeepSeek edge case).
+            if self._extra_body and self._extra_body.get("thinking", {}).get("type") == "disabled":
+                pass  # Drop tool_choice — thinking=disabled models may reject it
+            else:
+                kwargs["tool_choice"] = tool_choice
         return kwargs
 
     def run(
@@ -90,9 +109,11 @@ class ToolExecutor:
             response = self._client.chat.completions.create(
                 model=self._model,
                 messages=messages,
-                tools=tool_schemas if step == 0 else tool_schemas,
-                tool_choice="auto" if step == 0 else "auto",
-                **self._create_kwargs(temperature if temperature is not None else 0.0),
+                tools=tool_schemas,
+                **self._create_kwargs(
+                    temperature if temperature is not None else 0.0,
+                    tool_choice="auto",
+                ),
             )
             choice = response.choices[0]
 
@@ -363,15 +384,36 @@ class ToolExecutor:
         all_tool_calls: list[dict[str, Any]],
         temperature: float,
     ) -> dict[str, Any]:
-        """Force the model to call a specific tool using tool_choice."""
+        """Force the model to call a specific tool.
+
+        On models that support tool_choice (OpenAI), uses forced tool_choice.
+        On models that don't (DeepSeek), adds a user message instructing the
+        model to call the tool, then does a standard LLM call.
+        """
         time.sleep(1.5)  # rate limit
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=messages,
-            tools=tool_schemas,
-            tool_choice={"type": "function", "function": {"name": tool_name}},
-            **self._create_kwargs(temperature),
-        )
+
+        if self._omit_tool_choice:
+            # DeepSeek: instruct via message, no tool_choice
+            messages.append({
+                "role": "user",
+                "content": (
+                    f"You MUST now call the tool `{tool_name}`. "
+                    f"Call it with arguments: {json.dumps(args)}. "
+                    "Do not respond with text — make the tool call immediately."
+                ),
+            })
+            response = self._call_llm(messages, tool_schemas, temperature)
+        else:
+            # OpenAI: use tool_choice to force the tool
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=messages,
+                tools=tool_schemas,
+                **self._create_kwargs(
+                    temperature,
+                    tool_choice={"type": "function", "function": {"name": tool_name}},
+                ),
+            )
         choice = response.choices[0]
         assistant_msg = choice.message
 
@@ -432,8 +474,7 @@ class ToolExecutor:
             model=self._model,
             messages=messages,
             tools=tool_schemas,
-            tool_choice="auto",
-            **self._create_kwargs(temperature),
+            **self._create_kwargs(temperature, tool_choice="auto"),
         )
 
     def _process_tool_calls(
