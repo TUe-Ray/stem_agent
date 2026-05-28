@@ -51,12 +51,7 @@ class ToolExecutor:
         self._omit_tool_choice: bool = False
         if "deepseek" in model.lower():
             self._omit_tool_choice = True
-            # v4-pro: enable thinking for better code reasoning
-            # v4-flash: disable thinking (it interferes with tool calling)
-            if "pro" in model.lower():
-                self._extra_body = {"thinking": {"type": "enabled"}}
-            else:
-                self._extra_body = {"thinking": {"type": "disabled"}}
+            self._extra_body = {"thinking": {"type": "disabled"}}
 
     def _create_kwargs(self, temperature: float, tool_choice: Any = None) -> dict[str, Any]:
         """Build common kwargs for chat.completions.create calls.

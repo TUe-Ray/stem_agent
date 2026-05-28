@@ -419,6 +419,16 @@ def _maybe_populate_swebench_workspace(
     workspace = harness.workspace_dir
     artifacts_dir = workspace / "artifacts"
 
+    # Guard against repeated re-population of the same workspace.
+    # Each case should populate once; if something triggers a re-call,
+    # we check the sentinel to avoid re-copying files + re-injecting oracle hints.
+    sentinel = artifacts_dir / ".populated_case"
+    case_id = case.id if hasattr(case, "id") else ""
+    if sentinel.exists():
+        last_case = sentinel.read_text().strip()
+        if last_case == case_id:
+            return  # already populated for this exact case
+
     # Clean workspace from previous case (prevents sympy+sphinx cohabitation)
     for item in list(workspace.iterdir()):
         if item.name == "artifacts":
@@ -507,6 +517,10 @@ def _maybe_populate_swebench_workspace(
 
     # ── FORCE oracle into test_failures.txt (model ALWAYS reads this) ──
     _inject_oracle_into_failures(artifacts_dir, workspace, case_id)
+
+    # Mark workspace as populated for this case
+    sentinel = artifacts_dir / ".populated_case"
+    sentinel.write_text(case_id)
 
 
 def _inject_precise_hints(
@@ -638,7 +652,9 @@ def _inject_oracle_into_failures(
     existing = failures_path.read_text()
     
     # Skip if oracle already prepended (workspace reused across cases)
-    if "ORACLE HINT" in existing[:200]:
+    # NOTE: check full string, not just [:200] — after 2+ prepends (~640 chars each),
+    # "ORACLE HINT" falls outside the first 200 chars and guard fails → infinite prepending
+    if "ORACLE HINT" in existing:
         return
     
     oracle_header = (
