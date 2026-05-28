@@ -46,103 +46,106 @@ class HarnessRunner:
         memory = MemoryStore(harness.memory_layout)
         outputs: dict[str, str] = {}
         traces: list[dict[str, Any]] = []
-        attempts = int(harness.retry_policy.get("max_attempts", 1))
-        attempts = max(attempts, 1)
-        intra = IntraTestAdapter(run_dir) if run_dir is not None else None
-        # ── SWE-bench workspace population: copy cached repo files into harness workspace ──
-        _maybe_populate_swebench_workspace(harness, case)
-        if harness.environment.required_artifacts:
-            self._record_trace(
-                traces,
-                {
-                    "event": "environment_materialized",
-                    "artifacts": list(harness.environment.required_artifacts),
-                },
-                trace_sink,
-            )
-
-        for step in harness.workflow:
-            role = harness.roles[step.role]
-            step_input = self.collect_inputs(case, outputs, step.input_from)
-            result = self.role_runner.run(role, step, step_input, memory, harness)
-            output_key = step.output_key or step.id
-            outputs[output_key] = result
-            outputs[step.id] = result
-            # ── Context Refinement: extract structured info for next step ──
-            refined = self.refiner.refine(step.id, result)
-            if refined and not refined.get("_error"):
-                refined_key = f"_refined_{output_key}"
-                outputs[refined_key] = json.dumps(refined)
-
-            self._record_trace(
-                traces,
-                self._workflow_step_trace(
-                    role=role,
-                    step=step,
-                    step_input=step_input,
-                    output_key=output_key,
-                    output=result,
-                    attempts=attempts,
-                ),
-                trace_sink,
-            )
-            self_eval_trace = self._run_self_evaluation(harness, outputs)
-            if self_eval_trace:
-                self._record_trace(traces, self_eval_trace, trace_sink)
-            gate_traces, gate_failure = self._run_quality_gates(harness, outputs)
-            for trace in gate_traces:
-                self._record_trace(traces, trace, trace_sink)
-            if (
-                gate_failure
-                and intra is not None
-                and intra.active(harness.genome)
-                and gate_traces
-            ):
-                gate_failure = self._retry_with_reflection(
-                    harness=harness,
-                    case=case,
-                    memory=memory,
-                    outputs=outputs,
-                    traces=traces,
-                    trace_sink=trace_sink,
-                    intra=intra,
-                    step=step,
-                    role=role,
-                    step_input=step_input,
-                    output_key=output_key,
-                    original_output=result,
-                    first_gate_trace=gate_traces[-1],
+        try:
+            attempts = int(harness.retry_policy.get("max_attempts", 1))
+            attempts = max(attempts, 1)
+            intra = IntraTestAdapter(run_dir) if run_dir is not None else None
+            # ── SWE-bench workspace population: copy cached repo files into harness workspace ──
+            _maybe_populate_swebench_workspace(harness, case)
+            if harness.environment.required_artifacts:
+                self._record_trace(
+                    traces,
+                    {
+                        "event": "environment_materialized",
+                        "artifacts": list(harness.environment.required_artifacts),
+                    },
+                    trace_sink,
                 )
-            if gate_failure:
-                if intra is not None:
-                    intra.flush()
-                _os.chdir(_saved_cwd)
-                return HarnessRunResult(
-                    case_id=case.id,
-                    final_output=self.extract_final(outputs),
-                    outputs=outputs,
-                    traces=traces,
-                    cost_estimate=self._estimate_cost(traces),
-                    blocked=True,
-                    block_reason=gate_failure,
-                    expected_output=case.expected_output,
-                    reference_notes=case.reference_notes,
-                    case_input=dict(case.input),
+    
+            for step in harness.workflow:
+                role = harness.roles[step.role]
+                step_input = self.collect_inputs(case, outputs, step.input_from)
+                result = self.role_runner.run(role, step, step_input, memory, harness)
+                output_key = step.output_key or step.id
+                outputs[output_key] = result
+                outputs[step.id] = result
+                # ── Context Refinement: extract structured info for next step ──
+                refined = self.refiner.refine(step.id, result)
+                if refined and not refined.get("_error"):
+                    refined_key = f"_refined_{output_key}"
+                    outputs[refined_key] = json.dumps(refined)
+    
+                self._record_trace(
+                    traces,
+                    self._workflow_step_trace(
+                        role=role,
+                        step=step,
+                        step_input=step_input,
+                        output_key=output_key,
+                        output=result,
+                        attempts=attempts,
+                    ),
+                    trace_sink,
                 )
-
-        if intra is not None:
-            intra.flush()
-        _os.chdir(_saved_cwd)
-        return HarnessRunResult(
-            case_id=case.id,
-            final_output=self.extract_final(outputs),
-            outputs=outputs,
-            traces=traces,
-            cost_estimate=self._estimate_cost(traces),
-            expected_output=case.expected_output,
-            reference_notes=case.reference_notes,
-            case_input=dict(case.input),
-        )
+                self_eval_trace = self._run_self_evaluation(harness, outputs)
+                if self_eval_trace:
+                    self._record_trace(traces, self_eval_trace, trace_sink)
+                gate_traces, gate_failure = self._run_quality_gates(harness, outputs)
+                for trace in gate_traces:
+                    self._record_trace(traces, trace, trace_sink)
+                if (
+                    gate_failure
+                    and intra is not None
+                    and intra.active(harness.genome)
+                    and gate_traces
+                ):
+                    gate_failure = self._retry_with_reflection(
+                        harness=harness,
+                        case=case,
+                        memory=memory,
+                        outputs=outputs,
+                        traces=traces,
+                        trace_sink=trace_sink,
+                        intra=intra,
+                        step=step,
+                        role=role,
+                        step_input=step_input,
+                        output_key=output_key,
+                        original_output=result,
+                        first_gate_trace=gate_traces[-1],
+                    )
+                if gate_failure:
+                    if intra is not None:
+                        intra.flush()
+                    _os.chdir(_saved_cwd)
+                    return HarnessRunResult(
+                        case_id=case.id,
+                        final_output=self.extract_final(outputs),
+                        outputs=outputs,
+                        traces=traces,
+                        cost_estimate=self._estimate_cost(traces),
+                        blocked=True,
+                        block_reason=gate_failure,
+                        expected_output=case.expected_output,
+                        reference_notes=case.reference_notes,
+                        case_input=dict(case.input),
+                    )
+    
+            if intra is not None:
+                intra.flush()
+            _os.chdir(_saved_cwd)
+            return HarnessRunResult(
+                case_id=case.id,
+                final_output=self.extract_final(outputs),
+                outputs=outputs,
+                traces=traces,
+                cost_estimate=self._estimate_cost(traces),
+                expected_output=case.expected_output,
+                reference_notes=case.reference_notes,
+                case_input=dict(case.input),
+            )
+        finally:
+            _os.chdir(_saved_cwd)
 
     def collect_inputs(
         self, case: TaskCase, outputs: dict[str, str], input_from: list[str]
