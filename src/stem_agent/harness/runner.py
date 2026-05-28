@@ -431,6 +431,14 @@ def _maybe_populate_swebench_workspace(
         last_case = sentinel.read_text().strip()
         if last_case == case_id:
             return  # already populated for this exact case
+        # Case changed — clean artifact files to prevent cross-case oracle hint contamination
+        # test_file_hints.txt accumulates APPENDED hints from all previous cases;
+        # test_failures.txt accumulates PREPENDED oracle headers from all previous cases.
+        # Without cleanup, case 5 sees hints for all 5 bugs and gets confused.
+        if artifacts_dir.exists():
+            for artifact_file in list(artifacts_dir.iterdir()):
+                if artifact_file.is_file():
+                    artifact_file.unlink(missing_ok=True)
 
     # Clean workspace from previous case (prevents sympy+sphinx cohabitation)
     for item in list(workspace.iterdir()):
