@@ -12,6 +12,6 @@ set +a
 
 unset OPENAI_API_KEY
 export STEM_AGENT_MODEL=deepseek/deepseek-v4-pro
-export STEM_AGENT_LANGFUSE_DISABLED=1
+export STEM_AGENT_LANGFUSE_DISABLED=0
 
 exec stem_agent "$@"
