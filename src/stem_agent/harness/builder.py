@@ -32,7 +32,7 @@ class HarnessBuilder:
         *,
         workspace_dir: str | Path,
     ) -> MaterializedHarness:
-        workspace = Path(workspace_dir)
+        workspace = Path(workspace_dir).resolve()
         workspace.mkdir(parents=True, exist_ok=True)
         self._materialize_environment(genome.environment, workspace)
         return MaterializedHarness(
