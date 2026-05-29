@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-MAX_TOOL_STEPS = 5  # bounded loop — more steps = more TPM usage with gpt-4o-mini
+MAX_TOOL_STEPS = 12  # bounded loop — increased for deepseek-v4-pro (was 8); case 24102 needs 12+ to locate+read+patch
 MAX_RESULT_CHARS = 4000  # per-tool-result cap — prevents giant read_file outputs from blowing context
 # gpt-4o-mini has 128K context window. 200K TPM is per-minute, not per-request.
 # SWE-bench locator prompts alone are ~15-20K chars (scenario + case_input + instructions).

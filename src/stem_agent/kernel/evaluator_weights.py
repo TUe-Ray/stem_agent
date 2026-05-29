@@ -14,8 +14,8 @@ class EvaluatorWeights(BaseModel):
     artifact_presence: float = 0.08
     self_review_usage: float = 0.14
     workflow_completion: float = 0.08
-    quality_gate_usage: float = 0.10
-    generated_tool_usage: float = 0.04
+    quality_gate_usage: float = 0.04
+    generated_tool_usage: float = 0.15
     # STEM process metrics
     diagnosis_quality: float = 0.08
     architecture_fit: float = 0.08

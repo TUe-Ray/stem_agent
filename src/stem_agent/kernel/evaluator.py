@@ -866,10 +866,34 @@ class GuardianFitnessEvaluator:
         return passed / len(gate_traces)
 
     def _generated_tool_usage(self, run: HarnessRunResult) -> float:
+        """Score based on how many times generated tools are actually used.
+
+        Previously was binary (1.0 if ANY quality gate used a generated tool).
+        Now rewards repeated, diverse usage — incentivizes the Nucleus to create
+        tools that integrate deeply into the workflow, not just one-off checkers.
+        """
+        usage_count = 0
+        tool_names: set[str] = set()
+
         for trace in run.traces:
+            # Quality gate traces with generated tools
             if trace.get("event") == "quality_gate" and trace.get("generated_tool"):
-                return 1.0
-        return 0.0
+                usage_count += 1
+                tool_names.add(str(trace["generated_tool"]))
+            # Workflow step traces may also use generated tools
+            if trace.get("event") == "workflow_step" and trace.get("generated_tool"):
+                usage_count += 1
+                tool_names.add(str(trace["generated_tool"]))
+
+        if usage_count == 0:
+            return 0.0
+
+        # Score: base 0.5 for having any generated tool, +0.3 for multiple uses, +0.2 for diversity
+        base = 0.5  # at least one generated tool was used
+        usage_bonus = min(0.3, usage_count * 0.1)  # up to 0.3 for 3+ uses
+        diversity_bonus = 0.2 if len(tool_names) >= 2 else 0.0  # 0.2 for 2+ different tools
+
+        return min(1.0, base + usage_bonus + diversity_bonus)
 
     @staticmethod
     def _extract_diff(output: str) -> str:

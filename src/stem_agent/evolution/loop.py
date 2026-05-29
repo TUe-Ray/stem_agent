@@ -130,15 +130,10 @@ class EvolutionLoop:
             mutation_planner=MutationPlanner(model_client),
         )
         self.harness_runner = harness_runner or default_harness_runner
-        # Failure diagnoser: cheap LLM (gpt-4o-mini) for per-case failure reasons
+        # Failure diagnoser: reuse existing model_client (DeepSeek v4-pro) for per-case failure reasons
+        # ★ FIXED 2026-05-28: Was hardcoding gpt-4o-mini, which DeepSeek API rejects
         self.failure_diagnoser = FailureDiagnoser(enabled=True)
-        self.failure_diagnoser.configure(
-            ModelClient(
-                model="gpt-4o-mini",
-                test_mode=self.settings.test_mode,
-                endpoint=self.settings.openai_endpoint,
-            )
-        )
+        self.failure_diagnoser.configure(model_client)
         # Evaluator strategy: set STEM_AGENT_EVALUATOR=llm_judge to use LLM judge
         _eval_strategy = None
         if os.environ.get("STEM_AGENT_EVALUATOR") == "llm_judge":
