@@ -191,16 +191,13 @@ class GuardianFitnessEvaluator:
         requirement_coverage, failures = self._requirement_coverage(
             scenario.expected_output.requirements, output
         )
+        # ── NEW: task_completion — the primary metric ──
+        task_completion = self._task_completion(scenario, run, output)
         scenario_success = self._scenario_success(scenario, output)
         format_validity = self._format_validity(output)
         constraint_adherence = self._constraint_adherence(scenario, output)
         actionability = self._actionability(output)
-        input_specificity = self._input_specificity(run, output)
-        reference_alignment = self._reference_notes_alignment(run, output)
-        artifact_presence = self._artifact_presence(run)
-        self_review_usage = self._self_review_usage(run, output)
         workflow_completion = self._workflow_completion(genome, run)
-        quality_gate_usage = self._quality_gate_usage(run)
         generated_tool_usage = self._generated_tool_usage(run)
         cost_penalty = min(run.cost_estimate / 5.0, 1.0)
         stem_components = self._stem_process_components(
@@ -212,16 +209,11 @@ class GuardianFitnessEvaluator:
 
         w = self.weights
         output_components = {
-            "requirement_coverage": requirement_coverage,
+            "task_completion": task_completion,
             "format_validity": format_validity,
             "constraint_adherence": constraint_adherence,
             "actionability": actionability,
-            "input_specificity": input_specificity,
-            "reference_alignment": reference_alignment,
-            "artifact_presence": artifact_presence,
-            "self_review_usage": self_review_usage,
             "workflow_completion": workflow_completion,
-            "quality_gate_usage": quality_gate_usage,
             "generated_tool_usage": generated_tool_usage,
         }
         score_components = {**output_components, **stem_components}
@@ -248,15 +240,11 @@ class GuardianFitnessEvaluator:
             "task_performance": task_performance,
             "requirement_coverage": requirement_coverage,
             "scenario_success": scenario_success,
+            "task_completion": task_completion,
             "format_validity": format_validity,
             "constraint_adherence": constraint_adherence,
             "actionability": actionability,
-            "input_specificity": input_specificity,
-            "reference_alignment": reference_alignment,
-            "artifact_presence": artifact_presence,
-            "self_review_usage": self_review_usage,
             "workflow_completion": workflow_completion,
-            "quality_gate_usage": quality_gate_usage,
             "generated_tool_usage": generated_tool_usage,
             "cost_penalty": cost_penalty,
             "complexity_penalty": complexity_penalty,
@@ -312,6 +300,7 @@ class GuardianFitnessEvaluator:
             - self.weights.complexity_penalty * complexity_penalty
         )
         metrics["task_performance"] = self._clamp(weighted_score)
+        metrics["task_completion"] = self._clamp(weighted_score)  # same as task_perf for criteria path
         metrics.update(stem_components)
         metrics["cost_penalty"] = cost_penalty
         metrics["complexity_penalty"] = complexity_penalty
@@ -605,6 +594,38 @@ class GuardianFitnessEvaluator:
         if "risk" in constraints and "risk" not in output.lower():
             score -= 0.15
         return self._clamp(score)
+
+    def _task_completion(
+        self, scenario: Scenario, run: HarnessRunResult, output: str
+    ) -> float:
+        """Primary metric: did the agent actually solve the problem?
+
+        For scenarios with success_criteria: delegates to scenario-specific evaluation.
+        For scenarios without: falls back to requirement_coverage + actionability.
+        """
+        if scenario.success_criteria:
+            total_weight = sum(max(float(c.weight), 0.0) for c in scenario.success_criteria) or 1.0
+            score = 0.0
+            for criterion in scenario.success_criteria:
+                weight = max(float(criterion.weight), 0.0) / total_weight
+                method = getattr(criterion, "method", None) or ""
+                if method == "exact_match":
+                    expected = str(run.expected_output or "")
+                    score += weight * (1.0 if output.strip() == expected.strip() else 0.0)
+                elif method == "llm_judge":
+                    score += weight * self._llm_rubric_score(scenario, run, output)
+                elif method == "section_check":
+                    reqs = [getattr(criterion, "pattern", None)] if hasattr(criterion, "pattern") else scenario.expected_output.requirements
+                    cov, _ = self._requirement_coverage(reqs, output)
+                    score += weight * cov
+                else:
+                    cov, _ = self._requirement_coverage(scenario.expected_output.requirements, output)
+                    score += weight * cov
+            return self._clamp(score)
+
+        req_cov, _ = self._requirement_coverage(scenario.expected_output.requirements, output)
+        action = self._actionability(output)
+        return self._clamp(0.6 * req_cov + 0.4 * action)
 
     def _actionability(self, output: str) -> float:
         lower = output.lower()

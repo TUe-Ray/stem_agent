@@ -4,47 +4,60 @@ from pydantic import BaseModel
 
 
 class EvaluatorWeights(BaseModel):
-    # Output quality metrics (used by heuristic evaluator)
-    requirement_coverage: float = 0.20
-    format_validity: float = 0.08
-    constraint_adherence: float = 0.10
-    actionability: float = 0.16
-    input_specificity: float = 0.14
-    reference_alignment: float = 0.04
-    artifact_presence: float = 0.08
-    self_review_usage: float = 0.14
-    workflow_completion: float = 0.08
-    quality_gate_usage: float = 0.04
-    generated_tool_usage: float = 0.15
-    # STEM process metrics
-    diagnosis_quality: float = 0.08
-    architecture_fit: float = 0.08
-    safeguard_effectiveness: float = 0.06
-    minimality_score: float = 0.04
-    # Aggregate weights (used by LLM judge / external strategies)
+    """Weights for the stem_agent evaluator.
+
+    Design principles:
+    - task_completion dominates (50%) — measured by scenario-specific criteria
+    - process metrics are secondary (26%) — how the agent worked
+    - innovation rewards useful mutations (12%) — generated tools, safeguards
+    - penalties discourage bloat (12%) — cost, complexity
+
+    No more regex keyword-spotting for core scores.
+    """
+
+    # ── Task Outcome (62%) — what actually matters ──
+    task_completion: float = 0.50       # Did the agent solve the problem?
+    constraint_adherence: float = 0.08  # Did it follow the rules?
+    format_validity: float = 0.04       # Is the output well-formed?
+
+    # ── Process Quality (26%) — how the agent worked ──
+    workflow_completion: float = 0.08   # Did it complete all steps?
+    diagnosis_quality: float = 0.06     # Did it understand the problem?
+    architecture_fit: float = 0.06      # Is the genome well-structured?
+    actionability: float = 0.06         # Is the output directly usable?
+
+    # ── Innovation (12%) — evolution-specific ──
+    generated_tool_usage: float = 0.08  # Did generated tools actually help?
+    safeguard_effectiveness: float = 0.04  # Do quality gates catch errors?
+
+    # ── Penalties ──
+    cost_penalty: float = 0.05          # Token cost
+    complexity_penalty: float = 0.07    # Genome bloat
+
+    # ── Aggregate (used by LLM judge strategies) ──
     output_quality: float = 0.65
-    stem_process_quality: float = 0.15
-    # Penalties
-    cost_penalty: float = 0.03
-    complexity_penalty: float = 0.05
+    stem_process_quality: float = 0.20
+
+    # ── Deprecated / zeroed out (kept for backward compat) ──
+    requirement_coverage: float = 0.0   # → replaced by task_completion
+    input_specificity: float = 0.0      # → text-matching, not a real signal
+    reference_alignment: float = 0.0    # → text-matching, not a real signal
+    artifact_presence: float = 0.0      # → binary, not useful
+    self_review_usage: float = 0.0      # → keyword-spotting spam magnet
+    quality_gate_usage: float = 0.0     # → folded into safeguard_effectiveness
+    minimality_score: float = 0.0       # → folded into complexity_penalty
 
     def metric_weights(self) -> dict[str, float]:
         return {
-            "requirement_coverage": self.requirement_coverage,
-            "format_validity": self.format_validity,
+            "task_completion": self.task_completion,
             "constraint_adherence": self.constraint_adherence,
-            "actionability": self.actionability,
-            "input_specificity": self.input_specificity,
-            "reference_alignment": self.reference_alignment,
-            "artifact_presence": self.artifact_presence,
-            "self_review_usage": self.self_review_usage,
+            "format_validity": self.format_validity,
             "workflow_completion": self.workflow_completion,
-            "quality_gate_usage": self.quality_gate_usage,
-            "generated_tool_usage": self.generated_tool_usage,
             "diagnosis_quality": self.diagnosis_quality,
             "architecture_fit": self.architecture_fit,
+            "actionability": self.actionability,
+            "generated_tool_usage": self.generated_tool_usage,
             "safeguard_effectiveness": self.safeguard_effectiveness,
-            "minimality_score": self.minimality_score,
         }
 
     def normalized(self) -> "EvaluatorWeights":
